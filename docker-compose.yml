@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  grafana:
+    container_name: visual-eyes-grafana
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=visual_eyes
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    network_mode: host
+
+volumes:
+  grafana-storage:
+
+networks:
+  visual-eyes-network:
+    driver: bridge 

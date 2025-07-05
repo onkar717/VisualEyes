@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: visual-eyes-k8s-agent
+  namespace: kube-system
+  labels:
+    app: visual-eyes-k8s-agent
+spec:
+  selector:
+    matchLabels:
+      app: visual-eyes-k8s-agent
+  template:
+    metadata:
+      labels:
+        app: visual-eyes-k8s-agent
+    spec:
+      serviceAccountName: visual-eyes-agent
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: visual-eyes-k8s
+        image: onkar4545/visual-eyes:latest
+        imagePullPolicy: Always
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: VISUAL_EYES_CONFIG
+          value: "/etc/visual-eyes/config-k8s.yaml"
+        - name: VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT
+          value: "http://192.168.24.203:8080/api/kubernetes-metrics"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/visual-eyes
+        - name: kubelet-ssl
+          mountPath: /var/lib/kubelet
+          readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: visual-eyes-k8s-config
+      - name: kubelet-ssl
+        hostPath:
+          path: /var/lib/kubelet 

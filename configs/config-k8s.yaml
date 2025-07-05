@@ -1,0 +1,22 @@
+# VisualEyes Kubernetes Agent Configuration
+
+agent:
+  name: "visual-eyes-k8s-agent"
+  interval: "15s"
+  verbose: true
+  collection_interval: 10
+  disable_host_metrics: true
+  disable_kube_metrics: false
+  collectors:
+    kubernetes: true
+
+output:
+  console:
+    enabled: true
+    format: "json"
+  file:
+    enabled: false
+    path: /var/log/visual-eyes-k8s.log
+  remote:
+    enabled: true
+    endpoint: "http://192.168.24.203:8080/api/kubernetes-metrics" 

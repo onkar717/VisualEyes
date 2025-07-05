@@ -1,0 +1,97 @@
+import axios from 'axios';
+import type { Metric } from '../types/metrics';
+
+const API_BASE_URL = 'http://localhost:8080/api';
+
+interface MetricsResponse {
+  timestamp: string;
+  metrics: {
+    cpu: Record<string, MetricData>;
+    memory: Record<string, MetricData>;
+    disk: Record<string, MetricData>;
+    network: Record<string, MetricData>;
+    load: Record<string, MetricData>;
+  };
+}
+
+interface KubernetesMetricsResponse {
+  timestamp: string;
+  metrics: {
+    nodes: {
+      total: number;
+      ready: number;
+    };
+    pods: {
+      total: number;
+      running: number;
+    };
+    resources: {
+      cpu: {
+        usage: number;
+        total: number;
+      };
+      memory: {
+        usage: number;
+        total: number;
+      };
+    };
+    podResources: {
+      cpu: {
+        usage: number;
+        total: number;
+      };
+      memory: {
+        usage: number;
+        total: number;
+      };
+    };
+    history: {
+      nodeCpu: MetricSeries;
+      nodeMemory: MetricSeries;
+    };
+  };
+}
+
+interface MetricData {
+  value: number;
+  unit?: string;
+  tags?: Record<string, string>;
+  timestamp: string;
+}
+
+interface MetricSeries {
+  name: string;
+  data: Array<{
+    timestamp: string;
+    value: number;
+  }>;
+}
+
+const getMetrics = async (): Promise<Metric[]> => {
+  const response = await axios.get<MetricsResponse>(`${API_BASE_URL}/metrics/snapshot`);
+  const metrics: Metric[] = [];
+
+  Object.entries(response.data.metrics).forEach(([category, categoryMetrics]) => {
+    Object.entries(categoryMetrics).forEach(([name, data]) => {
+      metrics.push({
+        name: `${category}.${name}`,
+        value: data.value,
+        timestamp: data.timestamp,
+        unit: data.unit,
+        tags: data.tags
+      });
+    });
+  });
+
+  return metrics;
+};
+
+const getKubernetesMetrics = async (): Promise<KubernetesMetricsResponse['metrics']> => {
+  const response = await axios.get<KubernetesMetricsResponse>(`${API_BASE_URL}/kubernetes/metrics`);
+  return response.data.metrics;
+};
+
+export const api = {
+  getMetricsSnapshot: getMetrics,
+  getKubernetesMetrics
+}; 
