@@ -37,12 +37,6 @@ run-agent-host:
 	VISUAL_EYES_AGENT_DISABLE_HOST_METRICS=false \
 	./bin/$(BINARY_NAME_AGENT)
 
-# Run agent with k8s metrics only
-run-agent-k8s:
-	VISUAL_EYES_AGENT_DISABLE_KUBE_METRICS=false \
-	VISUAL_EYES_AGENT_DISABLE_HOST_METRICS=true \
-	./bin/$(BINARY_NAME_AGENT)
-
 # Run server
 run-server:
 	./bin/$(BINARY_NAME_SERVER)
@@ -79,7 +73,6 @@ help:
 	@echo "  build-server - Build server binary"
 	@echo "  run-agent    - Run agent locally (default config)"
 	@echo "  run-agent-host - Run agent with host metrics only"
-	@echo "  run-agent-k8s  - Run agent with k8s metrics only"
 	@echo "  run-server   - Run server locally"
 	@echo "  test         - Run tests"
 	@echo "  clean        - Clean build artifacts"

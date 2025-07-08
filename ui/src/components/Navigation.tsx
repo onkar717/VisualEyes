@@ -1,6 +1,22 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import { Computer, Storage } from '@mui/icons-material';
+import { 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Box, 
+  ToggleButtonGroup, 
+  ToggleButton, 
+  Badge,
+  IconButton,
+  Tooltip,
+} from '@mui/material';
+import { 
+  Computer, 
+  Storage,
+  LightMode,
+  DarkMode,
+} from '@mui/icons-material';
+import { useTheme } from '../theme/ThemeContext';
 
 interface NavigationProps {
   view: 'system' | 'kubernetes';
@@ -8,6 +24,8 @@ interface NavigationProps {
 }
 
 export const Navigation: React.FC<NavigationProps> = ({ view, onViewChange }) => {
+  const { isDarkMode, toggleTheme } = useTheme();
+
   const handleChange = (
     _event: React.MouseEvent<HTMLElement>,
     newView: 'system' | 'kubernetes' | null
@@ -18,30 +36,60 @@ export const Navigation: React.FC<NavigationProps> = ({ view, onViewChange }) =>
   };
 
   return (
-    <AppBar position="static" sx={{ backgroundColor: '#1a1a2e', boxShadow: 'none', borderBottom: '1px solid #2a2a3e' }}>
+    <AppBar 
+      position="fixed" 
+      sx={{ 
+        backgroundColor: isDarkMode ? '#1a1a2e' : '#ffffff',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        backdropFilter: 'blur(10px)',
+        background: isDarkMode 
+          ? 'linear-gradient(180deg, rgba(26,26,46,0.95) 0%, rgba(26,26,46,0.9) 100%)'
+          : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+      }}
+    >
       <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: '#fff' }}>
+        <Typography 
+          variant="h6" 
+          component="div" 
+          sx={{ 
+            flexGrow: 1, 
+            fontWeight: 600,
+            letterSpacing: '0.5px',
+            color: isDarkMode ? '#fff' : '#2c3e50',
+          }}
+        >
           VisualEyes Dashboard
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <ToggleButtonGroup
             value={view}
             exclusive
             onChange={handleChange}
             aria-label="view selector"
             sx={{
-              backgroundColor: '#2a2a3e',
+              backgroundColor: isDarkMode ? 'rgba(42, 42, 62, 0.5)' : 'rgba(245, 245, 245, 0.5)',
+              padding: '4px',
+              borderRadius: '12px',
+              border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(8px)',
               '& .MuiToggleButton-root': {
-                color: '#fff',
+                color: isDarkMode ? '#fff' : '#2c3e50',
+                padding: '8px 24px',
+                borderRadius: '8px',
+                transition: 'all 0.3s ease',
+                border: 'none',
+                margin: '0 4px',
                 '&.Mui-selected': {
                   backgroundColor: '#3f51b5',
                   color: '#fff',
+                  boxShadow: '0 4px 12px rgba(63, 81, 181, 0.3)',
                   '&:hover': {
-                    backgroundColor: '#3f51b5',
+                    backgroundColor: '#3949ab',
                   },
                 },
                 '&:hover': {
-                  backgroundColor: '#3a3a4e',
+                  backgroundColor: isDarkMode ? 'rgba(63, 81, 181, 0.1)' : 'rgba(63, 81, 181, 0.05)',
+                  transform: 'translateY(-1px)',
                 },
               },
             }}
@@ -49,12 +97,54 @@ export const Navigation: React.FC<NavigationProps> = ({ view, onViewChange }) =>
             <ToggleButton value="system" aria-label="system metrics">
               <Computer sx={{ mr: 1 }} />
               System
+              <Badge
+                badgeContent="16"
+                color="primary"
+                sx={{
+                  ml: 1,
+                  '& .MuiBadge-badge': {
+                    backgroundColor: '#4caf50',
+                    color: '#fff',
+                    boxShadow: '0 2px 6px rgba(76, 175, 80, 0.3)',
+                  },
+                }}
+              />
             </ToggleButton>
             <ToggleButton value="kubernetes" aria-label="kubernetes metrics">
               <Storage sx={{ mr: 1 }} />
               Kubernetes
+              <Badge
+                badgeContent="63"
+                color="primary"
+                sx={{
+                  ml: 1,
+                  '& .MuiBadge-badge': {
+                    backgroundColor: '#ff4081',
+                    color: '#fff',
+                    boxShadow: '0 2px 6px rgba(255, 64, 129, 0.3)',
+                  },
+                }}
+              />
             </ToggleButton>
           </ToggleButtonGroup>
+          <Tooltip title={`Switch to ${isDarkMode ? 'Light' : 'Dark'} Mode`}>
+            <IconButton 
+              onClick={toggleTheme}
+              sx={{ 
+                color: isDarkMode ? '#fff' : '#2c3e50',
+                backgroundColor: isDarkMode ? 'rgba(42, 42, 62, 0.5)' : 'rgba(245, 245, 245, 0.5)',
+                borderRadius: '12px',
+                padding: '8px',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: isDarkMode ? 'rgba(63, 81, 181, 0.1)' : 'rgba(63, 81, 181, 0.05)',
+                  transform: 'translateY(-1px)',
+                },
+              }}
+            >
+              {isDarkMode ? <LightMode /> : <DarkMode />}
+            </IconButton>
+          </Tooltip>
         </Box>
       </Toolbar>
     </AppBar>

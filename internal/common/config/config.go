@@ -37,30 +37,12 @@ type CollectorConfig struct {
 // TelemetryConfig holds all telemetry configuration
 type TelemetryConfig struct {
 	Metrics MetricsConfig `mapstructure:"metrics"`
-	Logs    LogsConfig    `mapstructure:"logs"`
-	Traces  TracesConfig  `mapstructure:"traces"`
 }
 
 // MetricsConfig holds metrics-specific configuration
 type MetricsConfig struct {
 	Enabled    bool          `mapstructure:"enabled"`
 	Collectors []string      `mapstructure:"collectors"`
-	Interval   time.Duration `mapstructure:"interval"`
-}
-
-// LogsConfig holds logs-specific configuration
-type LogsConfig struct {
-	Enabled    bool          `mapstructure:"enabled"`
-	Collectors []string      `mapstructure:"collectors"`
-	Paths      []string      `mapstructure:"paths"`
-	Interval   time.Duration `mapstructure:"interval"`
-}
-
-// TracesConfig holds tracing-specific configuration
-type TracesConfig struct {
-	Enabled    bool          `mapstructure:"enabled"`
-	Collectors []string      `mapstructure:"collectors"`
-	Endpoint   string        `mapstructure:"endpoint"`
 	Interval   time.Duration `mapstructure:"interval"`
 }
 
@@ -85,9 +67,8 @@ type FileOutput struct {
 
 // RemoteOutput configures remote output
 type RemoteOutput struct {
-	Enabled  bool              `mapstructure:"enabled"`
-	Endpoint string            `mapstructure:"endpoint"`
-	Headers  map[string]string `mapstructure:"headers"`
+	Enabled  bool   `mapstructure:"enabled"`
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 // Load reads the configuration file and environment variables
@@ -156,18 +137,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("telemetry.metrics.enabled", true)
 	v.SetDefault("telemetry.metrics.collectors", []string{"cpu", "memory", "disk", "network", "load"})
 	v.SetDefault("telemetry.metrics.interval", "15s")
-
-	// Logs defaults
-	v.SetDefault("telemetry.logs.enabled", false)
-	v.SetDefault("telemetry.logs.collectors", []string{"syslog"})
-	v.SetDefault("telemetry.logs.paths", []string{"/var/log/*.log"})
-	v.SetDefault("telemetry.logs.interval", "5s")
-
-	// Traces defaults
-	v.SetDefault("telemetry.traces.enabled", false)
-	v.SetDefault("telemetry.traces.collectors", []string{"opentelemetry"})
-	v.SetDefault("telemetry.traces.endpoint", "localhost:4317")
-	v.SetDefault("telemetry.traces.interval", "1s")
 
 	// Output defaults
 	v.SetDefault("output.console.enabled", true)

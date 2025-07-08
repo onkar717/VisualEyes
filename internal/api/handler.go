@@ -41,8 +41,8 @@ func NewHandler(systemStore, kubernetesStore storage.MetricStore) (*Handler, err
 	}, nil
 }
 
-// PostMetrics handles POST requests to store system metrics
-func (h *Handler) PostSystemMetrics(w http.ResponseWriter, r *http.Request) {
+// handleMetricsPost handles common POST request logic for metrics
+func (h *Handler) handleMetricsPost(w http.ResponseWriter, r *http.Request, store storage.MetricStore, metricType string) {
 	enableCORS(w)
 	if r.Method == "OPTIONS" {
 		return
@@ -60,7 +60,7 @@ func (h *Handler) PostSystemMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Received %d system metrics", len(metrics))
+	log.Printf("Received %d %s metrics", len(metrics), metricType)
 
 	// Validate and enrich metrics
 	for i := range metrics {
@@ -78,67 +78,27 @@ func (h *Handler) PostSystemMetrics(w http.ResponseWriter, r *http.Request) {
 			metrics[i].Tags = make(map[string]string)
 		}
 		metrics[i].Tags["hostname"] = h.hostname
-		metrics[i].Tags["type"] = "system"
+		metrics[i].Tags["type"] = metricType
 	}
 
-	if err := h.systemStore.StoreMetrics(metrics); err != nil {
-		log.Printf("Error storing system metrics: %v", err)
+	if err := store.StoreMetrics(metrics); err != nil {
+		log.Printf("Error storing %s metrics: %v", metricType, err)
 		http.Error(w, "Failed to store metrics", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully stored %d system metrics", len(metrics))
+	log.Printf("Successfully stored %d %s metrics", len(metrics), metricType)
 	w.WriteHeader(http.StatusCreated)
+}
+
+// PostSystemMetrics handles POST requests to store system metrics
+func (h *Handler) PostSystemMetrics(w http.ResponseWriter, r *http.Request) {
+	h.handleMetricsPost(w, r, h.systemStore, "system")
 }
 
 // PostKubernetesMetrics handles POST requests to store Kubernetes metrics
 func (h *Handler) PostKubernetesMetrics(w http.ResponseWriter, r *http.Request) {
-	enableCORS(w)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var metrics []models.Metric
-	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		log.Printf("Error decoding metrics: %v", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Received %d Kubernetes metrics", len(metrics))
-
-	// Validate and enrich metrics
-	for i := range metrics {
-		if err := metrics[i].Validate(); err != nil {
-			log.Printf("Error validating metric: %v", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if metrics[i].Timestamp.IsZero() {
-			metrics[i].Timestamp = time.Now()
-		}
-
-		if metrics[i].Tags == nil {
-			metrics[i].Tags = make(map[string]string)
-		}
-		metrics[i].Tags["hostname"] = h.hostname
-		metrics[i].Tags["type"] = "kubernetes"
-	}
-
-	if err := h.kubernetesStore.StoreMetrics(metrics); err != nil {
-		log.Printf("Error storing Kubernetes metrics: %v", err)
-		http.Error(w, "Failed to store metrics", http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("Successfully stored %d Kubernetes metrics", len(metrics))
-	w.WriteHeader(http.StatusCreated)
+	h.handleMetricsPost(w, r, h.kubernetesStore, "kubernetes")
 }
 
 // GetMetrics handles GET requests to stream metrics

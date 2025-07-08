@@ -25,21 +25,6 @@ telemetry:
       - "load"
     interval: "15s"
 
-  logs:
-    enabled: false
-    collectors:
-      - syslog
-    paths:
-      - /var/log/*.log
-    interval: 5s
-
-  traces:
-    enabled: false
-    collectors:
-      - opentelemetry
-    endpoint: localhost:4317
-    interval: 1s
-
 output:
   console:
     enabled: true

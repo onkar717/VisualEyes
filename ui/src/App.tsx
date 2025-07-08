@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { CssBaseline, Box } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { Dashboard } from './components/Dashboard';
 import { KubernetesDashboard } from './components/KubernetesDashboard';
 import { Navigation } from './components/Navigation';
+import { ThemeProvider } from './theme/ThemeContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,41 +15,18 @@ const queryClient = new QueryClient({
   },
 });
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    background: {
-      default: '#1e1e2d',
-      paper: '#2a2a3e',
-    },
-    primary: {
-      main: '#3f51b5',
-    },
-  },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        body: {
-          backgroundColor: '#1e1e2d',
-          color: '#ffffff',
-        },
-      },
-    },
-  },
-});
-
-function App() {
+export const App: React.FC = () => {
   const [view, setView] = useState<'system' | 'kubernetes'>('system');
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider>
         <CssBaseline />
-        <Navigation view={view} onViewChange={setView} />
-        {view === 'system' ? <Dashboard /> : <KubernetesDashboard />}
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          <Navigation view={view} onViewChange={setView} />
+          {view === 'system' ? <Dashboard /> : <KubernetesDashboard />}
+        </Box>
       </ThemeProvider>
     </QueryClientProvider>
   );
-}
-
-export default App;
+};

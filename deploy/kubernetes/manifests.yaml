@@ -17,6 +17,6 @@ data:
         enabled: false
     output:
       remote:
-        endpoint: "http://192.168.24.203:8080/api/kubernetes-metrics"
+        endpoint: "http://visual-eyes-backend.kube-system.svc.cluster.local:8080/api/kubernetes-metrics"
         batch_size: 100
         timeout: 5s 

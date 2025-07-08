@@ -45,6 +45,19 @@ interface KubernetesMetricsResponse {
         total: number;
       };
     };
+    containers: Array<{
+      namespace: string;
+      pod: string;
+      name: string;
+      cpu: {
+        usage: number;
+        total: number;
+      };
+      memory: {
+        usage: number;
+        total: number;
+      };
+    }>;
     history: {
       nodeCpu: MetricSeries;
       nodeMemory: MetricSeries;

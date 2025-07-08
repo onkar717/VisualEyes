@@ -1,6 +1,6 @@
 # Project Documentation
 
-This directory contains the main project documentation for the entire application. The documentation is organized as follows:
+This directory contains the main project documentation for the metrics monitoring application. The documentation is organized as follows:
 
 ## Documentation Structure
 
@@ -19,7 +19,7 @@ This directory contains the main project documentation for the entire applicatio
   
 - Backend documentation (in respective folders)
   - API documentation in `/api`
-  - Package documentation in `/pkg`
+  - Metrics collector documentation in `/pkg`
   - Internal documentation in `/internal`
 
 ## Getting Started

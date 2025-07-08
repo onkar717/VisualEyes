@@ -27,9 +27,13 @@ spec:
             fieldRef:
               fieldPath: spec.nodeName
         - name: VISUAL_EYES_CONFIG
-          value: "/etc/visual-eyes/config-k8s.yaml"
+          value: "/etc/visual-eyes/config.yaml"
+        - name: VISUAL_EYES_BACKEND_SERVICE
+          value: "visual-eyes-backend.kube-system.svc.cluster.local"
+        - name: VISUAL_EYES_BACKEND_PORT
+          value: "8080"
         - name: VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT
-          value: "http://192.168.24.203:8080/api/kubernetes-metrics"
+          value: "http://$(VISUAL_EYES_BACKEND_SERVICE):$(VISUAL_EYES_BACKEND_PORT)/api/kubernetes-metrics"
         volumeMounts:
         - name: config
           mountPath: /etc/visual-eyes
