@@ -23,10 +23,10 @@ VisualEyes is a modern, lightweight monitoring solution that provides real-time 
 
 ### 1. Setting up Local Development Environment
 
-```bash
+   ```bash
 # Clone the repository
 git clone https://github.com/yourusername/VisualEyes.git
-cd VisualEyes
+   cd VisualEyes
 
 # Install Go dependencies
 make deps
@@ -36,7 +36,7 @@ make build
 
 # Start the backend server
 make run-server
-```
+   ```
 
 ### 2. Starting the UI Development Server
 
@@ -84,7 +84,7 @@ kubectl cluster-info --context k3d-visual-eyes
 
 ### 5. Deploying VisualEyes in Kubernetes
 
-```bash
+   ```bash
 # Apply the Kubernetes configurations
 kubectl apply -f deploy/kubernetes/service.yaml
 kubectl apply -f deploy/kubernetes/config.yaml
@@ -117,7 +117,7 @@ The system uses a hierarchical configuration system:
 
 ## Development Commands
 
-```bash
+   ```bash
 # Format code
 make fmt
 
@@ -129,7 +129,7 @@ make test
 
 # Clean build artifacts
 make clean
-```
+   ```
 
 ## Architecture
 

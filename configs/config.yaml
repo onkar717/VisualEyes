@@ -1,37 +1,16 @@
 # VisualEyes Agent Configuration
+# Environment variables will override these default values
 
 agent:
-  name: "visual-eyes-agent"
-  interval: "15s"
-  verbose: true
+  # Collection interval in seconds (can be overridden by VISUAL_EYES_AGENT_COLLECTION_INTERVAL)
   collection_interval: 10
+  # Disable host metrics collection (can be overridden by VISUAL_EYES_AGENT_DISABLE_HOST_METRICS)
   disable_host_metrics: false
+  # Disable Kubernetes metrics collection (can be overridden by VISUAL_EYES_AGENT_DISABLE_KUBE_METRICS)
   disable_kube_metrics: false
-  collectors:
-    cpu: true
-    memory: true
-    disk: true
-    network: true
-    load: true
-
-telemetry:
-  metrics:
-    enabled: true
-    collectors:
-      - "cpu"
-      - "memory"
-      - "disk"
-      - "network"
-      - "load"
-    interval: "15s"
 
 output:
-  console:
-    enabled: true
-    format: "json"
-  file:
-    enabled: false
-    path: /var/log/visual-eyes.log
   remote:
     enabled: true
+    # Remote endpoint for sending metrics (overridden by VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT)
     endpoint: "http://localhost:8080/api/system-metrics"

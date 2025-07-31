@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - System metrics collection (CPU, Memory, Disk, Network, Load)
 - Kubernetes metrics collection
 - Real-time metrics streaming
-- Grafana dashboards for visualization
+- Modern React-based dashboard with dark/light themes
 - Docker and Kubernetes deployment support
 - Documentation and project guidelines
 
@@ -34,7 +34,7 @@ Initial release
 - Core metrics collection functionality
 - REST API for metrics ingestion
 - Real-time metrics streaming
-- Grafana integration
+- Modern dashboard UI
 - Docker support
 - Kubernetes deployment
 - Documentation 

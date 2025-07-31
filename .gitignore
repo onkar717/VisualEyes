@@ -1,96 +1,103 @@
-# Dependencies
-node_modules/
-vendor/
-
-# Build outputs
-dist/
-build/
-bin/
-
-# IDE and editor files
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# System files
-.DS_Store
-Thumbs.db
-
-# Docker volumes
-grafana-storage/
-
-# Go specific
-*.exe
-*.test
-*.prof
-*.out
-
-# Temporary files
-tmp/
-temp/
-
-# Binaries and build output
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+bin/
+dist/
 
-# Test binary, built with 'go test -c'
+# Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-coverage.html
 
-# IDE specific files
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+/build
+/dist
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Compiled binaries
+visual-eyes-agent
+visual-eyes-server
+visual-eyes-kube-agent
+
+# Docker volumes
+data/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Coverage reports
+coverage/
+*.cover
+*.coverprofile
+
+# Test artifacts
+test-results/
+
+# Build cache
+.cache/
+
+# IDE specific
 *.swp
 *.swo
 *~
+
+# System files
 .DS_Store
-
-# Debug files
-debug/
-
-# Log files
-logs/
-
-# System Files
+.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+Thumbs.db
 
-# Project specific
-/visual-eyes
-*.pprof
-*.cpu
-*.mem
+# Local configuration overrides
+config.local.yaml
+config.local.yml
+local.yaml
+local.yml
 
-# Configuration files (uncomment if you want to ignore)
-# *.yaml
-# *.yml
-# *.json
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Generated files
-*.generated.go
-*_string.go
-
-# Crash reports
-crash.log
-
-# Local development files
-notes.txt
-TODO.md 
+# Backup files
+*.bak
+*.backup 

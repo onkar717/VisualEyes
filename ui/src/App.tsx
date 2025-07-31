@@ -23,8 +23,8 @@ export const App: React.FC = () => {
       <ThemeProvider>
         <CssBaseline />
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navigation view={view} onViewChange={setView} />
-          {view === 'system' ? <Dashboard /> : <KubernetesDashboard />}
+        <Navigation view={view} onViewChange={setView} />
+        {view === 'system' ? <Dashboard /> : <KubernetesDashboard />}
         </Box>
       </ThemeProvider>
     </QueryClientProvider>

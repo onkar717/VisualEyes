@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { MetricCard } from './MetricCard';
 import { ModernLayout } from './ModernLayout';
@@ -25,49 +25,32 @@ export const KubernetesDashboard: React.FC = () => {
       error={error as Error}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {/* Resource Overview Section */}
-        <Box>
-          <Typography 
-            variant="h6" 
-            gutterBottom 
-            sx={{ 
-              color: '#fff', 
-              mb: 3,
-              background: 'linear-gradient(45deg, #fff 30%, #e0e0e0 90%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
-            }}
-          >
-            Cluster Resources
-          </Typography>
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(12, 1fr)', 
-            gap: 3,
-            '& > div': {
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
-              },
-            }
-          }}>
-            {/* Node Status */}
-            <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
-              <MetricCard
-                title="Nodes"
-                value={metrics?.nodes.ready || 0}
-                maxValue={metrics?.nodes.total || 1}
-                unit="/1"
-                color="#6b4cf5"
-                trend={nodeTrend}
-                description="Available cluster nodes"
-              />
-            </Box>
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(12, 1fr)', 
+          gap: 3,
+          '& > div': {
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-4px)',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+            },
+          }
+        }}>
+          {/* Node Status */}
+          <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
+            <MetricCard
+              title="Nodes"
+              value={metrics?.nodes.ready || 0}
+              maxValue={metrics?.nodes.total || 1}
+              unit="/1"
+              color="#6b4cf5"
+              trend={nodeTrend}
+              description="Available cluster nodes"
+            />
+          </Box>
 
-            {/* Node CPU Usage */}
+          {/* Node CPU Usage */}
             <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
               <MetricCard
                 title="Cluster CPU"
@@ -80,7 +63,7 @@ export const KubernetesDashboard: React.FC = () => {
               />
             </Box>
 
-            {/* Node Memory Usage */}
+          {/* Node Memory Usage */}
             <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
               <MetricCard
                 title="Cluster Memory"
@@ -93,7 +76,7 @@ export const KubernetesDashboard: React.FC = () => {
               />
             </Box>
 
-            {/* Pod Status */}
+          {/* Pod Status */}
             <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
               <MetricCard
                 title="Pods"
@@ -105,39 +88,8 @@ export const KubernetesDashboard: React.FC = () => {
                 description="Running pods in cluster"
               />
             </Box>
-          </Box>
-        </Box>
 
-        {/* Pod Resources Section */}
-        <Box>
-          <Typography 
-            variant="h6" 
-            gutterBottom 
-            sx={{ 
-              color: '#fff', 
-              mb: 3,
-              background: 'linear-gradient(45deg, #fff 30%, #e0e0e0 90%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
-            }}
-          >
-            Pod Resources
-          </Typography>
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(12, 1fr)', 
-            gap: 3,
-            '& > div': {
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
-              },
-            }
-          }}>
-            {/* Pod CPU Usage */}
+          {/* Pod CPU Usage */}
             <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
               <MetricCard
                 title="Pod CPU Usage"
@@ -149,7 +101,7 @@ export const KubernetesDashboard: React.FC = () => {
               />
             </Box>
 
-            {/* Pod Memory Usage */}
+          {/* Pod Memory Usage */}
             <Box sx={{ gridColumn: { xs: 'span 12', md: 'span 6', lg: 'span 3' } }}>
               <MetricCard
                 title="Pod Memory Usage"
@@ -183,7 +135,6 @@ export const KubernetesDashboard: React.FC = () => {
                 description="Available memory resources"
               />
             </Box>
-          </Box>
         </Box>
       </Box>
     </ModernLayout>

@@ -1,7 +1,8 @@
 import axios from 'axios';
 import type { Metric } from '../types/metrics';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+// Use environment variable for API base URL, fallback to dev default
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8080/api' : '/api');
 
 interface MetricsResponse {
   timestamp: string;
@@ -45,23 +46,6 @@ interface KubernetesMetricsResponse {
         total: number;
       };
     };
-    containers: Array<{
-      namespace: string;
-      pod: string;
-      name: string;
-      cpu: {
-        usage: number;
-        total: number;
-      };
-      memory: {
-        usage: number;
-        total: number;
-      };
-    }>;
-    history: {
-      nodeCpu: MetricSeries;
-      nodeMemory: MetricSeries;
-    };
   };
 }
 
@@ -70,14 +54,6 @@ interface MetricData {
   unit?: string;
   tags?: Record<string, string>;
   timestamp: string;
-}
-
-interface MetricSeries {
-  name: string;
-  data: Array<{
-    timestamp: string;
-    value: number;
-  }>;
 }
 
 const getMetrics = async (): Promise<Metric[]> => {

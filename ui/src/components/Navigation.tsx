@@ -6,7 +6,6 @@ import {
   Box, 
   ToggleButtonGroup, 
   ToggleButton, 
-  Badge,
   IconButton,
   Tooltip,
 } from '@mui/material';
@@ -97,34 +96,10 @@ export const Navigation: React.FC<NavigationProps> = ({ view, onViewChange }) =>
             <ToggleButton value="system" aria-label="system metrics">
               <Computer sx={{ mr: 1 }} />
               System
-              <Badge
-                badgeContent="16"
-                color="primary"
-                sx={{
-                  ml: 1,
-                  '& .MuiBadge-badge': {
-                    backgroundColor: '#4caf50',
-                    color: '#fff',
-                    boxShadow: '0 2px 6px rgba(76, 175, 80, 0.3)',
-                  },
-                }}
-              />
             </ToggleButton>
             <ToggleButton value="kubernetes" aria-label="kubernetes metrics">
               <Storage sx={{ mr: 1 }} />
               Kubernetes
-              <Badge
-                badgeContent="63"
-                color="primary"
-                sx={{
-                  ml: 1,
-                  '& .MuiBadge-badge': {
-                    backgroundColor: '#ff4081',
-                    color: '#fff',
-                    boxShadow: '0 2px 6px rgba(255, 64, 129, 0.3)',
-                  },
-                }}
-              />
             </ToggleButton>
           </ToggleButtonGroup>
           <Tooltip title={`Switch to ${isDarkMode ? 'Light' : 'Dark'} Mode`}>
