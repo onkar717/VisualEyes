@@ -291,15 +291,62 @@ func (h *Handler) GetKubernetesMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 // -------------------------------------------------------------------
-// Pod logs — stub, fully implemented in Commit 4
+// Pod logs
 // -------------------------------------------------------------------
 
+// HandlePodLogs dispatches POST (agent ingestion) and GET (UI query) for /api/pod-logs.
 func (h *Handler) HandlePodLogs(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
 	}
-	// Log store injected via SetLogStore() in Commit 4.
-	writeJSON(w, http.StatusOK, map[string]any{"logs": []any{}, "message": "log pipeline coming in commit 4"})
+	switch r.Method {
+	case http.MethodPost:
+		h.postPodLogs(w, r)
+	case http.MethodGet:
+		h.getPodLogs(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (h *Handler) postPodLogs(w http.ResponseWriter, r *http.Request) {
+	if h.logStore == nil {
+		w.WriteHeader(http.StatusAccepted) // accept but discard until store is ready
+		return
+	}
+	var logs []models.PodLog
+	if err := json.NewDecoder(r.Body).Decode(&logs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.logStore.StoreLogs(logs); err != nil {
+		slog.Error("failed to store pod logs", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to store logs")
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) getPodLogs(w http.ResponseWriter, r *http.Request) {
+	if h.logStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"logs": []any{}})
+		return
+	}
+	pod := r.URL.Query().Get("pod")
+	ns := r.URL.Query().Get("namespace")
+	if ns == "" {
+		ns = "default"
+	}
+	limit := 500
+	fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
+
+	logs, err := h.logStore.GetLogs(pod, ns, limit)
+	if err != nil {
+		slog.Error("failed to get pod logs", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to get logs")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"logs": logs, "count": len(logs)})
 }
 
 // -------------------------------------------------------------------
@@ -307,12 +354,18 @@ func (h *Handler) HandlePodLogs(w http.ResponseWriter, r *http.Request) {
 // -------------------------------------------------------------------
 
 // HandleKubeEvents accepts K8s event batches (POST) and serves them (GET).
+// Full event store is added in a future iteration; for now we accept + log.
 func (h *Handler) HandleKubeEvents(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
 	}
 	switch r.Method {
 	case http.MethodPost:
+		// Acknowledge; downstream RCA will consume these once wired.
+		var payload []map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+			slog.Debug("received k8s events", "count", len(payload))
+		}
 		w.WriteHeader(http.StatusAccepted)
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"events": []any{}})

@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/onkar717/visual-eyes/backend/models"
 )
 
 // Collector handles collecting Kubernetes metrics
 type Collector struct {
-	client *KubeletClient
+	client    *KubeletClient
+	k8sClient kubernetes.Interface // may be nil if in-cluster config fails
 }
 
 // New creates a new Kubernetes metrics collector
 func New() (*Collector, error) {
-	// Check if we're running in a Kubernetes cluster
 	if !IsInCluster() {
 		return nil, fmt.Errorf("not running in a Kubernetes cluster")
 	}
@@ -25,10 +28,22 @@ func New() (*Collector, error) {
 		return nil, fmt.Errorf("failed to create Kubelet client: %w", err)
 	}
 
+	// Build a standard in-cluster kubernetes client for Events collection.
+	var k8sClient kubernetes.Interface
+	if restCfg, err := rest.InClusterConfig(); err == nil {
+		if cs, err := kubernetes.NewForConfig(restCfg); err == nil {
+			k8sClient = cs
+		}
+	}
+
 	return &Collector{
-		client: kubeletClient,
+		client:    kubeletClient,
+		k8sClient: k8sClient,
 	}, nil
 }
+
+// Client returns the kubernetes.Interface client (may be nil outside a cluster).
+func (c *Collector) Client() kubernetes.Interface { return c.k8sClient }
 
 // Collect gathers metrics from the Kubelet API
 func (c *Collector) Collect(ctx context.Context) ([]models.Metric, error) {
