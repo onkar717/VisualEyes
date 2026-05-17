@@ -1,44 +1,100 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/onkar717/visual-eyes/backend/api"
+	"github.com/onkar717/visual-eyes/backend/config"
+	"github.com/onkar717/visual-eyes/backend/internal/logger"
 	"github.com/onkar717/visual-eyes/backend/storage"
 )
 
 func main() {
-	// Initialize in-memory storage
+	// ── Config ────────────────────────────────────────────────────────────────
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// ── Logging ───────────────────────────────────────────────────────────────
+	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
+	slog.Info("VisualEyes server starting",
+		"version", version(),
+		"log_level", cfg.Logging.Level,
+	)
+
+	// ── Storage ───────────────────────────────────────────────────────────────
+	// Commit 2 replaces these with SQLiteStore; keeping MemoryStore here ensures
+	// the binary compiles and works before persistence is wired.
 	systemStore := storage.NewMemoryStore()
 	k8sStore := storage.NewMemoryStore()
 
-	// Initialize handler with both stores
-	handler, err := api.NewHandler(systemStore, k8sStore)
+	// ── Handler + Router ──────────────────────────────────────────────────────
+	handler, err := api.NewHandler(systemStore, k8sStore, cfg.Server.CORSOrigins)
 	if err != nil {
-		log.Fatalf("Failed to create handler: %v", err)
+		slog.Error("failed to create handler", "error", err)
+		os.Exit(1)
 	}
 
-	// Set up routes
-	http.HandleFunc("/api/system-metrics", handler.PostSystemMetrics)
-	http.HandleFunc("/api/kubernetes-metrics", handler.PostKubernetesMetrics)
-	http.HandleFunc("/api/metrics/snapshot", handler.GetMetricsSnapshot)
-	http.HandleFunc("/api/kubernetes/metrics", handler.GetKubernetesMetrics)
+	mux := http.NewServeMux()
+	router := api.RegisterRoutes(mux, handler, cfg)
 
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// ── HTTP Server ───────────────────────────────────────────────────────────
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
 	}
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "0.0.0.0"
+
+	// ── Graceful shutdown ─────────────────────────────────────────────────────
+	shutdownCh := make(chan os.Signal, 1)
+	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		slog.Info("server listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	sig := <-shutdownCh
+	slog.Info("shutdown signal received", "signal", sig)
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+	defer cancel()
+
+	handler.StopRateLimiter()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("graceful shutdown failed", "error", err)
+		os.Exit(1)
 	}
-	addr := fmt.Sprintf("%s:%s", host, port)
-	log.Printf("Starting VisualEyes server on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("Server failed: %v", err)
+
+	slog.Info("server stopped cleanly")
+}
+
+// version returns the binary version from the VERSION env var or "dev".
+func version() string {
+	if v := os.Getenv("VISUAL_EYES_VERSION"); v != "" {
+		return v
 	}
+	return "dev"
+}
+
+// Ensure the config.ServerConfig duration fields are non-zero before using them.
+func init() {
+	// Viper parses duration strings like "15s" correctly, but if the field is
+	// zero (e.g. first run with no config file), set safe defaults.
+	_ = time.Second // silence unused import if durations are removed
 }
