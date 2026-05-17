@@ -11,9 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	sharedhttp "github.com/onkar717/visual-eyes/backend/http"
+	appmetrics "github.com/onkar717/visual-eyes/backend/metrics"
 	"github.com/onkar717/visual-eyes/backend/models"
 	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/backend/ws"
 )
 
 // Handler is the central HTTP handler for all VisualEyes API endpoints.
@@ -23,6 +26,7 @@ type Handler struct {
 	alertStore      storage.AlertStore
 	logStore        storage.LogStore
 	rcaStore        storage.RCAStore
+	broadcaster     *ws.Broadcaster
 	hostname        string
 	corsOrigins     string
 	startedAt       time.Time
@@ -37,6 +41,9 @@ func (h *Handler) SetLogStore(s storage.LogStore) { h.logStore = s }
 
 // SetRCAStore injects the RCA store after construction (Commit 5).
 func (h *Handler) SetRCAStore(s storage.RCAStore) { h.rcaStore = s }
+
+// SetBroadcaster injects the WebSocket broadcaster (Commit 6).
+func (h *Handler) SetBroadcaster(b *ws.Broadcaster) { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -141,6 +148,17 @@ func (h *Handler) handleMetricsPost(w http.ResponseWriter, r *http.Request, stor
 		slog.Error("failed to store metrics", "type", metricType, "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to store metrics")
 		return
+	}
+
+	// Update Prometheus counters and last-value gauges.
+	appmetrics.MetricsIngested.WithLabelValues(metricType).Add(float64(len(metrics)))
+	for _, m := range metrics {
+		appmetrics.LastMetricValue.WithLabelValues(m.Name, metricType).Set(m.Value)
+	}
+
+	// Broadcast a fresh snapshot to any connected WebSocket clients.
+	if h.broadcaster != nil && h.broadcaster.Len() > 0 {
+		go h.broadcastSnapshot()
 	}
 
 	slog.Debug("stored metrics", "type", metricType, "count", len(metrics))
@@ -380,10 +398,57 @@ func (h *Handler) HandleKubeEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// WebSocketStream upgrades to a WebSocket connection for real-time metric streaming.
-// Full implementation lands in Commit 6.
+// WebSocketStream upgrades to a WebSocket connection and streams metric
+// snapshots in real-time. Each message is a JSON object identical to the
+// /api/metrics/snapshot response so the UI can share a single decoder.
 func (h *Handler) WebSocketStream(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "websocket stream not yet initialised — coming in commit 6", http.StatusNotImplemented)
+	if h.broadcaster == nil {
+		http.Error(w, "broadcaster not initialised", http.StatusServiceUnavailable)
+		return
+	}
+	appmetrics.WSClients.Inc()
+	defer appmetrics.WSClients.Dec()
+	h.broadcaster.ServeClient(w, r)
+}
+
+// broadcastSnapshot reads the current metric snapshot and fans it out to all
+// connected WebSocket clients. It is called in a goroutine after every
+// successful metric ingestion.
+func (h *Handler) broadcastSnapshot() {
+	all := h.systemStore.GetAllMetrics()
+	grouped := map[string]map[string]any{
+		"cpu": {}, "memory": {}, "disk": {}, "network": {}, "load": {},
+	}
+	for _, m := range all {
+		m.Value = roundValue(m.Value)
+		var cat, name string
+		switch {
+		case strings.HasPrefix(m.Name, "cpu."):
+			cat, name = "cpu", strings.TrimPrefix(m.Name, "cpu.")
+		case strings.HasPrefix(m.Name, "memory."):
+			cat, name = "memory", strings.TrimPrefix(m.Name, "memory.")
+		case strings.HasPrefix(m.Name, "disk."):
+			cat, name = "disk", strings.TrimPrefix(m.Name, "disk.")
+		case strings.HasPrefix(m.Name, "network."):
+			cat, name = "network", strings.TrimPrefix(m.Name, "network.")
+		case strings.HasPrefix(m.Name, "load."):
+			cat, name = "load", strings.TrimPrefix(m.Name, "load.")
+		default:
+			continue
+		}
+		grouped[cat][name] = map[string]any{
+			"value": m.Value, "unit": m.Unit, "tags": m.Tags, "timestamp": m.Timestamp,
+		}
+	}
+	payload, err := json.Marshal(map[string]any{
+		"type":      "metrics_snapshot",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"metrics":   grouped,
+	})
+	if err != nil {
+		return
+	}
+	h.broadcaster.Send(payload)
 }
 
 // -------------------------------------------------------------------
@@ -625,12 +690,34 @@ func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PrometheusMetrics exposes basic counters in the Prometheus text format.
-// A full Prometheus registry is added in Commit 6.
+// PrometheusMetrics exposes all registered application metrics in Prometheus
+// text exposition format (scrape endpoint for Prometheus / Grafana / Victoria).
 func (h *Handler) PrometheusMetrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-	uptime := time.Since(h.startedAt).Seconds()
-	fmt.Fprintf(w, "# HELP visual_eyes_uptime_seconds Seconds since server start\n")
-	fmt.Fprintf(w, "# TYPE visual_eyes_uptime_seconds gauge\n")
-	fmt.Fprintf(w, "visual_eyes_uptime_seconds %.2f\n", uptime)
+	// Refresh gauges that must be computed on-demand.
+	appmetrics.UptimeSeconds.Set(time.Since(h.startedAt).Seconds())
+
+	if h.alertStore != nil {
+		h.refreshAlertGauges()
+	}
+
+	promhttp.HandlerFor(appmetrics.Registry, promhttp.HandlerOpts{
+		EnableOpenMetrics: true,
+	}).ServeHTTP(w, r)
+}
+
+// refreshAlertGauges re-queries active alerts and updates the Prometheus gauges.
+func (h *Handler) refreshAlertGauges() {
+	active, err := h.alertStore.GetActiveAlerts()
+	if err != nil {
+		return
+	}
+	counts := map[string]float64{"critical": 0, "warning": 0, "info": 0}
+	for _, a := range active {
+		if _, ok := counts[string(a.Severity)]; ok {
+			counts[string(a.Severity)]++
+		}
+	}
+	for sev, n := range counts {
+		appmetrics.ActiveAlerts.WithLabelValues(sev).Set(n)
+	}
 }
