@@ -16,8 +16,15 @@ server:
     burst: 200
 
 database:
-  path: "./data/visual-eyes.db"
-  max_records: 10000
+  host: "localhost"
+  port: 5432
+  user: "visual_eyes"
+  password: "visual_eyes"
+  dbname: "visual_eyes"
+  sslmode: "disable"
+  timezone: "UTC"
+  # dsn: ""  # set this to override individual fields above
+  max_records: 10000  # max rows stored per metric name before pruning
 
 logging:
   level: "info"   # debug | info | warn | error
