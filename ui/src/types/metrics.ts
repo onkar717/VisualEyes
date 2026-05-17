@@ -26,27 +26,26 @@ export interface SystemMetrics {
 }
 
 // ── Alerts ────────────────────────────────────────────────────────────────────
+// Field names match Go JSON tags (camelCase).
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 export type AlertStatus = 'firing' | 'resolved';
 export type RCAStatus = 'pending' | 'running' | 'done' | 'failed' | '';
 
 export interface Alert {
-  ID: number;
-  RuleName: string;
-  Severity: AlertSeverity;
-  Status: AlertStatus;
-  ResourceID: string;
-  Namespace: string;
-  Value: number;
-  Threshold: number;
-  Message: string;
-  FiredAt: string;
-  ResolvedAt?: string;
-  RCAStatus?: RCAStatus;
-  RCAID?: number;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: number;
+  ruleName: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  resourceID: string;
+  namespace: string;
+  value: number;
+  threshold: number;
+  message: string;
+  firedAt: string;
+  resolvedAt?: string;
+  rcaStatus?: RCAStatus;
+  rcaID?: number;
 }
 
 // ── RCA ───────────────────────────────────────────────────────────────────────
@@ -55,36 +54,37 @@ export type RemediationStatus = 'pending' | 'executed' | 'skipped' | 'failed';
 
 export interface FixCommand {
   command: string;
-  is_auto_safe: boolean;
+  isAutoSafe: boolean;
   status: RemediationStatus;
   output?: string;
-  exec_error?: string;
+  error?: string;
 }
 
 export interface RCAResult {
-  ID: number;
-  AlertID: number;
-  Explanation: string;
-  RootCause: string;
-  Commands: FixCommand[];
-  Status: 'pending' | 'done' | 'failed';
-  Model: string;
-  InputTokens: number;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: number;
+  alertID: number;
+  explanation: string;
+  rootCause: string;
+  commands: string; // JSON string of FixCommand[] — parsed on use
+  status: 'pending' | 'done' | 'failed';
+  model: string;
+  inputTokens: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────────────
+// Field names match Go JSON tags (lowercase).
 
 export interface PodLog {
-  ID: number;
-  Pod: string;
-  Namespace: string;
-  Container: string;
-  Node: string;
-  Stream: 'stdout' | 'stderr';
-  Line: string;
-  Timestamp: string;
+  id: number;
+  pod: string;
+  namespace: string;
+  container: string;
+  node: string;
+  stream: 'stdout' | 'stderr';
+  line: string;
+  timestamp: string;
 }
 
 // ── WebSocket broadcast ───────────────────────────────────────────────────────

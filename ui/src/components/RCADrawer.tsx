@@ -62,7 +62,7 @@ function CommandRow({
     },
   });
 
-  const canExecute = rcaDone && cmd.status === 'pending' && !cmd.is_auto_safe;
+  const canExecute = rcaDone && cmd.status === 'pending' && !cmd.isAutoSafe;
 
   return (
     <Paper
@@ -87,7 +87,7 @@ function CommandRow({
             >
               {cmd.command}
             </Typography>
-            {cmd.is_auto_safe && (
+            {cmd.isAutoSafe && (
               <Chip label="auto-safe" color="success" size="small" variant="outlined" />
             )}
           </Box>
@@ -111,7 +111,7 @@ function CommandRow({
               {cmd.output}
             </Box>
           )}
-          {cmd.exec_error && (
+          {cmd.error && (
             <Box
               sx={{
                 mt: 0.5,
@@ -126,7 +126,7 @@ function CommandRow({
                 overflowY: 'auto',
               }}
             >
-              {cmd.exec_error}
+              {cmd.error}
             </Box>
           )}
         </Box>
@@ -155,20 +155,19 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
   const [showRaw, setShowRaw] = useState(false);
 
   const rcaQuery = useQuery({
-    queryKey: ['rca', alert?.ID],
-    queryFn: () => api.getRCA(alert!.ID),
-    enabled: open && alert !== null && (alert.RCAStatus === 'done' || alert.RCAStatus === 'running' || alert.RCAStatus === 'failed'),
+    queryKey: ['rca', alert?.id],
+    queryFn: () => api.getRCA(alert!.id),
+    enabled: open && alert !== null && (alert.rcaStatus === 'done' || alert.rcaStatus === 'running' || alert.rcaStatus === 'failed'),
     refetchInterval: (query) => {
-      const status = query.state.data?.Status;
+      const status = query.state.data?.status;
       return status === 'pending' || status === undefined ? 3000 : false;
     },
   });
 
   const rca = rcaQuery.data;
   const commands: FixCommand[] = (() => {
-    if (!rca?.Commands) return [];
-    if (Array.isArray(rca.Commands)) return rca.Commands;
-    try { return JSON.parse(rca.Commands as unknown as string); } catch { return []; }
+    if (!rca?.commands) return [];
+    try { return JSON.parse(rca.commands); } catch { return []; }
   })();
 
   return (
@@ -213,24 +212,24 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
           >
             <Stack direction="row" spacing={1} alignItems="center" mb={1}>
               <Chip
-                label={alert.Severity}
-                color={alert.Severity === 'critical' ? 'error' : alert.Severity === 'warning' ? 'warning' : 'info'}
+                label={alert.severity}
+                color={alert.severity === 'critical' ? 'error' : alert.severity === 'warning' ? 'warning' : 'info'}
                 size="small"
                 sx={{ fontWeight: 600 }}
               />
-              <Typography variant="subtitle2" fontWeight={600}>{alert.RuleName}</Typography>
+              <Typography variant="subtitle2" fontWeight={600}>{alert.ruleName}</Typography>
             </Stack>
-            <Typography variant="body2" color="text.secondary">{alert.Message}</Typography>
+            <Typography variant="body2" color="text.secondary">{alert.message}</Typography>
             <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-              Fired {formatDistanceToNow(new Date(alert.FiredAt), { addSuffix: true })}
-              {alert.Namespace && ` · ${alert.Namespace}`}
-              {alert.ResourceID && ` · ${alert.ResourceID}`}
+              Fired {formatDistanceToNow(new Date(alert.firedAt), { addSuffix: true })}
+              {alert.namespace && ` · ${alert.namespace}`}
+              {alert.resourceID && ` · ${alert.resourceID}`}
             </Typography>
           </Paper>
         )}
 
         {/* RCA not triggered */}
-        {alert && !alert.RCAStatus && (
+        {alert && !alert.rcaStatus && (
           <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
             <SmartToy sx={{ fontSize: 48, opacity: 0.3, mb: 1 }} />
             <Typography>RCA has not been triggered for this alert.</Typography>
@@ -241,7 +240,7 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
         )}
 
         {/* RCA running / loading */}
-        {(alert?.RCAStatus === 'running' || alert?.RCAStatus === 'pending' || rcaQuery.isLoading) && (
+        {(alert?.rcaStatus === 'running' || alert?.rcaStatus === 'pending' || rcaQuery.isLoading) && (
           <Box sx={{ textAlign: 'center', py: 6 }}>
             <CircularProgress size={40} sx={{ mb: 2 }} />
             <Typography color="text.secondary">Claude is analysing the alert…</Typography>
@@ -249,15 +248,15 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
         )}
 
         {/* RCA failed */}
-        {rca?.Status === 'failed' && (
+        {rca?.status === 'failed' && (
           <Box sx={{ textAlign: 'center', py: 4, color: 'error.main' }}>
             <ErrorIcon sx={{ fontSize: 40, mb: 1 }} />
-            <Typography>{rca.Explanation || 'Analysis failed.'}</Typography>
+            <Typography>{rca.explanation || 'Analysis failed.'}</Typography>
           </Box>
         )}
 
         {/* RCA done */}
-        {rca?.Status === 'done' && (
+        {rca?.status === 'done' && (
           <>
             {/* Root cause */}
             <Typography variant="overline" color="text.secondary" gutterBottom>
@@ -271,7 +270,7 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
                 background: isDarkMode ? 'rgba(255,152,0,0.06)' : 'rgba(255,243,224,0.8)',
               }}
             >
-              <Typography variant="body2" lineHeight={1.7}>{rca.RootCause || '—'}</Typography>
+              <Typography variant="body2" lineHeight={1.7}>{rca.rootCause || '—'}</Typography>
             </Paper>
 
             {/* Explanation */}
@@ -279,7 +278,7 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
               Analysis
             </Typography>
             <Typography variant="body2" lineHeight={1.8} mb={3}>
-              {rca.Explanation}
+              {rca.explanation}
             </Typography>
 
             {/* Commands */}
@@ -316,8 +315,8 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
                       key={i}
                       cmd={cmd}
                       index={i}
-                      alertId={alert!.ID}
-                      rcaDone={rca.Status === 'done'}
+                      alertId={alert!.id}
+                      rcaDone={rca.status === 'done'}
                     />
                   ))
                 )}
@@ -326,8 +325,8 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
 
             <Divider sx={{ my: 2 }} />
             <Typography variant="caption" color="text.secondary">
-              Model: {rca.Model} · {rca.InputTokens.toLocaleString()} input tokens ·{' '}
-              {formatDistanceToNow(new Date(rca.UpdatedAt), { addSuffix: true })}
+              Model: {rca.model} · {rca.inputTokens.toLocaleString()} input tokens ·{' '}
+              {formatDistanceToNow(new Date(rca.updatedAt), { addSuffix: true })}
             </Typography>
           </>
         )}

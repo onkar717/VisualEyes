@@ -39,7 +39,7 @@ const RCA_STATUS_LABEL: Record<string, { label: string; color: 'default' | 'info
   failed:    { label: 'Failed',   color: 'error' },
 };
 
-function rcaBadge(status: RCAStatus | undefined) {
+function rcaBadge(status: RCAStatus | string | undefined) {
   const s = status ?? '';
   const meta = RCA_STATUS_LABEL[s] ?? RCA_STATUS_LABEL[''];
   return (
@@ -134,51 +134,51 @@ export const AlertsPanel: React.FC = () => {
             <TableBody>
               {alerts.map((alert) => (
                 <TableRow
-                  key={alert.ID}
+                  key={alert.id}
                   sx={rowSx}
                   onClick={() => setSelectedAlert(alert)}
                 >
                   <TableCell>
                     <Chip
-                      label={alert.Severity}
-                      color={SEVERITY_COLOR[alert.Severity]}
+                      label={alert.severity}
+                      color={SEVERITY_COLOR[alert.severity]}
                       size="small"
                       sx={{ fontWeight: 600, minWidth: 68 }}
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" fontWeight={500}>{alert.RuleName}</Typography>
+                    <Typography variant="body2" fontWeight={500}>{alert.ruleName}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">{alert.ResourceID}</Typography>
-                    {alert.Namespace && (
-                      <Typography variant="caption" color="text.secondary">{alert.Namespace}</Typography>
+                    <Typography variant="body2">{alert.resourceID}</Typography>
+                    {alert.namespace && (
+                      <Typography variant="caption" color="text.secondary">{alert.namespace}</Typography>
                     )}
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {alert.Value.toFixed(2)} / {alert.Threshold.toFixed(2)}
+                      {alert.value.toFixed(2)} / {alert.threshold.toFixed(2)}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Tooltip title={alert.FiredAt}>
+                    <Tooltip title={alert.firedAt}>
                       <Typography variant="body2" color="text.secondary">
-                        {formatDistanceToNow(new Date(alert.FiredAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(alert.firedAt), { addSuffix: true })}
                       </Typography>
                     </Tooltip>
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={alert.Status}
-                      color={alert.Status === 'firing' ? 'error' : 'default'}
+                      label={alert.status}
+                      color={alert.status === 'firing' ? 'error' : 'default'}
                       size="small"
-                      variant={alert.Status === 'resolved' ? 'outlined' : 'filled'}
+                      variant={alert.status === 'resolved' ? 'outlined' : 'filled'}
                     />
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      {rcaBadge(alert.RCAStatus)}
-                      {alert.RCAStatus === 'done' && (
+                      {rcaBadge(alert.rcaStatus)}
+                      {alert.rcaStatus === 'done' && (
                         <Tooltip title="View AI analysis">
                           <SmartToy fontSize="small" color="success" />
                         </Tooltip>
