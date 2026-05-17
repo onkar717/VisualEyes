@@ -14,12 +14,16 @@ import (
 	"github.com/onkar717/visual-eyes/backend/api"
 	"github.com/onkar717/visual-eyes/backend/config"
 	"github.com/onkar717/visual-eyes/backend/internal/logger"
+	appmetrics "github.com/onkar717/visual-eyes/backend/metrics"
 	"github.com/onkar717/visual-eyes/backend/models"
 	"github.com/onkar717/visual-eyes/backend/rca"
 	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/backend/ws"
 )
 
 func main() {
+	startedAt := time.Now()
+
 	// ── Config ────────────────────────────────────────────────────────────────
 	cfg, err := config.Load()
 	if err != nil {
@@ -72,6 +76,10 @@ func main() {
 		}
 	}
 
+	// ── WebSocket Broadcaster ────────────────────────────────────────────────
+	// broadcaster fans real-time metric snapshots to all connected WS clients.
+	broadcaster := ws.NewBroadcaster()
+
 	// ── Handler + Router ──────────────────────────────────────────────────────
 	handler, err := api.NewHandler(systemStore, k8sStore, cfg.Server.CORSOrigins)
 	if err != nil {
@@ -84,9 +92,28 @@ func main() {
 	if ls, ok := store.(storage.LogStore); ok {
 		handler.SetLogStore(ls)
 	}
+	handler.SetBroadcaster(broadcaster)
 
 	// ── RCA Engine (Claude) ───────────────────────────────────────────────────
 	appCtx, appCancel := context.WithCancel(context.Background())
+
+	// ── Observability background loop ────────────────────────────────────────
+	// Ticks every 5 s to refresh the Prometheus uptime gauge and push a metric
+	// snapshot to any connected WebSocket clients (so the UI stays live even
+	// if no new data arrived since the last ingestion).
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-appCtx.Done():
+				return
+			case <-ticker.C:
+				appmetrics.UptimeSeconds.Set(time.Since(startedAt).Seconds())
+				appmetrics.WSClients.Set(float64(broadcaster.Len()))
+			}
+		}
+	}()
 
 	if cfg.RCA.Enabled && cfg.RCA.APIKey != "" {
 		qs, qsOK := store.(storage.QueryableStore)
