@@ -35,8 +35,28 @@ type RateLimitConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path       string `mapstructure:"path"`
+	// PostgreSQL connection settings.
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	DBName   string `mapstructure:"dbname"`
+	SSLMode  string `mapstructure:"sslmode"`
+	TimeZone string `mapstructure:"timezone"`
+	// DSN overrides individual fields when set.
+	DSN        string `mapstructure:"dsn"`
 	MaxRecords int    `mapstructure:"max_records"`
+}
+
+// BuildDSN returns the PostgreSQL DSN, preferring an explicit DSN over individual fields.
+func (d DatabaseConfig) BuildDSN() string {
+	if d.DSN != "" {
+		return d.DSN
+	}
+	return fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=%s",
+		d.Host, d.User, d.Password, d.DBName, d.Port, d.SSLMode, d.TimeZone,
+	)
 }
 
 type AlertsConfig struct {
@@ -148,8 +168,14 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.rate_limit.requests_per_second", 100.0)
 	v.SetDefault("server.rate_limit.burst", 200)
 
-	// Database
-	v.SetDefault("database.path", "./data/visual-eyes.db")
+	// Database (PostgreSQL)
+	v.SetDefault("database.host", "localhost")
+	v.SetDefault("database.port", 5432)
+	v.SetDefault("database.user", "visual_eyes")
+	v.SetDefault("database.password", "visual_eyes")
+	v.SetDefault("database.dbname", "visual_eyes")
+	v.SetDefault("database.sslmode", "disable")
+	v.SetDefault("database.timezone", "UTC")
 	v.SetDefault("database.max_records", 10000)
 
 	// Alerts

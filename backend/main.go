@@ -31,11 +31,22 @@ func main() {
 		"log_level", cfg.Logging.Level,
 	)
 
-	// ── Storage ───────────────────────────────────────────────────────────────
-	// Commit 2 replaces these with SQLiteStore; keeping MemoryStore here ensures
-	// the binary compiles and works before persistence is wired.
-	systemStore := storage.NewMemoryStore()
-	k8sStore := storage.NewMemoryStore()
+	// ── Storage (PostgreSQL) ─────────────────────────────────────────────────
+	// A single PostgresStore handles all feature tables. Falls back to
+	// in-memory if Postgres is unreachable (dev/no-DB mode).
+	var store storage.MetricStore
+	pgStore, dbErr := storage.NewPostgresStore(cfg.Database.BuildDSN(), cfg.Database.MaxRecords)
+	if dbErr != nil {
+		slog.Error("failed to connect to postgres — falling back to in-memory store",
+			"error", dbErr,
+			"dsn_hint", cfg.Database.Host+":"+fmt.Sprint(cfg.Database.Port),
+		)
+		store = storage.NewMemoryStore()
+	} else {
+		store = pgStore
+	}
+	systemStore := store
+	k8sStore := store
 
 	// ── Handler + Router ──────────────────────────────────────────────────────
 	handler, err := api.NewHandler(systemStore, k8sStore, cfg.Server.CORSOrigins)
