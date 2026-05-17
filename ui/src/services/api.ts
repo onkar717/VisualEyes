@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Metric } from '../types/metrics';
+import type { Alert, Metric, PodLog, RCAResult } from '../types/metrics';
 
 // Use environment variable for API base URL, fallback to dev default
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8080/api' : '/api');
@@ -80,7 +80,63 @@ const getKubernetesMetrics = async (): Promise<KubernetesMetricsResponse['metric
   return response.data.metrics;
 };
 
+// ── Alerts ────────────────────────────────────────────────────────────────────
+
+const getAlerts = async (status: 'firing' | 'all' = 'firing'): Promise<Alert[]> => {
+  const response = await axios.get<{ alerts: Alert[]; count: number }>(
+    `${API_BASE_URL}/alerts?status=${status}`
+  );
+  return response.data.alerts ?? [];
+};
+
+const getAlertById = async (id: number): Promise<Alert> => {
+  const response = await axios.get<Alert>(`${API_BASE_URL}/alerts/${id}`);
+  return response.data;
+};
+
+// ── RCA ───────────────────────────────────────────────────────────────────────
+
+const getRCA = async (alertId: number): Promise<RCAResult> => {
+  const response = await axios.get<RCAResult>(`${API_BASE_URL}/rca/${alertId}`);
+  return response.data;
+};
+
+const executeRCACommand = async (alertId: number, commandIndex: number): Promise<{ output: string; error?: string }> => {
+  const response = await axios.post<{ output: string; error?: string }>(
+    `${API_BASE_URL}/rca/${alertId}/execute`,
+    { command_index: commandIndex }
+  );
+  return response.data;
+};
+
+// ── Logs ──────────────────────────────────────────────────────────────────────
+
+const getPodLogs = async (params?: {
+  pod?: string;
+  namespace?: string;
+  container?: string;
+  limit?: number;
+}): Promise<PodLog[]> => {
+  const query = new URLSearchParams();
+  if (params?.pod) query.set('pod', params.pod);
+  if (params?.namespace) query.set('namespace', params.namespace);
+  if (params?.container) query.set('container', params.container);
+  if (params?.limit) query.set('limit', String(params.limit));
+
+  const response = await axios.get<{ logs: PodLog[]; count: number }>(
+    `${API_BASE_URL}/pod-logs?${query}`
+  );
+  return response.data.logs ?? [];
+};
+
+// ── Exports ───────────────────────────────────────────────────────────────────
+
 export const api = {
   getMetricsSnapshot: getMetrics,
-  getKubernetesMetrics
-}; 
+  getKubernetesMetrics,
+  getAlerts,
+  getAlertById,
+  getRCA,
+  executeRCACommand,
+  getPodLogs,
+};
