@@ -10,9 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/onkar717/visual-eyes/backend/alerts"
 	"github.com/onkar717/visual-eyes/backend/api"
 	"github.com/onkar717/visual-eyes/backend/config"
 	"github.com/onkar717/visual-eyes/backend/internal/logger"
+	"github.com/onkar717/visual-eyes/backend/models"
 	"github.com/onkar717/visual-eyes/backend/storage"
 )
 
@@ -48,11 +50,35 @@ func main() {
 	systemStore := store
 	k8sStore := store
 
+	// ── Alert Engine ─────────────────────────────────────────────────────────
+	// rcaTrigger is a buffered channel feeding fired alerts to the RCA processor
+	// (Commit 5). Buffer of 100 so fast bursts don't block the eval loop.
+	rcaTrigger := make(chan models.Alert, 100)
+
+	var alertEngine *alerts.Engine
+	if cfg.Alerts.Enabled {
+		if qs, ok := store.(storage.QueryableStore); ok {
+			if as, ok := store.(storage.AlertStore); ok {
+				rules := alerts.FromConfig(cfg.Alerts.Rules)
+				alertEngine = alerts.NewEngine(
+					qs, as, rules,
+					cfg.Alerts.EvalInterval,
+					cfg.Alerts.LookbackWindow,
+					rcaTrigger,
+				)
+				alertEngine.Start()
+			}
+		}
+	}
+
 	// ── Handler + Router ──────────────────────────────────────────────────────
 	handler, err := api.NewHandler(systemStore, k8sStore, cfg.Server.CORSOrigins)
 	if err != nil {
 		slog.Error("failed to create handler", "error", err)
 		os.Exit(1)
+	}
+	if as, ok := store.(storage.AlertStore); ok {
+		handler.SetAlertStore(as)
 	}
 
 	mux := http.NewServeMux()
@@ -86,6 +112,10 @@ func main() {
 	defer cancel()
 
 	handler.StopRateLimiter()
+	if alertEngine != nil {
+		alertEngine.Stop()
+	}
+	close(rcaTrigger)
 
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("graceful shutdown failed", "error", err)
