@@ -15,6 +15,7 @@ import (
 	"github.com/onkar717/visual-eyes/backend/config"
 	"github.com/onkar717/visual-eyes/backend/internal/logger"
 	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/backend/rca"
 	"github.com/onkar717/visual-eyes/backend/storage"
 )
 
@@ -84,6 +85,40 @@ func main() {
 		handler.SetLogStore(ls)
 	}
 
+	// ── RCA Engine (Claude) ───────────────────────────────────────────────────
+	appCtx, appCancel := context.WithCancel(context.Background())
+
+	if cfg.RCA.Enabled && cfg.RCA.APIKey != "" {
+		qs, qsOK := store.(storage.QueryableStore)
+		ls, lsOK := store.(storage.LogStore)
+		as, asOK := store.(storage.AlertStore)
+		rs, rsOK := store.(storage.RCAStore)
+
+		if qsOK && asOK && rsOK {
+			var logStore storage.LogStore
+			if lsOK {
+				logStore = ls
+			}
+			ctxBuilder := rca.NewContextBuilder(qs, logStore, as,
+				cfg.RCA.LogLines, cfg.RCA.MetricSamples)
+			claudeClient := rca.NewClaudeClient(cfg.RCA.APIKey, cfg.RCA.Model, cfg.RCA.MaxTokens)
+			executor := rca.NewExecutor(30 * time.Second)
+			processor := rca.NewProcessor(ctxBuilder, claudeClient, executor, rs, as)
+
+			handler.SetRCAStore(rs)
+
+			go processor.RunWorker(appCtx, rcaTrigger, 2)
+			slog.Info("rca engine started", "model", cfg.RCA.Model)
+		}
+	} else {
+		slog.Info("rca engine disabled — set rca.enabled=true and ANTHROPIC_API_KEY to enable")
+		// Still drain the trigger channel so the alert engine doesn't block.
+		go func() {
+			for range rcaTrigger {
+			}
+		}()
+	}
+
 	mux := http.NewServeMux()
 	router := api.RegisterRoutes(mux, handler, cfg)
 
@@ -114,6 +149,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 
+	appCancel() // stop RCA workers
 	handler.StopRateLimiter()
 	if alertEngine != nil {
 		alertEngine.Stop()
