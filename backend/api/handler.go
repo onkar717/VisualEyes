@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -18,12 +20,13 @@ import (
 type Handler struct {
 	systemStore     storage.MetricStore
 	kubernetesStore storage.MetricStore
-	alertStore      storage.AlertStore  // set via SetAlertStore; nil until Commit 3 wires it
-	logStore        storage.LogStore    // set via SetLogStore; nil until Commit 4 wires it
+	alertStore      storage.AlertStore
+	logStore        storage.LogStore
+	rcaStore        storage.RCAStore
 	hostname        string
 	corsOrigins     string
 	startedAt       time.Time
-	rateLimiter     interface{ Stop() } // set by RegisterRoutes; stopped on shutdown
+	rateLimiter     interface{ Stop() }
 }
 
 // SetAlertStore injects the alert store after construction (Commit 3).
@@ -31,6 +34,9 @@ func (h *Handler) SetAlertStore(s storage.AlertStore) { h.alertStore = s }
 
 // SetLogStore injects the log store after construction (Commit 4).
 func (h *Handler) SetLogStore(s storage.LogStore) { h.logStore = s }
+
+// SetRCAStore injects the RCA store after construction (Commit 5).
+func (h *Handler) SetRCAStore(s storage.RCAStore) { h.rcaStore = s }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -448,14 +454,141 @@ func (h *Handler) HandleAlertByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // -------------------------------------------------------------------
-// RCA — stub, fully implemented in Commit 5
+// RCA
 // -------------------------------------------------------------------
 
+// HandleRCA dispatches:
+//   GET  /api/rca/{alertID}          — fetch RCA result
+//   POST /api/rca/{alertID}/execute  — manually execute a specific command
 func (h *Handler) HandleRCA(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
 	}
-	writeError(w, http.StatusNotFound, "not implemented yet")
+	if h.rcaStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "rca store not initialised")
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/rca/")
+
+	if strings.HasSuffix(path, "/execute") && r.Method == http.MethodPost {
+		h.executeRCACommand(w, r, strings.TrimSuffix(path, "/execute"))
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		h.getRCAResult(w, r, path)
+		return
+	}
+
+	writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+}
+
+func (h *Handler) getRCAResult(w http.ResponseWriter, r *http.Request, alertIDStr string) {
+	var alertID uint
+	if _, err := fmt.Sscanf(alertIDStr, "%d", &alertID); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid alert id")
+		return
+	}
+	result, err := h.rcaStore.GetRCAResult(alertID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "rca result not found")
+		return
+	}
+
+	// Parse commands JSON for the response.
+	var commands []models.FixCommand
+	if result.Commands != "" {
+		json.Unmarshal([]byte(result.Commands), &commands)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":          result.ID,
+		"alertID":     result.AlertID,
+		"explanation": result.Explanation,
+		"rootCause":   result.RootCause,
+		"commands":    commands,
+		"status":      result.Status,
+		"model":       result.Model,
+		"inputTokens": result.InputTokens,
+		"createdAt":   result.CreatedAt,
+	})
+}
+
+func (h *Handler) executeRCACommand(w http.ResponseWriter, r *http.Request, alertIDStr string) {
+	var alertID uint
+	if _, err := fmt.Sscanf(alertIDStr, "%d", &alertID); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid alert id")
+		return
+	}
+
+	var req struct {
+		CommandIndex int `json:"commandIndex"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	result, err := h.rcaStore.GetRCAResult(alertID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "rca result not found")
+		return
+	}
+
+	var commands []models.FixCommand
+	if err := json.Unmarshal([]byte(result.Commands), &commands); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse commands")
+		return
+	}
+
+	if req.CommandIndex < 0 || req.CommandIndex >= len(commands) {
+		writeError(w, http.StatusBadRequest, "command index out of range")
+		return
+	}
+
+	cmd := &commands[req.CommandIndex]
+	if cmd.Status == models.RemediationExecuted {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "already_executed", "output": cmd.Output})
+		return
+	}
+
+	// Manual execution (may not be in auto-safe list — let it through with warning).
+	slog.Info("manual rca command execution requested", "command", cmd.Command, "alert_id", alertID)
+	output, execErr := runCommand(cmd.Command)
+	if execErr != nil {
+		cmd.Status = models.RemediationFailed
+		cmd.ExecError = execErr.Error()
+	} else {
+		cmd.Status = models.RemediationExecuted
+		cmd.Output = output
+	}
+
+	// Persist updated command status.
+	updated, _ := json.Marshal(commands)
+	result.Commands = string(updated)
+	result.UpdatedAt = time.Now()
+	h.rcaStore.UpdateRCAResult(result)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": string(cmd.Status),
+		"output": cmd.Output,
+		"error":  cmd.ExecError,
+	})
+}
+
+// runCommand executes a shell command and returns combined output.
+// This is the manual-approval path; the auto-safe path uses rca.Executor.
+func runCommand(cmd string) (string, error) {
+	parts := strings.Fields(cmd)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("empty command")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	c := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	out, err := c.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
 }
 
 // -------------------------------------------------------------------
