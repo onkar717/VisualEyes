@@ -80,6 +80,9 @@ func main() {
 	if as, ok := store.(storage.AlertStore); ok {
 		handler.SetAlertStore(as)
 	}
+	if ls, ok := store.(storage.LogStore); ok {
+		handler.SetLogStore(ls)
+	}
 
 	mux := http.NewServeMux()
 	router := api.RegisterRoutes(mux, handler, cfg)

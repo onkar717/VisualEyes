@@ -28,18 +28,24 @@ spec:
               fieldPath: spec.nodeName
         - name: VISUAL_EYES_CONFIG
           value: "/etc/visual-eyes/config.yaml"
+        - name: VISUAL_EYES_LOG_DIR
+          value: "/var/log/containers"
         volumeMounts:
         - name: config
           mountPath: /etc/visual-eyes
         - name: kubelet-ssl
           mountPath: /var/lib/kubelet
           readOnly: true
+        # Log collection: read container logs from host filesystem
+        - name: varlog
+          mountPath: /var/log/containers
+          readOnly: true
         resources:
           requests:
             memory: "64Mi"
             cpu: "100m"
           limits:
-            memory: "128Mi"
+            memory: "192Mi"
             cpu: "200m"
       volumes:
       - name: config
@@ -47,4 +53,7 @@ spec:
           name: visual-eyes-k8s-config
       - name: kubelet-ssl
         hostPath:
-          path: /var/lib/kubelet 
+          path: /var/lib/kubelet
+      - name: varlog
+        hostPath:
+          path: /var/log/containers

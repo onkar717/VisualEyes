@@ -28,9 +28,9 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs (runtime log files, not source packages)
 *.log
-logs/
+/logs/
 
 # Node.js dependencies
 node_modules/
