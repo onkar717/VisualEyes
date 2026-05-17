@@ -23,7 +23,7 @@ import { useTheme } from '../theme/ThemeContext';
 import type { PodLog } from '../types/metrics';
 
 function LogLine({ log, isDarkMode }: { log: PodLog; isDarkMode: boolean }) {
-  const isStderr = log.Stream === 'stderr';
+  const isStderr = log.stream === 'stderr';
   return (
     <Box
       sx={{
@@ -42,10 +42,10 @@ function LogLine({ log, isDarkMode }: { log: PodLog; isDarkMode: boolean }) {
         color="text.disabled"
         sx={{ whiteSpace: 'nowrap', pt: 0.1, minWidth: 130 }}
       >
-        {format(new Date(log.Timestamp), 'HH:mm:ss.SSS')}
+        {format(new Date(log.timestamp), 'HH:mm:ss.SSS')}
       </Typography>
       <Chip
-        label={log.Stream}
+        label={log.stream}
         size="small"
         color={isStderr ? 'error' : 'default'}
         variant="outlined"
@@ -62,16 +62,16 @@ function LogLine({ log, isDarkMode }: { log: PodLog; isDarkMode: boolean }) {
             : isDarkMode ? '#e0e0e0' : '#222',
         }}
       >
-        {log.Line}
+        {log.line}
       </Typography>
     </Box>
   );
 }
 
 function deriveOptions(logs: PodLog[]) {
-  const pods = [...new Set(logs.map((l) => l.Pod))].sort();
-  const namespaces = [...new Set(logs.map((l) => l.Namespace))].sort();
-  const containers = [...new Set(logs.map((l) => l.Container))].sort();
+  const pods = [...new Set(logs.map((l) => l.pod))].sort();
+  const namespaces = [...new Set(logs.map((l) => l.namespace))].sort();
+  const containers = [...new Set(logs.map((l) => l.container))].sort();
   return { pods, namespaces, containers };
 }
 
@@ -219,7 +219,7 @@ export const LogViewer: React.FC = () => {
             </Typography>
           </Box>
         ) : (
-          logs.map((log) => <LogLine key={log.ID} log={log} isDarkMode={isDarkMode} />)
+          logs.map((log) => <LogLine key={log.id} log={log} isDarkMode={isDarkMode} />)
         )}
         <div ref={logEndRef} />
       </Paper>

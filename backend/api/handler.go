@@ -357,10 +357,7 @@ func (h *Handler) getPodLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pod := r.URL.Query().Get("pod")
-	ns := r.URL.Query().Get("namespace")
-	if ns == "" {
-		ns = "default"
-	}
+	ns := r.URL.Query().Get("namespace") // empty = all namespaces
 	limit := 500
 	fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
 

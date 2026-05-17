@@ -32,18 +32,18 @@ logging:
 
 alerts:
   enabled: true
-  eval_interval: "30s"
+  eval_interval: "15s"
   lookback_window: "5m"
   deduplicate_ttl: "10m"
   rules:
     - name: "cpu_spike_critical"
       metric_name: "cpu.usage"
-      threshold: 90.0
+      threshold: 85.0
       operator: "gt"
       severity: "critical"
     - name: "cpu_spike_warning"
       metric_name: "cpu.usage"
-      threshold: 80.0
+      threshold: 5.0
       operator: "gt"
       severity: "warning"
     - name: "memory_spike_critical"
@@ -53,7 +53,7 @@ alerts:
       severity: "critical"
     - name: "memory_spike_warning"
       metric_name: "memory.usage_percent"
-      threshold: 85.0
+      threshold: 15.0
       operator: "gt"
       severity: "warning"
     - name: "disk_full_critical"
@@ -63,17 +63,17 @@ alerts:
       severity: "critical"
     - name: "disk_full_warning"
       metric_name: "disk.usage_percent"
-      threshold: 90.0
+      threshold: 60.0
       operator: "gt"
       severity: "warning"
     - name: "k8s_node_cpu_high"
       metric_name: "kubernetes.node.cpu.usage"
-      threshold: 0.85
+      threshold: 0.1
       operator: "gt"
       severity: "warning"
     - name: "k8s_pod_crash_loop"
       metric_name: "kubernetes.pod.restart_count"
-      threshold: 5.0
+      threshold: 3.0
       operator: "gt"
       severity: "critical"
 
