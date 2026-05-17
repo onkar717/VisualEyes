@@ -15,16 +15,22 @@ import (
 )
 
 // Handler is the central HTTP handler for all VisualEyes API endpoints.
-// Fields for log/alert/RCA stores are added as stubs here and wired up in
-// later commits when those packages are introduced.
 type Handler struct {
 	systemStore     storage.MetricStore
 	kubernetesStore storage.MetricStore
+	alertStore      storage.AlertStore  // set via SetAlertStore; nil until Commit 3 wires it
+	logStore        storage.LogStore    // set via SetLogStore; nil until Commit 4 wires it
 	hostname        string
 	corsOrigins     string
 	startedAt       time.Time
 	rateLimiter     interface{ Stop() } // set by RegisterRoutes; stopped on shutdown
 }
+
+// SetAlertStore injects the alert store after construction (Commit 3).
+func (h *Handler) SetAlertStore(s storage.AlertStore) { h.alertStore = s }
+
+// SetLogStore injects the log store after construction (Commit 4).
+func (h *Handler) SetLogStore(s storage.LogStore) { h.logStore = s }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -322,21 +328,70 @@ func (h *Handler) WebSocketStream(w http.ResponseWriter, r *http.Request) {
 }
 
 // -------------------------------------------------------------------
-// Alerts — stub, fully implemented in Commit 3
+// Alerts
 // -------------------------------------------------------------------
 
+// HandleAlerts serves GET /api/alerts?status=firing|all&limit=N.
 func (h *Handler) HandleAlerts(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"alerts": []any{}, "message": "alert engine coming in commit 3"})
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.alertStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"alerts": []any{}})
+		return
+	}
+
+	statusFilter := r.URL.Query().Get("status")
+	var (
+		alertList []models.Alert
+		err       error
+	)
+	if statusFilter == "firing" || statusFilter == "" {
+		alertList, err = h.alertStore.GetActiveAlerts()
+	} else {
+		limit := 100
+		fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
+		alertList, err = h.alertStore.GetAlertHistory(limit)
+	}
+	if err != nil {
+		slog.Error("failed to fetch alerts", "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to fetch alerts")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"alerts": alertList, "count": len(alertList)})
 }
 
+// HandleAlertByID serves GET /api/alerts/{id}.
 func (h *Handler) HandleAlertByID(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
 	}
-	writeError(w, http.StatusNotFound, "not implemented yet")
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if h.alertStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "alert store not initialised")
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/alerts/")
+	var id uint
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid alert id")
+		return
+	}
+
+	alert, err := h.alertStore.GetAlertByID(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "alert not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, alert)
 }
 
 // -------------------------------------------------------------------
