@@ -1,0 +1,57 @@
+package api
+
+import (
+	"net/http"
+
+	"github.com/onkar717/visual-eyes/backend/api/middleware"
+	"github.com/onkar717/visual-eyes/backend/config"
+)
+
+// RegisterRoutes wires all HTTP routes onto mux, wrapping with middleware chain.
+func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Handler {
+	// ── Observability ─────────────────────────────────────────────────────────
+	mux.HandleFunc("/ping", h.Ping)
+	mux.HandleFunc("/healthz", h.Healthz)
+	mux.HandleFunc("/metrics", h.PrometheusMetrics)
+
+	// ── Metric ingestion (agents → server) ───────────────────────────────────
+	mux.HandleFunc("/api/system-metrics", h.PostSystemMetrics)
+	mux.HandleFunc("/api/kubernetes-metrics", h.PostKubernetesMetrics)
+
+	// ── Metric query (UI → server) ────────────────────────────────────────────
+	mux.HandleFunc("/api/metrics/snapshot", h.GetMetricsSnapshot)
+	mux.HandleFunc("/api/metrics/history", h.GetMetricHistory)
+	mux.HandleFunc("/api/kubernetes/metrics", h.GetKubernetesMetrics)
+
+	// ── Logs & K8s events ─────────────────────────────────────────────────────
+	mux.HandleFunc("/api/pod-logs", h.HandlePodLogs)
+	mux.HandleFunc("/api/events", h.HandleKubeEvents)
+
+	// ── Alerts ────────────────────────────────────────────────────────────────
+	mux.HandleFunc("/api/alerts", h.HandleAlerts)
+	mux.HandleFunc("/api/alerts/", h.HandleAlertByID) // /api/alerts/{id}
+
+	// ── RCA ───────────────────────────────────────────────────────────────────
+	mux.HandleFunc("/api/rca/", h.HandleRCA) // /api/rca/{id} and /api/rca/{id}/execute
+
+	// ── WebSocket real-time stream ────────────────────────────────────────────
+	mux.HandleFunc("/ws", h.WebSocketStream)
+
+	// Build middleware chain (outermost first):
+	// recovery → CORS → rate-limit → request-logger → mux
+	var chain http.Handler = mux
+	chain = middleware.RequestLogger(chain)
+
+	if cfg.Server.RateLimit.Enabled {
+		rl := middleware.NewRateLimiter(
+			cfg.Server.RateLimit.RequestsPerSecond,
+			cfg.Server.RateLimit.Burst,
+		)
+		h.rateLimiter = rl
+		chain = middleware.Limit(rl)(chain)
+	}
+
+	chain = middleware.CORS(cfg.Server.CORSOrigins)(chain)
+	chain = middleware.Recovery(chain)
+	return chain
+}
