@@ -1,4 +1,4 @@
-.PHONY: build build-system-agent build-kube-agent build-server build-cli cross run-system-agent run-kube-agent run-server run-ui install-ui build-ui build-docker build-docker-tag push-docker build-and-push build-docker-server run-docker-server push-docker-server build-docker-ui run-docker-ui push-docker-ui build-docker-system-agent run-docker-system-agent push-docker-system-agent docker-up docker-down docker-logs deploy-k8s undeploy-k8s status-k8s run-all test clean fmt lint deps help
+.PHONY: build build-system-agent build-kube-agent build-server build-cli cross install install-cli run-system-agent run-kube-agent run-server run-ui install-ui build-ui build-docker build-docker-tag push-docker build-and-push build-docker-server run-docker-server push-docker-server build-docker-ui run-docker-ui push-docker-ui build-docker-system-agent run-docker-system-agent push-docker-system-agent docker-up docker-down docker-logs deploy-k8s undeploy-k8s status-k8s run-all test test-race clean fmt lint tidy deps help
 
 # Go parameters
 GOCMD=go
@@ -15,7 +15,11 @@ BINARY_NAME_CLI=veye
 
 # Version
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS=-ldflags "-X main.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X main.Version=$(VERSION) -s -w"
+LDFLAGS_DEV=-ldflags "-X main.Version=$(VERSION)"
+
+# Install dir
+INSTALL_DIR ?= /usr/local/bin
 
 # Main paths
 SYSTEM_AGENT_PATH=./agents/system
@@ -178,11 +182,35 @@ run-all: run-server run-system-agent run-ui
 test:
 	$(GOTEST) -v ./...
 
+# Run tests with race detector (use in CI and before release)
+test-race:
+	$(GOTEST) -v -race -count=1 ./...
+
+# Install veye CLI to INSTALL_DIR (default: /usr/local/bin)
+install-cli: build-cli
+	@if [ -w "$(INSTALL_DIR)" ]; then \
+		cp bin/$(BINARY_NAME_CLI) $(INSTALL_DIR)/$(BINARY_NAME_CLI); \
+	else \
+		sudo cp bin/$(BINARY_NAME_CLI) $(INSTALL_DIR)/$(BINARY_NAME_CLI); \
+	fi
+	@echo "$(BINARY_NAME_CLI) installed to $(INSTALL_DIR)/$(BINARY_NAME_CLI)"
+
+# Install server binary to INSTALL_DIR
+install: build-server
+	@if [ -w "$(INSTALL_DIR)" ]; then \
+		cp bin/$(BINARY_NAME_SERVER) $(INSTALL_DIR)/$(BINARY_NAME_SERVER); \
+	else \
+		sudo cp bin/$(BINARY_NAME_SERVER) $(INSTALL_DIR)/$(BINARY_NAME_SERVER); \
+	fi
+	@echo "$(BINARY_NAME_SERVER) installed to $(INSTALL_DIR)/$(BINARY_NAME_SERVER)"
+
 # Clean binaries
 clean:
 	$(GOCLEAN)
 	rm -f bin/$(BINARY_NAME_AGENT)
 	rm -f bin/$(BINARY_NAME_SERVER)
+	rm -f bin/$(BINARY_NAME_CLI)
+	rm -rf dist/
 
 # Create necessary directories
 init:
@@ -194,6 +222,9 @@ fmt:
 
 lint:
 	$(GOLINT) run
+
+tidy:
+	$(GOCMD) mod tidy
 
 deps:
 	$(GOCMD) mod download
