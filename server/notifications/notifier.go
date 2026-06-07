@@ -3,8 +3,9 @@ package notifications
 
 import (
 	"errors"
+	"strings"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // Notifier delivers alert events to an external channel.
@@ -47,4 +48,42 @@ func (m *MultiNotifier) fanOut(fn func(Notifier) error) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// SeverityFilteredNotifier wraps a Notifier and only fires when the alert
+// severity is in the allowlist. Empty allowlist means all severities pass.
+type SeverityFilteredNotifier struct {
+	inner      Notifier
+	severities map[string]bool // lower-case severity values that are allowed
+}
+
+// NewSeverityFilter wraps n and restricts delivery to the given severities.
+// Pass an empty slice to allow all severities.
+func NewSeverityFilter(n Notifier, severities []string) *SeverityFilteredNotifier {
+	set := make(map[string]bool, len(severities))
+	for _, s := range severities {
+		set[strings.ToLower(s)] = true
+	}
+	return &SeverityFilteredNotifier{inner: n, severities: set}
+}
+
+func (f *SeverityFilteredNotifier) allowed(alert models.Alert) bool {
+	if len(f.severities) == 0 {
+		return true
+	}
+	return f.severities[strings.ToLower(string(alert.Severity))]
+}
+
+func (f *SeverityFilteredNotifier) AlertFired(alert models.Alert) error {
+	if !f.allowed(alert) {
+		return nil
+	}
+	return f.inner.AlertFired(alert)
+}
+
+func (f *SeverityFilteredNotifier) AlertResolved(alert models.Alert) error {
+	if !f.allowed(alert) {
+		return nil
+	}
+	return f.inner.AlertResolved(alert)
 }

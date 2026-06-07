@@ -31,6 +31,7 @@ type Handler struct {
 	remediationLogStore storage.RemediationLogStore
 	clusterStore        storage.ClusterStore
 	snapshotStore       storage.ClusterSnapshotStore
+	eventBuffer         *storage.EventBuffer // ring buffer for K8s Warning events
 	broadcaster         *ws.Broadcaster
 	hostname          string
 	corsOrigins       string
@@ -40,6 +41,7 @@ type Handler struct {
 
 func (h *Handler) SetAlertStore(s storage.AlertStore)               { h.alertStore = s }
 func (h *Handler) SetLogStore(s storage.LogStore)                   { h.logStore = s }
+func (h *Handler) SetEventBuffer(eb *storage.EventBuffer)           { h.eventBuffer = eb }
 func (h *Handler) SetRCAStore(s storage.RCAStore)                   { h.rcaStore = s }
 func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notificationStore = s }
 func (h *Handler) SetIncidentStore(s storage.IncidentStore)                 { h.incidentStore = s }
@@ -385,14 +387,22 @@ func (h *Handler) HandleKubeEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPost:
-		// Acknowledge; downstream RCA will consume these once wired.
-		var payload []map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
-			slog.Debug("received k8s events", "count", len(payload))
+		var payload []storage.K8sEvent
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
 		}
+		if h.eventBuffer != nil && len(payload) > 0 {
+			h.eventBuffer.Store(payload)
+		}
+		slog.Debug("received k8s events", "count", len(payload))
 		w.WriteHeader(http.StatusAccepted)
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"events": []any{}})
+		var events []storage.K8sEvent
+		if h.eventBuffer != nil {
+			events = h.eventBuffer.GetRecent("", 100)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"events": events})
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
@@ -1151,7 +1161,6 @@ func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request)
 		snap := &models.ClusterSnapshot{
 			ClusterName:   c.Name,
 			RecordedAt:    c.LastSeen,
-			HealthScore:   c.HealthScore,
 			TotalNodes:    c.TotalNodes,
 			ReadyNodes:    c.ReadyNodes,
 			TotalPods:     c.TotalPods,
@@ -1160,7 +1169,12 @@ func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request)
 			FailedPods:    c.FailedPods,
 			CrashloopPods: c.CrashloopPods,
 			OpenIncidents: c.OpenIncidents,
+			CPUUsagePct:   c.CPUUsagePct,
+			MemUsagePct:   c.MemUsagePct,
 		}
+		// Recompute health score using all factors including CPU/Mem pressure.
+		snap.ComputeHealthScore()
+		c.HealthScore = snap.HealthScore
 		if err := h.snapshotStore.SaveSnapshot(snap); err != nil {
 			slog.Warn("save cluster snapshot failed", "error", err)
 		}

@@ -42,6 +42,8 @@ type Processor struct {
 	incidentStore       storage.IncidentStore       // optional
 	remediationLogStore storage.RemediationLogStore // optional
 	agentTimeoutSeconds int                         // per-stage LLM timeout; 0 = no limit
+	autoRemediate       bool                        // execute auto-safe commands when true
+	dryRun              bool                        // log commands but never execute when true
 }
 
 // SetIncidentStore injects the incident store after construction.
@@ -51,6 +53,13 @@ func (p *Processor) SetIncidentStore(s storage.IncidentStore) { p.incidentStore 
 func (p *Processor) SetRemediationLogStore(s storage.RemediationLogStore) {
 	p.remediationLogStore = s
 }
+
+// SetAutoRemediate controls whether auto-safe commands are actually executed.
+// When false, safe commands are identified but skipped (dry-run behaviour).
+func (p *Processor) SetAutoRemediate(v bool) { p.autoRemediate = v }
+
+// SetDryRun disables all command execution when true, overriding AutoRemediate.
+func (p *Processor) SetDryRun(v bool) { p.dryRun = v }
 
 // NewProcessor builds a Processor from its dependencies.
 func NewProcessor(
@@ -186,9 +195,15 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	fixCmds := resp.ToFixCommands()
 
 	// 6. Auto-execute safe commands and write an audit log entry per step.
+	// Skipped entirely when DryRun=true or AutoRemediate=false.
 	autoRemediated := false
 	for i, cmd := range fixCmds {
 		if !cmd.IsAutoSafe {
+			continue
+		}
+		if p.dryRun || !p.autoRemediate {
+			log.Info("remediation skipped (dry-run or auto-remediate disabled)", "command", cmd.Command)
+			fixCmds[i].Status = models.RemediationPending
 			continue
 		}
 		start := time.Now()
