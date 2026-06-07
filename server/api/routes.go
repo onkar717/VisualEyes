@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/onkar717/visual-eyes/backend/api/middleware"
-	"github.com/onkar717/visual-eyes/backend/config"
+	"github.com/onkar717/visual-eyes/server/api/middleware"
+	"github.com/onkar717/visual-eyes/server/config"
 )
 
 // RegisterRoutes wires all HTTP routes onto mux, wrapping with middleware chain.
@@ -43,6 +43,9 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// Incident lifecycle (SEV1-4, MTTR, status, single-incident GET)
 	mux.HandleFunc("/api/incidents/full", h.HandleIncidentsFull)
 	mux.HandleFunc("/api/incidents/full/", h.HandleIncidentByIDOrStatus) // GET|PATCH /api/incidents/full/{id}
+
+	// Aggregate stats
+	mux.HandleFunc("/api/stats", h.HandleStats)
 
 	// WebSocket real-time stream
 	mux.HandleFunc("/ws", h.WebSocketStream)

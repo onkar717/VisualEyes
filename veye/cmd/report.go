@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onkar717/visual-eyes/cli/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -94,7 +94,7 @@ func printSingleReport(id uint) error {
 }
 
 func printSummaryReport() error {
-	resp, err := api.FullIncidents(20, "", "")
+	resp, err := api.FullIncidents(20, "", "", 0)
 	if err != nil {
 		return fmt.Errorf("fetch incidents: %w", err)
 	}

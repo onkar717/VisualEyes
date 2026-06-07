@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/storage"
 )
 
 // Processor orchestrates the full RCA pipeline for a single alert:
@@ -20,12 +20,13 @@ import (
 //  3. Auto-execute safe commands (kubectl delete pod, kubectl rollout restart)
 //  4. Persist RCAResult; update Alert.RCAStatus
 type Processor struct {
-	contextBuilder *ContextBuilder
-	pipeline       *Pipeline
-	executor       *Executor
-	rcaStore       storage.RCAStore
-	alertStore     storage.AlertStore
-	incidentStore  storage.IncidentStore // optional
+	contextBuilder      *ContextBuilder
+	pipeline            *Pipeline
+	executor            *Executor
+	rcaStore            storage.RCAStore
+	alertStore          storage.AlertStore
+	incidentStore       storage.IncidentStore // optional
+	agentTimeoutSeconds int                   // per-stage LLM timeout; 0 = no limit
 }
 
 // SetIncidentStore injects the incident store after construction.
@@ -38,17 +39,19 @@ func NewProcessor(
 	ex *Executor,
 	rcaStore storage.RCAStore,
 	alertStore storage.AlertStore,
+	agentTimeoutSeconds int,
 ) *Processor {
 	maxTokens := 2048
 	if claude, ok := llm.(*ClaudeClient); ok {
 		maxTokens = claude.maxTokens / 2 // per stage budget
 	}
 	return &Processor{
-		contextBuilder: cb,
-		pipeline:       NewPipeline(llm, maxTokens),
-		executor:       ex,
-		rcaStore:       rcaStore,
-		alertStore:     alertStore,
+		contextBuilder:      cb,
+		pipeline:            NewPipeline(llm, maxTokens),
+		executor:            ex,
+		rcaStore:            rcaStore,
+		alertStore:          alertStore,
+		agentTimeoutSeconds: agentTimeoutSeconds,
 	}
 }
 
@@ -101,8 +104,15 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	}
 	p.linkRCAToAlert(alert.ID, result.ID)
 
-	// 3. Run multi-stage pipeline.
-	resp, inputTokens, err := p.pipeline.RunPipeline(ctx, ac)
+	// 3. Run multi-stage pipeline with optional timeout (6 stages × per-stage timeout).
+	pipelineCtx := ctx
+	if p.agentTimeoutSeconds > 0 {
+		var cancel context.CancelFunc
+		pipelineCtx, cancel = context.WithTimeout(ctx,
+			time.Duration(p.agentTimeoutSeconds*6)*time.Second)
+		defer cancel()
+	}
+	resp, inputTokens, err := p.pipeline.RunPipeline(pipelineCtx, ac)
 	if err != nil {
 		log.Error("rca pipeline failed", "error", err)
 		result.Status = "failed"

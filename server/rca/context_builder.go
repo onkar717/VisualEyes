@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/storage"
 )
 
 // AlertContext bundles everything the LLM pipeline needs for high-quality RCA.
@@ -80,13 +80,22 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Sibling alerts on the same resource.
+	// Sibling alerts on the same resource (cap at 10 to bound prompt size).
 	if all, err := b.alertStore.GetActiveAlerts(); err == nil {
 		for _, a := range all {
 			if a.ID != alert.ID && a.ResourceID == alert.ResourceID {
 				ctx.SiblingAlerts = append(ctx.SiblingAlerts, a)
+				if len(ctx.SiblingAlerts) >= 10 {
+					break
+				}
 			}
 		}
+	}
+
+	// Cap related metrics to prevent oversized prompts on high-cardinality clusters.
+	const maxRelatedMetrics = 50
+	if len(ctx.RelatedMetrics) > maxRelatedMetrics {
+		ctx.RelatedMetrics = ctx.RelatedMetrics[:maxRelatedMetrics]
 	}
 
 	return ctx

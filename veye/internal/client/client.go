@@ -246,7 +246,8 @@ func (c *Client) Scan() (*ScanResult, error) {
 }
 
 // FullIncidents calls /api/incidents/full and returns structured incident records.
-func (c *Client) FullIncidents(limit int, severity, status string) (*IncidentListResponse, error) {
+// hours=0 means no time filter; hours>0 restricts to the last N hours.
+func (c *Client) FullIncidents(limit int, severity, status string, hours int) (*IncidentListResponse, error) {
 	var r IncidentListResponse
 	q := fmt.Sprintf("/api/incidents/full?limit=%d", limit)
 	if severity != "" {
@@ -254,6 +255,9 @@ func (c *Client) FullIncidents(limit int, severity, status string) (*IncidentLis
 	}
 	if status != "" {
 		q += "&status=" + status
+	}
+	if hours > 0 {
+		q += fmt.Sprintf("&hours=%d", hours)
 	}
 	return &r, c.get(q, &r)
 }

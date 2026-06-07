@@ -10,16 +10,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/alerts"
-	"github.com/onkar717/visual-eyes/backend/api"
-	"github.com/onkar717/visual-eyes/backend/config"
-	"github.com/onkar717/visual-eyes/backend/internal/logger"
-	appmetrics "github.com/onkar717/visual-eyes/backend/metrics"
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/notifications"
-	"github.com/onkar717/visual-eyes/backend/rca"
-	"github.com/onkar717/visual-eyes/backend/storage"
-	"github.com/onkar717/visual-eyes/backend/ws"
+	"github.com/onkar717/visual-eyes/server/alerts"
+	"github.com/onkar717/visual-eyes/server/api"
+	"github.com/onkar717/visual-eyes/server/config"
+	"github.com/onkar717/visual-eyes/server/internal/logger"
+	appmetrics "github.com/onkar717/visual-eyes/server/metrics"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/notifications"
+	"github.com/onkar717/visual-eyes/server/rca"
+	"github.com/onkar717/visual-eyes/server/storage"
+	"github.com/onkar717/visual-eyes/server/ws"
 )
 
 func main() {
@@ -182,7 +182,7 @@ func main() {
 			ctxBuilder := rca.NewContextBuilder(qs, logStore, as,
 				cfg.RCA.LogLines, cfg.RCA.MetricSamples)
 			executor := rca.NewExecutor(30 * time.Second)
-			processor := rca.NewProcessor(ctxBuilder, llmProvider, executor, rs, as)
+			processor := rca.NewProcessor(ctxBuilder, llmProvider, executor, rs, as, cfg.RCA.AgentTimeoutSeconds)
 
 			handler.SetRCAStore(rs)
 			if is, ok := store.(storage.IncidentStore); ok {

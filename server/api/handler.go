@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	sharedhttp "github.com/onkar717/visual-eyes/backend/http"
-	appmetrics "github.com/onkar717/visual-eyes/backend/metrics"
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/storage"
-	"github.com/onkar717/visual-eyes/backend/ws"
+	sharedhttp "github.com/onkar717/visual-eyes/server/http"
+	appmetrics "github.com/onkar717/visual-eyes/server/metrics"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/storage"
+	"github.com/onkar717/visual-eyes/server/ws"
 )
 
 // Handler is the central HTTP handler for all VisualEyes API endpoints.
@@ -1020,7 +1020,12 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 		limit = 500
 	}
 
-	incidents, err := h.incidentStore.GetRecentIncidents(q.Get("severity"), q.Get("status"), limit)
+	hours := 0
+	if h := q.Get("hours"); h != "" {
+		fmt.Sscanf(h, "%d", &hours)
+	}
+
+	incidents, err := h.incidentStore.GetRecentIncidents(q.Get("severity"), q.Get("status"), limit, hours)
 	if err != nil {
 		slog.Error("get incidents", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -1034,6 +1039,29 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 		"mttr_avg_seconds": avg,
 		"mttr_count":       count,
 	})
+}
+
+// HandleStats returns aggregate incident statistics.
+// GET /api/stats
+func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if h.incidentStore == nil {
+		writeJSON(w, http.StatusOK, storage.IncidentStats{
+			BySeverity: map[string]int{},
+			ByStatus:   map[string]int{},
+		})
+		return
+	}
+	stats, err := h.incidentStore.GetStats()
+	if err != nil {
+		slog.Error("get stats", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
 }
 
 // HandleIncidentStatus updates an incident's status (OPEN→INVESTIGATING→MITIGATED→RESOLVED).
