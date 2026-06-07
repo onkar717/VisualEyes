@@ -72,6 +72,8 @@ type IncidentStats struct {
 	MTTRCount      int               `json:"mttr_count"`
 	// MTTRBySeverity maps severity level (SEV1..SEV4) to average MTTR in seconds.
 	MTTRBySeverity map[string]float64 `json:"mttr_by_severity,omitempty"`
+	// MTTRCountBySeverity maps severity level to count of resolved incidents used for MTTR.
+	MTTRCountBySeverity map[string]int `json:"mttr_count_by_severity,omitempty"`
 	BySeverity     map[string]int    `json:"by_severity"`
 	ByStatus       map[string]int    `json:"by_status"`
 }

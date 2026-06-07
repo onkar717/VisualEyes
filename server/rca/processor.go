@@ -263,7 +263,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 
 	// 8. Create/update Incident record from RCA output.
 	if p.incidentStore != nil {
-		p.upsertIncident(alert, result, autoRemediated, scanDuration, resp.RunbookUsed, resp.RawOutput, resp.ServiceImpacts)
+		p.upsertIncident(alert, result, autoRemediated, scanDuration, resp.RunbookUsed, resp.RawOutput, resp)
 	}
 
 	log.Info("rca processing complete",
@@ -284,7 +284,7 @@ func (p *Processor) upsertIncident(
 	scanDurationSecs float64,
 	runbookUsed string,
 	rawOutput string,
-	serviceImpacts []ServiceImpact,
+	resp *RCAResponse,
 ) {
 	rawSnip := rawOutput
 	if len(rawSnip) > 2000 {
@@ -292,9 +292,50 @@ func (p *Processor) upsertIncident(
 	}
 
 	impactsJSON := "[]"
-	if len(serviceImpacts) > 0 {
-		if b, err := json.Marshal(serviceImpacts); err == nil {
+	if len(resp.ServiceImpacts) > 0 {
+		if b, err := json.Marshal(resp.ServiceImpacts); err == nil {
 			impactsJSON = string(b)
+		}
+	}
+
+	evidenceJSON := "[]"
+	if len(resp.Evidence) > 0 {
+		if b, err := json.Marshal(resp.Evidence); err == nil {
+			evidenceJSON = string(b)
+		}
+	}
+
+	remPlanJSON := "[]"
+	if len(resp.RemediationPlan) > 0 {
+		steps := make([]models.RemediationStep, len(resp.RemediationPlan))
+		for i, s := range resp.RemediationPlan {
+			steps[i] = models.RemediationStep{
+				StepNumber:    s.StepNumber,
+				Description:   s.Description,
+				Command:       s.Command,
+				IsDestructive: s.IsDestructive,
+				IsAutomated:   s.IsAutomated,
+				Status:        models.StepPending,
+			}
+		}
+		if b, err := json.Marshal(steps); err == nil {
+			remPlanJSON = string(b)
+		}
+	}
+
+	nsJSON := "[]"
+	if len(resp.AffectedNamespaces) > 0 {
+		if b, err := json.Marshal(resp.AffectedNamespaces); err == nil {
+			nsJSON = string(b)
+		}
+	} else if alert.Namespace != "" {
+		nsJSON = `["` + alert.Namespace + `"]`
+	}
+
+	podCount := resp.AffectedPodCount
+	if podCount == 0 {
+		for _, si := range resp.ServiceImpacts {
+			podCount += len(si.AffectedPods)
 		}
 	}
 
@@ -305,6 +346,10 @@ func (p *Processor) upsertIncident(
 		existing.ContributingFactors  = result.ContributingFactors
 		existing.AffectedServices    = result.AffectedServices
 		existing.ServiceImpacts      = impactsJSON
+		existing.EvidenceItems       = evidenceJSON
+		existing.RemediationPlan     = remPlanJSON
+		existing.AffectedNamespaces  = nsJSON
+		existing.AffectedPodCount    = podCount
 		existing.ConfidenceScore     = result.ConfidenceScore
 		existing.Severity            = models.SeverityFromRCA(result.Severity)
 		existing.Category            = result.Category
@@ -329,6 +374,10 @@ func (p *Processor) upsertIncident(
 		dup.ContributingFactors  = result.ContributingFactors
 		dup.AffectedServices    = result.AffectedServices
 		dup.ServiceImpacts      = impactsJSON
+		dup.EvidenceItems       = evidenceJSON
+		dup.RemediationPlan     = remPlanJSON
+		dup.AffectedNamespaces  = nsJSON
+		dup.AffectedPodCount    = podCount
 		dup.ConfidenceScore     = result.ConfidenceScore
 		dup.Severity            = models.SeverityFromRCA(result.Severity)
 		dup.AutoRemediated      = autoRemediated || dup.AutoRemediated
@@ -365,6 +414,10 @@ func (p *Processor) upsertIncident(
 		ContributingFactors: result.ContributingFactors,
 		AffectedServices:    result.AffectedServices,
 		ServiceImpacts:      impactsJSON,
+		EvidenceItems:       evidenceJSON,
+		RemediationPlan:     remPlanJSON,
+		AffectedNamespaces:  nsJSON,
+		AffectedPodCount:    podCount,
 		ConfidenceScore:     result.ConfidenceScore,
 		AutoRemediated:      autoRemediated,
 		ScanDurationSecs:    scanDurationSecs,

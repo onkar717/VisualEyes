@@ -3,7 +3,10 @@ package notifications
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/onkar717/visual-eyes/server/models"
 )
@@ -86,4 +89,42 @@ func (f *SeverityFilteredNotifier) AlertResolved(alert models.Alert) error {
 		return nil
 	}
 	return f.inner.AlertResolved(alert)
+}
+
+// DedupNotifier suppresses re-delivery of the same alert within a time window.
+// Prevents notification spam when the same alert repeatedly fires.
+type DedupNotifier struct {
+	inner     Notifier
+	window    time.Duration
+	mu        sync.Mutex
+	lastFired map[string]time.Time // alert key → last delivery time
+}
+
+// NewDedupNotifier wraps n and suppresses AlertFired re-delivery within window.
+func NewDedupNotifier(n Notifier, window time.Duration) *DedupNotifier {
+	return &DedupNotifier{inner: n, window: window, lastFired: make(map[string]time.Time)}
+}
+
+func (d *DedupNotifier) alertKey(alert models.Alert) string {
+	return fmt.Sprintf("%d", alert.ID)
+}
+
+func (d *DedupNotifier) AlertFired(alert models.Alert) error {
+	key := d.alertKey(alert)
+	d.mu.Lock()
+	last, ok := d.lastFired[key]
+	if ok && time.Since(last) < d.window {
+		d.mu.Unlock()
+		return nil
+	}
+	d.lastFired[key] = time.Now()
+	d.mu.Unlock()
+	return d.inner.AlertFired(alert)
+}
+
+func (d *DedupNotifier) AlertResolved(alert models.Alert) error {
+	d.mu.Lock()
+	delete(d.lastFired, d.alertKey(alert))
+	d.mu.Unlock()
+	return d.inner.AlertResolved(alert)
 }

@@ -25,6 +25,51 @@ type ServiceImpact struct {
 	P99LatencyMs float64            `json:"p99LatencyMs,omitempty"` // from histogram_quantile
 }
 
+// EvidenceType classifies the source of a piece of RCA evidence.
+type EvidenceType string
+
+const (
+	EvidenceMetric  EvidenceType = "metric"
+	EvidenceLog     EvidenceType = "log"
+	EvidenceEvent   EvidenceType = "event"
+	EvidenceNode    EvidenceType = "node"
+	EvidenceRunbook EvidenceType = "runbook"
+)
+
+// Evidence is a single piece of evidence supporting the RCA conclusion.
+type Evidence struct {
+	Type        EvidenceType `json:"type"`
+	Source      string       `json:"source"`
+	Description string       `json:"description"`
+	Raw         string       `json:"raw,omitempty"`
+	MetricName  string       `json:"metricName,omitempty"`
+	MetricValue float64      `json:"metricValue,omitempty"`
+	PodName     string       `json:"podName,omitempty"`
+	Namespace   string       `json:"namespace,omitempty"`
+}
+
+// RemediationStepStatus tracks execution state of a single remediation step.
+type RemediationStepStatus string
+
+const (
+	StepPending RemediationStepStatus = "PENDING"
+	StepApplied RemediationStepStatus = "APPLIED"
+	StepSkipped RemediationStepStatus = "SKIPPED"
+	StepFailed  RemediationStepStatus = "FAILED"
+)
+
+// RemediationStep is a structured remediation step with execution tracking.
+type RemediationStep struct {
+	StepNumber    int                   `json:"stepNumber"`
+	Description   string                `json:"description"`
+	Command       string                `json:"command,omitempty"`
+	IsDestructive bool                  `json:"isDestructive"`
+	IsAutomated   bool                  `json:"isAutomated"`
+	Status        RemediationStepStatus `json:"status"`
+	AppliedAt     *time.Time            `json:"appliedAt,omitempty"`
+	Result        string                `json:"result,omitempty"`
+}
+
 // IncidentSeverity follows Google/PagerDuty SRE conventions.
 type IncidentSeverity string
 
@@ -67,6 +112,14 @@ type Incident struct {
 
 	// Service impact — JSON-encoded []ServiceImpact
 	ServiceImpacts string `gorm:"type:text" json:"serviceImpacts,omitempty"`
+	// EvidenceItems — JSON-encoded []Evidence
+	EvidenceItems string `gorm:"type:text" json:"evidenceItems,omitempty"`
+	// RemediationPlan — JSON-encoded []RemediationStep with per-step execution tracking
+	RemediationPlan string `gorm:"type:text" json:"remediationPlan,omitempty"`
+	// AffectedNamespaces — JSON-encoded []string for cross-namespace incidents
+	AffectedNamespaces string `gorm:"type:text" json:"affectedNamespaces,omitempty"`
+	// AffectedPodCount is total count of pods mentioned across all service impacts.
+	AffectedPodCount int `json:"affectedPodCount"`
 
 	// Remediation observability
 	AutoRemediated  bool    `gorm:"default:false" json:"autoRemediated"`  // true if any command auto-executed
