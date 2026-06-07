@@ -100,4 +100,4 @@ local.yml
 
 # Backup files
 *.bak
-*.backup 
+*.backup
