@@ -187,6 +187,8 @@ func main() {
 			}
 			ctxBuilder := rca.NewContextBuilder(qs, logStore, as,
 				cfg.RCA.LogLines, cfg.RCA.MetricSamples)
+			ctxBuilder.SetPrometheus(cfg.RCA.PrometheusURL, cfg.RCA.PrometheusEnabled)
+			ctxBuilder.SetLoki(cfg.RCA.LokiURL, cfg.RCA.LokiEnabled)
 			executor := rca.NewExecutor(30 * time.Second)
 			processor := rca.NewProcessor(ctxBuilder, llmProvider, executor, rs, as, cfg.RCA.AgentTimeoutSeconds)
 
