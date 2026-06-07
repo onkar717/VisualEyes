@@ -218,8 +218,7 @@ func (e *Engine) resolve(alertID uint, dedupeKey string) {
 	slog.Info("alert resolved", "id", alertID, "rule", a.RuleName, "resource", a.ResourceID)
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// Helpers
 // groupByResource groups metric samples by their resource identifier tag.
 func groupByResource(samples []models.Metric) map[string][]models.Metric {
 	m := make(map[string][]models.Metric)

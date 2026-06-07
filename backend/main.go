@@ -25,21 +25,21 @@ import (
 func main() {
 	startedAt := time.Now()
 
-	// ── Config ────────────────────────────────────────────────────────────────
+	// Config
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// ── Logging ───────────────────────────────────────────────────────────────
+	// Logging
 	logger.Init(cfg.Logging.Level, cfg.Logging.Format)
 	slog.Info("VisualEyes server starting",
 		"version", version(),
 		"log_level", cfg.Logging.Level,
 	)
 
-	// ── Storage (PostgreSQL) ─────────────────────────────────────────────────
+	// Storage (PostgreSQL)
 	// A single PostgresStore handles all feature tables. Falls back to
 	// in-memory if Postgres is unreachable (dev/no-DB mode).
 	var store storage.MetricStore
@@ -56,7 +56,7 @@ func main() {
 	systemStore := store
 	k8sStore := store
 
-	// ── Notifications (multi-channel fan-out) ────────────────────────────────
+	// Notifications (multi-channel fan-out)
 	var activeNotifiers []notifications.Notifier
 	var channelNames []string
 
@@ -100,7 +100,7 @@ func main() {
 		notifier = notifications.NewLoggingNotifier(baseNotifier, channel, ns)
 	}
 
-	// ── Alert Engine ─────────────────────────────────────────────────────────
+	// Alert Engine
 	// rcaTrigger is a buffered channel feeding fired alerts to the RCA processor.
 	// Buffer of 100 so fast bursts don't block the eval loop.
 	rcaTrigger := make(chan models.Alert, 100)
@@ -122,11 +122,11 @@ func main() {
 		}
 	}
 
-	// ── WebSocket Broadcaster ────────────────────────────────────────────────
+	// WebSocket Broadcaster
 	// broadcaster fans real-time metric snapshots to all connected WS clients.
 	broadcaster := ws.NewBroadcaster()
 
-	// ── Handler + Router ──────────────────────────────────────────────────────
+	// Handler + Router
 	handler, err := api.NewHandler(systemStore, k8sStore, cfg.Server.CORSOrigins)
 	if err != nil {
 		slog.Error("failed to create handler", "error", err)
@@ -143,10 +143,10 @@ func main() {
 	}
 	handler.SetBroadcaster(broadcaster)
 
-	// ── RCA Engine (Claude) ───────────────────────────────────────────────────
+	// RCA Engine (Claude)
 	appCtx, appCancel := context.WithCancel(context.Background())
 
-	// ── Observability background loop ────────────────────────────────────────
+	// Observability background loop
 	// Ticks every 5 s to refresh the Prometheus uptime gauge and push a metric
 	// snapshot to any connected WebSocket clients (so the UI stays live even
 	// if no new data arrived since the last ingestion).
@@ -164,7 +164,7 @@ func main() {
 		}
 	}()
 
-	// ── RCA LLM provider selection ────────────────────────────────────────────
+	// RCA LLM provider selection
 	llmProvider := rca.BuildLLMProvider(cfg)
 	rcaEnabled := cfg.RCA.Enabled && llmProvider != nil
 
@@ -204,7 +204,7 @@ func main() {
 	mux := http.NewServeMux()
 	router := api.RegisterRoutes(mux, handler, cfg)
 
-	// ── HTTP Server ───────────────────────────────────────────────────────────
+	// HTTP Server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr:         addr,
@@ -213,7 +213,7 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
-	// ── Graceful shutdown ─────────────────────────────────────────────────────
+	// Graceful shutdown
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
 

@@ -7,8 +7,7 @@ import (
 	"github.com/onkar717/visual-eyes/backend/models"
 )
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
+// helpers
 func metric(name string, value float64, tags map[string]string, ts time.Time) models.Metric {
 	return models.Metric{Name: name, Value: value, Tags: tags, Timestamp: ts}
 }
@@ -22,8 +21,7 @@ func newAlert(rule string, status models.AlertStatus) *models.Alert {
 	}
 }
 
-// ─── MetricStore ──────────────────────────────────────────────────────────────
-
+// MetricStore
 func TestMemoryStore_StoreAndGetMetrics(t *testing.T) {
 	s := NewMemoryStore()
 	now := time.Now()
@@ -81,8 +79,7 @@ func TestMemoryStore_MaxPerKey(t *testing.T) {
 	}
 }
 
-// ─── QueryableStore ───────────────────────────────────────────────────────────
-
+// QueryableStore
 func TestMemoryStore_QueryByName(t *testing.T) {
 	s := NewMemoryStore()
 	base := time.Now()
@@ -141,8 +138,7 @@ func TestMemoryStore_QueryByTags(t *testing.T) {
 	}
 }
 
-// ─── AlertStore ───────────────────────────────────────────────────────────────
-
+// AlertStore
 func TestMemoryStore_SaveAlert_AssignsID(t *testing.T) {
 	s := NewMemoryStore()
 	a := newAlert("high-cpu", models.AlertFiring)
@@ -230,8 +226,7 @@ func TestMemoryStore_GetAlertByID(t *testing.T) {
 	}
 }
 
-// ─── LogStore ─────────────────────────────────────────────────────────────────
-
+// LogStore
 func TestMemoryStore_StoreLogs_AssignsID(t *testing.T) {
 	s := NewMemoryStore()
 	logs := []models.PodLog{{Pod: "web-1", Namespace: "prod", Line: "started", Timestamp: time.Now()}}
@@ -278,8 +273,7 @@ func TestMemoryStore_GetLogsSince(t *testing.T) {
 	}
 }
 
-// ─── RCAStore ─────────────────────────────────────────────────────────────────
-
+// RCAStore
 func TestMemoryStore_RCAResult(t *testing.T) {
 	s := NewMemoryStore()
 

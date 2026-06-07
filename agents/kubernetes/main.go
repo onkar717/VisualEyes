@@ -40,7 +40,7 @@ func main() {
 		"node", nodeName,
 	)
 
-	// ── Kubernetes client ─────────────────────────────────────────────────────
+	// Kubernetes client
 	collector, err := metrics.New()
 	if err != nil {
 		slog.Error("failed to create kubernetes metrics collector", "error", err)
@@ -52,7 +52,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// ── Metrics goroutine ─────────────────────────────────────────────────────
+	// Metrics goroutine
 	go func() {
 		ticker := time.NewTicker(sharedhttp.DefaultCollectionInterval)
 		defer ticker.Stop()
@@ -78,7 +78,7 @@ func main() {
 		}
 	}()
 
-	// ── Log collection goroutine ──────────────────────────────────────────────
+	// Log collection goroutine
 	logDir := os.Getenv("VISUAL_EYES_LOG_DIR")
 	if logDir == "" {
 		logDir = "/var/log/containers"
@@ -109,7 +109,7 @@ func main() {
 		}
 	}()
 
-	// ── K8s Events goroutine ──────────────────────────────────────────────────
+	// K8s Events goroutine
 	// Events collector uses the same in-cluster client as the metrics collector.
 	k8sClient := collector.Client()
 	if k8sClient != nil {
@@ -130,7 +130,7 @@ func main() {
 		}()
 	}
 
-	// ── Graceful shutdown ─────────────────────────────────────────────────────
+	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	slog.Info("kubernetes agent running — waiting for signal")

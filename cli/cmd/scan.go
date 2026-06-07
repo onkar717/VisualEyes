@@ -30,7 +30,7 @@ var scanCmd = &cobra.Command{
 }
 
 func printScanResult(r *client.ScanResult) {
-	// ── Header ────────────────────────────────────────────────────────────────
+	// Header
 	overallStyle := styles.Good
 	overallIcon := "✓"
 	switch r.Overall {
@@ -49,7 +49,7 @@ func printScanResult(r *client.ScanResult) {
 		overallStyle.Bold(true).Render(strings.ToUpper(r.Overall)),
 	)
 
-	// ── Summary bar ───────────────────────────────────────────────────────────
+	// Summary bar
 	summaryBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#303060")).
@@ -70,7 +70,7 @@ func printScanResult(r *client.ScanResult) {
 	fmt.Println(summaryBox.Render(summary))
 	fmt.Println()
 
-	// ── Issues ────────────────────────────────────────────────────────────────
+	// Issues
 	if len(r.Issues) == 0 {
 		fmt.Println(styles.Good.Render("  No issues found. Everything looks healthy."))
 		fmt.Println()

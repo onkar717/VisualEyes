@@ -64,7 +64,7 @@ func printAlertsTable() {
 	colRCA  := 10
 
 	// Header row
-	sep := styles.Mute.Render(strings.Repeat("─", colSev+colRule+colRes+colVal+colRCA+8))
+	sep := styles.Mute.Render(strings.Repeat("-", colSev+colRule+colRes+colVal+colRCA+8))
 	hdr := lipgloss.JoinHorizontal(lipgloss.Left,
 		styles.KeyStyle.Width(colSev).Render("SEV"),
 		styles.KeyStyle.Width(colRule).Render("RULE"),

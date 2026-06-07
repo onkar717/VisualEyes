@@ -9,42 +9,42 @@ import (
 
 // RegisterRoutes wires all HTTP routes onto mux, wrapping with middleware chain.
 func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Handler {
-	// ── Observability ─────────────────────────────────────────────────────────
+	// Observability
 	mux.HandleFunc("/ping", h.Ping)
 	mux.HandleFunc("/healthz", h.Healthz)
 	mux.HandleFunc("/metrics", h.PrometheusMetrics)
 
-	// ── Metric ingestion (agents → server) ───────────────────────────────────
+	// Metric ingestion (agents → server)
 	mux.HandleFunc("/api/system-metrics", h.PostSystemMetrics)
 	mux.HandleFunc("/api/kubernetes-metrics", h.PostKubernetesMetrics)
 
-	// ── Metric query (UI → server) ────────────────────────────────────────────
+	// Metric query (UI → server)
 	mux.HandleFunc("/api/metrics/snapshot", h.GetMetricsSnapshot)
 	mux.HandleFunc("/api/metrics/history", h.GetMetricHistory)
 	mux.HandleFunc("/api/kubernetes/metrics", h.GetKubernetesMetrics)
 
-	// ── Logs & K8s events ─────────────────────────────────────────────────────
+	// Logs & K8s events
 	mux.HandleFunc("/api/pod-logs", h.HandlePodLogs)
 	mux.HandleFunc("/api/events", h.HandleKubeEvents)
 
-	// ── Alerts ────────────────────────────────────────────────────────────────
+	// Alerts
 	mux.HandleFunc("/api/alerts", h.HandleAlerts)
 	mux.HandleFunc("/api/alerts/", h.HandleAlertByID) // /api/alerts/{id}
 
-	// ── RCA ───────────────────────────────────────────────────────────────────
+	// RCA
 	mux.HandleFunc("/api/rca/", h.HandleRCA) // /api/rca/{id} and /api/rca/{id}/execute
 
-	// ── Cluster health scan ───────────────────────────────────────────────────
+	// Cluster health scan
 	mux.HandleFunc("/api/scan", h.HandleScan)
 
-	// ── Notification delivery history ─────────────────────────────────────────
+	// Notification delivery history
 	mux.HandleFunc("/api/incidents", h.HandleIncidents)
 
-	// ── Incident lifecycle (SEV1-4, MTTR, status) ─────────────────────────────
+	// Incident lifecycle (SEV1-4, MTTR, status)
 	mux.HandleFunc("/api/incidents/full", h.HandleIncidentsFull)
 	mux.HandleFunc("/api/incidents/full/", h.HandleIncidentStatus) // PATCH /api/incidents/full/{id}
 
-	// ── WebSocket real-time stream ────────────────────────────────────────────
+	// WebSocket real-time stream
 	mux.HandleFunc("/ws", h.WebSocketStream)
 
 	// Build middleware chain (outermost first):

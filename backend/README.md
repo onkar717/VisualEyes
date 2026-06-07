@@ -50,27 +50,27 @@ Go HTTP server. Central hub for metrics ingestion, alert processing, AI RCA, Web
 
 ```
 backend/
-├── alerts/          # Alert engine: rule evaluation, dedup, noise filter
-├── api/
-│   ├── handler.go   # All HTTP handler functions
-│   ├── routes.go    # Route registration
-│   └── middleware/  # CORS, logging, rate limit, recovery
-├── config/          # Config loading from file + env vars
-├── http/            # Outbound HTTP client (used by agents)
-├── metrics/         # Prometheus registry and metric definitions
-├── models/          # Shared data models (Alert, Metric, RCAResult, PodLog)
-├── rca/
-│   ├── claude_client.go    # Anthropic API client
-│   ├── context_builder.go  # Builds incident context for Claude
-│   ├── executor.go         # Safe command execution
-│   └── processor.go        # RCA pipeline orchestration
-├── storage/
-│   ├── interface.go  # Storage interface
-│   ├── memory.go     # In-memory store (dev/no-DB mode)
-│   └── postgres.go   # PostgreSQL via GORM
-├── ws/
-│   └── broadcaster.go  # WebSocket hub, client management, broadcast loop
-└── main.go
+├-- alerts/          # Alert engine: rule evaluation, dedup, noise filter
+├-- api/
+│   ├-- handler.go   # All HTTP handler functions
+│   ├-- routes.go    # Route registration
+│   └-- middleware/  # CORS, logging, rate limit, recovery
+├-- config/          # Config loading from file + env vars
+├-- http/            # Outbound HTTP client (used by agents)
+├-- metrics/         # Prometheus registry and metric definitions
+├-- models/          # Shared data models (Alert, Metric, RCAResult, PodLog)
+├-- rca/
+│   ├-- claude_client.go    # Anthropic API client
+│   ├-- context_builder.go  # Builds incident context for Claude
+│   ├-- executor.go         # Safe command execution
+│   └-- processor.go        # RCA pipeline orchestration
+├-- storage/
+│   ├-- interface.go  # Storage interface
+│   ├-- memory.go     # In-memory store (dev/no-DB mode)
+│   └-- postgres.go   # PostgreSQL via GORM
+├-- ws/
+│   └-- broadcaster.go  # WebSocket hub, client management, broadcast loop
+└-- main.go
 ```
 
 ## Run
