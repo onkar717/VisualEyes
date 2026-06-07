@@ -147,6 +147,20 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
 
+	// Healthy-cluster fast exit — skip 5 LLM calls when triage says no issue.
+	if !triage.HasIssue {
+		slog.Info("rca triage: no issue detected — healthy cluster short-circuit", "alert_id", ac.Alert.ID)
+		return &RCAResponse{
+			HasIssue:    false,
+			Severity:    "SEV4",
+			Category:    "healthy",
+			Explanation: "All monitored systems are operating within normal parameters.",
+			RootCause:   "No anomaly detected by triage agent.",
+			Confidence:  triage.Confidence,
+			RawOutput:   triageRaw,
+		}, total, nil
+	}
+
 	// Stage 2: Metrics Analysis
 	slog.Info("rca stage 2/6: metrics analysis", "alert_id", ac.Alert.ID)
 	metricsUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRIC DATA:\n%s",
@@ -214,6 +228,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	if err := json.Unmarshal([]byte(stripFences(finalRaw)), &resp); err != nil {
 		slog.Warn("commander parse failed — building from sub-stages", "err", err)
 		resp = RCAResponse{
+			HasIssue:            true,
 			Explanation:         triage.Summary,
 			RootCause:           "See log and infra analysis",
 			Confidence:          triage.Confidence,
@@ -222,10 +237,15 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 			ContributingFactors: nil,
 			AffectedServices:    triage.AffectedServices,
 			Commands:            rem.Commands,
+			RunbookUsed:         rem.RunbookUsed,
 		}
 	}
 
+	// Always store raw commander output for audit trail.
+	resp.RawOutput = finalRaw
+
 	// Fill gaps from sub-stages when commander omits fields.
+	resp.HasIssue = true // if we got past triage, there is an issue
 	if resp.Severity == "" {
 		resp.Severity = triage.Severity
 	}
@@ -237,6 +257,9 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	}
 	if len(resp.Commands) == 0 {
 		resp.Commands = rem.Commands
+	}
+	if resp.RunbookUsed == "" {
+		resp.RunbookUsed = rem.RunbookUsed
 	}
 
 	// Enforce auto-safe allowlist regardless of what LLM said.

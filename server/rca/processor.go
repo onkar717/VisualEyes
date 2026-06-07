@@ -7,12 +7,26 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/onkar717/visual-eyes/server/models"
 	"github.com/onkar717/visual-eyes/server/storage"
 )
+
+// retryWaits defines backoff delays for LLM rate-limit errors (15 / 30 / 60 s).
+var retryWaits = []time.Duration{15 * time.Second, 30 * time.Second, 60 * time.Second}
+
+// isRateLimitError detects 429 / rate-limit responses from any LLM provider.
+func isRateLimitError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "429") ||
+		strings.Contains(msg, "rate limit") ||
+		strings.Contains(msg, "ratelimit") ||
+		strings.Contains(msg, "quota exceeded") ||
+		strings.Contains(msg, "too many requests")
+}
 
 // Processor orchestrates the full RCA pipeline for a single alert:
 //  1. Build AlertContext (metrics + logs + sibling alerts)
@@ -111,6 +125,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	p.linkRCAToAlert(alert.ID, result.ID)
 
 	// 3. Run multi-stage pipeline with optional timeout (6 stages × per-stage timeout).
+	scanStart := time.Now()
 	pipelineCtx := ctx
 	if p.agentTimeoutSeconds > 0 {
 		var cancel context.CancelFunc
@@ -118,21 +133,60 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 			time.Duration(p.agentTimeoutSeconds*6)*time.Second)
 		defer cancel()
 	}
-	resp, inputTokens, err := p.pipeline.RunPipeline(pipelineCtx, ac)
-	if err != nil {
-		log.Error("rca pipeline failed", "error", err)
+
+	// Retry on LLM rate-limit errors (3 attempts: 15 / 30 / 60 s backoff).
+	var resp *RCAResponse
+	var inputTokens int
+	for attempt := 0; attempt < 3; attempt++ {
+		var rcaErr error
+		resp, inputTokens, rcaErr = p.pipeline.RunPipeline(pipelineCtx, ac)
+		if rcaErr == nil {
+			break
+		}
+		if isRateLimitError(rcaErr) && attempt < 2 {
+			wait := retryWaits[attempt]
+			log.Warn("rca rate-limit — retrying", "attempt", attempt+1, "wait", wait)
+			select {
+			case <-time.After(wait):
+				continue
+			case <-pipelineCtx.Done():
+				rcaErr = pipelineCtx.Err()
+			}
+		}
+		log.Error("rca pipeline failed", "error", rcaErr, "attempt", attempt+1)
 		result.Status = "failed"
-		result.Explanation = "RCA failed: " + err.Error()
+		result.Explanation = "RCA failed: " + rcaErr.Error()
 		result.UpdatedAt = time.Now()
 		p.rcaStore.UpdateRCAResult(result)
 		p.updateAlertRCAStatus(alert.ID, "failed")
 		return
 	}
+	scanDuration := time.Since(scanStart).Seconds()
 
-	// 4. Prepare commands with initial status.
+	// 4. Healthy-cluster short-circuit — record a resolved no-op incident.
+	if !resp.HasIssue {
+		log.Info("rca: no issue — healthy cluster", "alert_id", alert.ID)
+		result.Explanation = resp.Explanation
+		result.RootCause   = resp.RootCause
+		result.Commands    = "[]"
+		result.Severity    = "SEV4"
+		result.Category    = "healthy"
+		result.Status      = "done"
+		result.InputTokens = inputTokens
+		result.UpdatedAt   = time.Now()
+		_ = p.rcaStore.UpdateRCAResult(result)
+		p.updateAlertRCAStatus(alert.ID, "done")
+		if p.incidentStore != nil {
+			p.createHealthyIncident(alert, result, scanDuration, resp.RawOutput)
+		}
+		return
+	}
+
+	// 5. Prepare commands with initial status.
 	fixCmds := resp.ToFixCommands()
 
-	// 5. Auto-execute safe commands and write an audit log entry per step.
+	// 6. Auto-execute safe commands and write an audit log entry per step.
+	autoRemediated := false
 	for i, cmd := range fixCmds {
 		if !cmd.IsAutoSafe {
 			continue
@@ -148,6 +202,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 		} else {
 			fixCmds[i].Status = models.RemediationExecuted
 			fixCmds[i].Output = output
+			autoRemediated = true
 			log.Info("auto-executed fix", "command", cmd.Command)
 		}
 
@@ -168,22 +223,22 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 		}
 	}
 
-	// 6. Marshal all enriched fields and persist.
+	// 7. Marshal all enriched fields and persist.
 	cmdsJSON, _ := json.Marshal(fixCmds)
 	factorsJSON, _ := json.Marshal(resp.ContributingFactors)
 	servicesJSON, _ := json.Marshal(resp.AffectedServices)
 
-	result.Explanation          = resp.Explanation
-	result.RootCause            = resp.RootCause
-	result.Commands             = string(cmdsJSON)
-	result.ConfidenceScore      = resp.Confidence
-	result.Severity             = resp.Severity
-	result.Category             = resp.Category
-	result.ContributingFactors  = string(factorsJSON)
-	result.AffectedServices     = string(servicesJSON)
-	result.Status               = "done"
-	result.InputTokens          = inputTokens
-	result.UpdatedAt            = time.Now()
+	result.Explanation         = resp.Explanation
+	result.RootCause           = resp.RootCause
+	result.Commands            = string(cmdsJSON)
+	result.ConfidenceScore     = resp.Confidence
+	result.Severity            = resp.Severity
+	result.Category            = resp.Category
+	result.ContributingFactors = string(factorsJSON)
+	result.AffectedServices    = string(servicesJSON)
+	result.Status              = "done"
+	result.InputTokens         = inputTokens
+	result.UpdatedAt           = time.Now()
 
 	if err := p.rcaStore.UpdateRCAResult(result); err != nil {
 		log.Error("failed to update rca result", "error", err)
@@ -191,9 +246,9 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 
 	p.updateAlertRCAStatus(alert.ID, "done")
 
-	// 7. Create/update Incident record from RCA output.
+	// 8. Create/update Incident record from RCA output.
 	if p.incidentStore != nil {
-		p.upsertIncident(alert, result)
+		p.upsertIncident(alert, result, autoRemediated, scanDuration, resp.RunbookUsed, resp.RawOutput)
 	}
 
 	log.Info("rca processing complete",
@@ -201,21 +256,38 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 		"category", resp.Category,
 		"confidence", resp.Confidence,
 		"commands", len(fixCmds),
+		"auto_remediated", autoRemediated,
+		"scan_secs", scanDuration,
 		"tokens", inputTokens,
 	)
 }
 
-func (p *Processor) upsertIncident(alert models.Alert, result *models.RCAResult) {
+func (p *Processor) upsertIncident(
+	alert models.Alert,
+	result *models.RCAResult,
+	autoRemediated bool,
+	scanDurationSecs float64,
+	runbookUsed string,
+	rawOutput string,
+) {
+	rawSnip := rawOutput
+	if len(rawSnip) > 2000 {
+		rawSnip = rawSnip[:2000]
+	}
+
 	// Check if an incident already exists for this alert.
 	existing, _ := p.incidentStore.GetIncidentByAlertID(alert.ID)
 	if existing != nil {
-		// Update existing incident with fresh RCA data.
-		existing.RootCause           = result.RootCause
-		existing.ContributingFactors  = result.ContributingFactors
-		existing.AffectedServices     = result.AffectedServices
-		existing.ConfidenceScore      = result.ConfidenceScore
-		existing.Severity             = models.SeverityFromRCA(result.Severity)
-		existing.Category             = result.Category
+		existing.RootCause          = result.RootCause
+		existing.ContributingFactors = result.ContributingFactors
+		existing.AffectedServices   = result.AffectedServices
+		existing.ConfidenceScore    = result.ConfidenceScore
+		existing.Severity           = models.SeverityFromRCA(result.Severity)
+		existing.Category           = result.Category
+		existing.AutoRemediated     = autoRemediated
+		existing.ScanDurationSecs   = scanDurationSecs
+		existing.RunbookUsed        = runbookUsed
+		existing.RawAgentOutput     = rawSnip
 		if existing.Status == models.IncidentOpen {
 			existing.Status = models.IncidentInvestigating
 		}
@@ -247,6 +319,10 @@ func (p *Processor) upsertIncident(alert models.Alert, result *models.RCAResult)
 		ContributingFactors: result.ContributingFactors,
 		AffectedServices:    result.AffectedServices,
 		ConfidenceScore:     result.ConfidenceScore,
+		AutoRemediated:      autoRemediated,
+		ScanDurationSecs:    scanDurationSecs,
+		RunbookUsed:         runbookUsed,
+		RawAgentOutput:      rawSnip,
 		DetectedAt:          alert.FiredAt,
 		CreatedAt:           now,
 		UpdatedAt:           now,
@@ -256,6 +332,40 @@ func (p *Processor) upsertIncident(alert models.Alert, result *models.RCAResult)
 		return
 	}
 	slog.Info("incident created", "code", inc.IncidentCode, "severity", inc.Severity, "alert_id", alert.ID)
+}
+
+// createHealthyIncident records a no-issue IGNORED incident so operators have a
+// full audit trail even when the cluster is healthy.
+func (p *Processor) createHealthyIncident(
+	alert models.Alert,
+	result *models.RCAResult,
+	scanDurationSecs float64,
+	rawOutput string,
+) {
+	rawSnip := rawOutput
+	if len(rawSnip) > 2000 {
+		rawSnip = rawSnip[:2000]
+	}
+	now := time.Now()
+	inc := &models.Incident{
+		IncidentCode:     models.NewIncidentCode(),
+		AlertID:          alert.ID,
+		RCAID:            &result.ID,
+		Title:            "Cluster Healthy — No Issues Detected",
+		Severity:         models.IncidentSEV4,
+		Category:         "healthy",
+		Status:           models.IncidentIgnored,
+		RootCause:        "All monitored systems operating within normal parameters.",
+		ConfidenceScore:  result.ConfidenceScore,
+		ScanDurationSecs: scanDurationSecs,
+		RawAgentOutput:   rawSnip,
+		DetectedAt:       alert.FiredAt,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if err := p.incidentStore.SaveIncident(inc); err != nil {
+		slog.Error("createHealthyIncident: save failed", "alert_id", alert.ID, "error", err)
+	}
 }
 
 func (p *Processor) updateAlertRCAStatus(alertID uint, status string) {

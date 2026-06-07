@@ -7,7 +7,7 @@ import (
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // RCAResponse is the structured JSON any LLM returns from the final pipeline stage.
@@ -20,6 +20,9 @@ type RCAResponse struct {
 	ContributingFactors []string     `json:"contributing_factors"`
 	AffectedServices    []string     `json:"affected_services"`
 	Commands            []FixCommand `json:"commands"`
+	HasIssue            bool         `json:"has_issue"`    // false = cluster healthy, skip remediation
+	RunbookUsed         string       `json:"runbook_used"` // matched runbook filename
+	RawOutput           string       `json:"-"`            // raw commander text for audit
 }
 
 // FixCommand is one proposed remediation action.

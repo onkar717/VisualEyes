@@ -24,6 +24,7 @@ const (
 	IncidentInvestigating IncidentStatus = "INVESTIGATING"
 	IncidentMitigated     IncidentStatus = "MITIGATED"
 	IncidentResolved      IncidentStatus = "RESOLVED"
+	IncidentIgnored       IncidentStatus = "IGNORED" // healthy-cluster scans with no issue
 )
 
 // Incident is the top-level response record created when an alert fires and
@@ -44,6 +45,12 @@ type Incident struct {
 	ContributingFactors string `gorm:"type:text" json:"contributingFactors"` // JSON []string
 	AffectedServices    string `gorm:"type:text" json:"affectedServices"`    // JSON []string
 	ConfidenceScore     int    `json:"confidenceScore"`
+
+	// Remediation observability
+	AutoRemediated  bool    `gorm:"default:false" json:"autoRemediated"`  // true if any command auto-executed
+	RunbookUsed     string  `json:"runbookUsed,omitempty"`                // matched runbook filename
+	ScanDurationSecs float64 `json:"scanDurationSecs"`                    // wall-clock time of pipeline
+	RawAgentOutput  string  `gorm:"type:text" json:"rawAgentOutput,omitempty"` // first 2000 chars of commander
 
 	// Timing
 	DetectedAt  time.Time  `gorm:"index;not null" json:"detectedAt"`
