@@ -81,6 +81,34 @@ type HealthResponse struct {
 	Components map[string]bool   `json:"components"`
 }
 
+// ScanIssue is a single finding from /api/scan.
+type ScanIssue struct {
+	Severity string `json:"severity"`
+	Category string `json:"category"`
+	Resource string `json:"resource"`
+	Message  string `json:"message"`
+	Value    string `json:"value,omitempty"`
+}
+
+// ScanSummary is the high-level metrics from /api/scan.
+type ScanSummary struct {
+	ActiveAlerts   int     `json:"activeAlerts"`
+	CriticalAlerts int     `json:"criticalAlerts"`
+	WarningAlerts  int     `json:"warningAlerts"`
+	CPUPercent     float64 `json:"cpuPercent"`
+	MemoryPercent  float64 `json:"memoryPercent"`
+	DiskPercent    float64 `json:"diskPercent"`
+}
+
+// ScanResult is the /api/scan response.
+type ScanResult struct {
+	Timestamp  string      `json:"timestamp"`
+	Overall    string      `json:"overall"`
+	IssueCount int         `json:"issueCount"`
+	Issues     []ScanIssue `json:"issues"`
+	Summary    ScanSummary `json:"summary"`
+}
+
 // K8sMetrics is the /api/kubernetes/metrics response.
 type K8sMetrics struct {
 	Timestamp string `json:"timestamp"`
@@ -166,6 +194,12 @@ func (c *Client) AlertByID(id uint) (*Alert, error) {
 func (c *Client) RCA(alertID uint) (*RCAResult, error) {
 	var r RCAResult
 	return &r, c.get(fmt.Sprintf("/api/rca/%d", alertID), &r)
+}
+
+// Scan calls /api/scan and returns a cluster health assessment.
+func (c *Client) Scan() (*ScanResult, error) {
+	var r ScanResult
+	return &r, c.get("/api/scan", &r)
 }
 
 // Logs calls /api/pod-logs with optional filters.
