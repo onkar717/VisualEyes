@@ -37,8 +37,12 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// ── Cluster health scan ───────────────────────────────────────────────────
 	mux.HandleFunc("/api/scan", h.HandleScan)
 
-	// ── Notification / incident history ───────────────────────────────────────
+	// ── Notification delivery history ─────────────────────────────────────────
 	mux.HandleFunc("/api/incidents", h.HandleIncidents)
+
+	// ── Incident lifecycle (SEV1-4, MTTR, status) ─────────────────────────────
+	mux.HandleFunc("/api/incidents/full", h.HandleIncidentsFull)
+	mux.HandleFunc("/api/incidents/full/", h.HandleIncidentStatus) // PATCH /api/incidents/full/{id}
 
 	// ── WebSocket real-time stream ────────────────────────────────────────────
 	mux.HandleFunc("/ws", h.WebSocketStream)
