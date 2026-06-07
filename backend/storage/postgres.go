@@ -41,7 +41,10 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 	}
 
 	// Connection pool tuning.
-	sqlDB, _ := db.DB()
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get sql.DB: %w", err)
+	}
 	sqlDB.SetMaxOpenConns(20)
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
