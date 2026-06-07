@@ -25,10 +25,11 @@ type Handler struct {
 	kubernetesStore   storage.MetricStore
 	alertStore        storage.AlertStore
 	logStore          storage.LogStore
-	rcaStore          storage.RCAStore
-	notificationStore storage.NotificationStore
-	incidentStore     storage.IncidentStore
-	broadcaster       *ws.Broadcaster
+	rcaStore            storage.RCAStore
+	notificationStore   storage.NotificationStore
+	incidentStore       storage.IncidentStore
+	remediationLogStore storage.RemediationLogStore
+	broadcaster         *ws.Broadcaster
 	hostname          string
 	corsOrigins       string
 	startedAt         time.Time
@@ -39,8 +40,9 @@ func (h *Handler) SetAlertStore(s storage.AlertStore)               { h.alertSto
 func (h *Handler) SetLogStore(s storage.LogStore)                   { h.logStore = s }
 func (h *Handler) SetRCAStore(s storage.RCAStore)                   { h.rcaStore = s }
 func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notificationStore = s }
-func (h *Handler) SetIncidentStore(s storage.IncidentStore)         { h.incidentStore = s }
-func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                 { h.broadcaster = b }
+func (h *Handler) SetIncidentStore(s storage.IncidentStore)                 { h.incidentStore = s }
+func (h *Handler) SetRemediationLogStore(s storage.RemediationLogStore)     { h.remediationLogStore = s }
+func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                         { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -1039,6 +1041,72 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 		"mttr_avg_seconds": avg,
 		"mttr_count":       count,
 	})
+}
+
+// HandleRemediationLog handles GET and POST for remediation step audit log.
+// GET  /api/remediation-log?incident_id=N  — fetch log for one incident
+// GET  /api/remediation-log?limit=N        — fetch recent entries (default 50)
+// POST /api/remediation-log                — record a step execution
+func (h *Handler) HandleRemediationLog(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if h.remediationLogStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		q := r.URL.Query()
+		if idStr := q.Get("incident_id"); idStr != "" {
+			var id uint
+			fmt.Sscanf(idStr, "%d", &id)
+			logs, err := h.remediationLogStore.GetRemediationLogs(id)
+			if err != nil {
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			if logs == nil {
+				logs = []models.RemediationLogEntry{}
+			}
+			writeJSON(w, http.StatusOK, logs)
+			return
+		}
+		limit := 50
+		if l := q.Get("limit"); l != "" {
+			fmt.Sscanf(l, "%d", &limit)
+		}
+		logs, err := h.remediationLogStore.GetRecentRemediationLogs(limit)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if logs == nil {
+			logs = []models.RemediationLogEntry{}
+		}
+		writeJSON(w, http.StatusOK, logs)
+
+	case http.MethodPost:
+		var entry models.RemediationLogEntry
+		if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if entry.ExecutedAt.IsZero() {
+			entry.ExecutedAt = time.Now()
+		}
+		if err := h.remediationLogStore.SaveRemediationLog(&entry); err != nil {
+			slog.Error("save remediation log", "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusCreated, entry)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // HandleStats returns aggregate incident statistics.

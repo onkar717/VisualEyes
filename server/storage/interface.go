@@ -50,6 +50,13 @@ type NotificationStore interface {
 	GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error)
 }
 
+// RemediationLogStore persists per-step remediation execution records.
+type RemediationLogStore interface {
+	SaveRemediationLog(e *models.RemediationLogEntry) error
+	GetRemediationLogs(incidentID uint) ([]models.RemediationLogEntry, error)
+	GetRecentRemediationLogs(limit int) ([]models.RemediationLogEntry, error)
+}
+
 // IncidentStats is the aggregated summary returned by /api/stats.
 type IncidentStats struct {
 	TotalIncidents int            `json:"total_incidents"`

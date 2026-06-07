@@ -141,6 +141,9 @@ func main() {
 	if ns, ok := store.(storage.NotificationStore); ok {
 		handler.SetNotificationStore(ns)
 	}
+	if rls, ok := store.(storage.RemediationLogStore); ok {
+		handler.SetRemediationLogStore(rls)
+	}
 	handler.SetBroadcaster(broadcaster)
 
 	// RCA Engine (Claude)
@@ -188,6 +191,9 @@ func main() {
 			if is, ok := store.(storage.IncidentStore); ok {
 				processor.SetIncidentStore(is)
 				handler.SetIncidentStore(is)
+			}
+			if rls, ok := store.(storage.RemediationLogStore); ok {
+				processor.SetRemediationLogStore(rls)
 			}
 
 			go processor.RunWorker(appCtx, rcaTrigger, 2)

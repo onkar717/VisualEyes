@@ -25,12 +25,18 @@ type Processor struct {
 	executor            *Executor
 	rcaStore            storage.RCAStore
 	alertStore          storage.AlertStore
-	incidentStore       storage.IncidentStore // optional
-	agentTimeoutSeconds int                   // per-stage LLM timeout; 0 = no limit
+	incidentStore       storage.IncidentStore       // optional
+	remediationLogStore storage.RemediationLogStore // optional
+	agentTimeoutSeconds int                         // per-stage LLM timeout; 0 = no limit
 }
 
 // SetIncidentStore injects the incident store after construction.
 func (p *Processor) SetIncidentStore(s storage.IncidentStore) { p.incidentStore = s }
+
+// SetRemediationLogStore injects the remediation log store after construction.
+func (p *Processor) SetRemediationLogStore(s storage.RemediationLogStore) {
+	p.remediationLogStore = s
+}
 
 // NewProcessor builds a Processor from its dependencies.
 func NewProcessor(
@@ -126,20 +132,39 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	// 4. Prepare commands with initial status.
 	fixCmds := resp.ToFixCommands()
 
-	// 5. Auto-execute safe commands.
+	// 5. Auto-execute safe commands and write an audit log entry per step.
 	for i, cmd := range fixCmds {
 		if !cmd.IsAutoSafe {
 			continue
 		}
-		output, err := p.executor.Execute(ctx, cmd.Command)
-		if err != nil {
+		start := time.Now()
+		output, execErr := p.executor.Execute(ctx, cmd.Command)
+		durationMs := time.Since(start).Milliseconds()
+
+		if execErr != nil {
 			fixCmds[i].Status = models.RemediationFailed
-			fixCmds[i].ExecError = err.Error()
-			log.Warn("auto-execute failed", "command", cmd.Command, "error", err)
+			fixCmds[i].ExecError = execErr.Error()
+			log.Warn("auto-execute failed", "command", cmd.Command, "error", execErr)
 		} else {
 			fixCmds[i].Status = models.RemediationExecuted
 			fixCmds[i].Output = output
 			log.Info("auto-executed fix", "command", cmd.Command)
+		}
+
+		if p.remediationLogStore != nil {
+			entry := &models.RemediationLogEntry{
+				AlertID:    alert.ID,
+				StepNumber: i + 1,
+				Command:    cmd.Command,
+				Status:     models.RemediationStatus(fixCmds[i].Status),
+				Output:     output,
+				DurationMs: durationMs,
+				ExecutedAt: start,
+			}
+			if execErr != nil {
+				entry.ExecError = execErr.Error()
+			}
+			_ = p.remediationLogStore.SaveRemediationLog(entry)
 		}
 	}
 

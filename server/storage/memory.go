@@ -9,9 +9,8 @@ import (
 	"github.com/onkar717/visual-eyes/server/models"
 )
 
-// MemoryStore is a fully in-memory implementation of MetricStore, QueryableStore,
-// AlertStore, LogStore, RCAStore, and NotificationStore. Used as a fallback when
-// PostgreSQL is unreachable (dev / no-DB mode).
+// MemoryStore is a fully in-memory implementation of all storage interfaces.
+// Used as a fallback when PostgreSQL is unreachable (dev / no-DB mode).
 type MemoryStore struct {
 	mu sync.RWMutex
 
@@ -38,6 +37,10 @@ type MemoryStore struct {
 	// incidents
 	incidents   []*models.Incident
 	incidentSeq uint
+
+	// remediation log
+	remediationLogs []*models.RemediationLogEntry
+	remediationSeq  uint
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -397,6 +400,45 @@ func (s *MemoryStore) MTTRStats() (float64, int, error) {
 		return 0, 0, nil
 	}
 	return float64(total) / float64(count), count, nil
+}
+
+// RemediationLogStore
+func (s *MemoryStore) SaveRemediationLog(e *models.RemediationLogEntry) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.remediationSeq++
+	e.ID = s.remediationSeq
+	cp := *e
+	s.remediationLogs = append(s.remediationLogs, &cp)
+	if len(s.remediationLogs) > 5000 {
+		s.remediationLogs = s.remediationLogs[len(s.remediationLogs)-5000:]
+	}
+	return nil
+}
+
+func (s *MemoryStore) GetRemediationLogs(incidentID uint) ([]models.RemediationLogEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []models.RemediationLogEntry
+	for _, e := range s.remediationLogs {
+		if e.IncidentID == incidentID {
+			out = append(out, *e)
+		}
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) GetRecentRemediationLogs(limit int) ([]models.RemediationLogEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]models.RemediationLogEntry, 0, limit)
+	for i := len(s.remediationLogs) - 1; i >= 0; i-- {
+		out = append(out, *s.remediationLogs[i])
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }
 
 func (s *MemoryStore) GetStats() (IncidentStats, error) {
