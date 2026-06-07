@@ -8,8 +8,7 @@ import (
 	"strings"
 )
 
-// ─── Stage prompts ────────────────────────────────────────────────────────────
-
+// Stage prompts
 const triageSystemPrompt = `You are an expert SRE Triage Specialist.
 Analyse the Kubernetes alert data and classify the incident.
 Output ONLY valid JSON — no markdown, no code fences.
@@ -85,8 +84,7 @@ Schema (exact):
   ]
 }`
 
-// ─── Pipeline ─────────────────────────────────────────────────────────────────
-
+// Pipeline
 // Pipeline runs a 5-stage sequential RCA analysis, each stage informed by the
 // previous. This produces richer, more accurate results than a single LLM call.
 type Pipeline struct {
@@ -126,7 +124,7 @@ type diagnosisStage struct {
 func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCAResponse, int, error) {
 	totalTokens := 0
 
-	// ── Stage 1: Triage ───────────────────────────────────────────────────────
+	// Stage 1: Triage
 	slog.Info("rca pipeline stage 1/5: triage", "alert_id", ac.Alert.ID)
 	triageUser := fmt.Sprintf("Alert context:\n\n%s", ac.Format())
 	triageRaw, tok, err := p.llm.Complete(ctx, triageSystemPrompt, triageUser, p.maxTokens)
@@ -141,7 +139,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
 
-	// ── Stage 2: Diagnosis ────────────────────────────────────────────────────
+	// Stage 2: Diagnosis
 	slog.Info("rca pipeline stage 2/5: diagnosis", "alert_id", ac.Alert.ID)
 	diagUser := fmt.Sprintf(
 		"TRIAGE:\n%s\n\nORIGINAL ALERT CONTEXT:\n%s",
@@ -159,7 +157,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		diag = diagnosisStage{RootCause: "Unable to determine root cause — insufficient signal.", Confidence: 30}
 	}
 
-	// ── Stage 3: Remediation ──────────────────────────────────────────────────
+	// Stage 3: Remediation
 	slog.Info("rca pipeline stage 3/5: remediation", "alert_id", ac.Alert.ID)
 	remUser := fmt.Sprintf(
 		"TRIAGE:\n%s\n\nDIAGNOSIS:\n%s\n\nALERT:\n%s",
@@ -171,7 +169,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	}
 	totalTokens += tok
 
-	// ── Stage 4: Synthesis (Commander) ───────────────────────────────────────
+	// Stage 4: Synthesis (Commander)
 	slog.Info("rca pipeline stage 4/5: commander", "alert_id", ac.Alert.ID)
 	cmdUser := fmt.Sprintf(
 		"TRIAGE:\n%s\n\nDIAGNOSIS:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
@@ -183,7 +181,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	}
 	totalTokens += tok
 
-	// ── Parse final output ────────────────────────────────────────────────────
+	// Parse final output
 	var resp RCAResponse
 	if err := json.Unmarshal([]byte(stripFences(finalRaw)), &resp); err != nil {
 		// Best-effort fallback from parsed stages.

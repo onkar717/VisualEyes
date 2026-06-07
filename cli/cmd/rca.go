@@ -33,7 +33,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 
 	fmt.Println()
 
-	// ── Alert summary ──────────────────────────────────────────────────────────
+	// Alert summary
 	t, _ := time.Parse(time.RFC3339Nano, alert.FiredAt)
 	fired := humanDuration(time.Since(t))
 
@@ -46,7 +46,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 	))
 	fmt.Println()
 
-	// ── RCA status ─────────────────────────────────────────────────────────────
+	// RCA status
 	switch alert.RCAStatus {
 	case "", "pending":
 		fmt.Println(styles.Mute.Render("  RCA not yet triggered or pending."))
@@ -63,13 +63,13 @@ func runRCA(_ *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// ── Fetch RCA result ───────────────────────────────────────────────────────
+	// Fetch RCA result
 	rca, err := api.RCA(id)
 	if err != nil {
 		return fmt.Errorf("could not fetch RCA for alert %d: %w", id, err)
 	}
 
-	// ── Root cause ─────────────────────────────────────────────────────────────
+	// Root cause
 	fmt.Println(styles.SectionHeader.Render("  ROOT CAUSE"))
 	fmt.Println()
 	for _, line := range wrap(rca.RootCause, 80) {
@@ -77,7 +77,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	// ── Explanation ────────────────────────────────────────────────────────────
+	// Explanation
 	fmt.Println(styles.SectionHeader.Render("  ANALYSIS"))
 	fmt.Println()
 	for _, line := range wrap(rca.Explanation, 80) {
@@ -85,7 +85,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 	}
 	fmt.Println()
 
-	// ── Remediation commands ───────────────────────────────────────────────────
+	// Remediation commands
 	var cmds []client.FixCommand
 	if rca.Commands != "" {
 		_ = json.Unmarshal([]byte(rca.Commands), &cmds)
@@ -121,7 +121,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 		fmt.Println()
 	}
 
-	// ── Footer ─────────────────────────────────────────────────────────────────
+	// Footer
 	updAt, _ := time.Parse(time.RFC3339Nano, rca.UpdatedAt)
 	fmt.Println(styles.Mute.Render(fmt.Sprintf("  model: %s  ·  %d input tokens  ·  analysed %s ago",
 		rca.Model, rca.InputTokens, humanDuration(time.Since(updAt)))))

@@ -56,19 +56,19 @@ Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a 
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────┐
+┌--------------------------------------------------------------┐
 │                        VisualEyes                            │
 │                                                              │
-│  ┌─────────────────┐    ┌─────────────────────────────────┐  │
+│  ┌-----------------┐    ┌---------------------------------┐  │
 │  │  System Agent   │    │      Kubernetes Agent           │  │
 │  │  (gopsutil)     │    │  (kubelet summary API)          │  │
 │  │  CPU/Mem/Disk   │    │  Pod & Node metrics             │  │
 │  │  Net/Load       │    │  Events + Logs                  │  │
-│  └────────┬────────┘    └────────────┬────────────────────┘  │
+│  └--------┬--------┘    └------------┬--------------------┘  │
 │           │  POST /api/system-metrics │ POST /api/k8s-metrics  │
-│           └──────────────┬───────────┘                       │
+│           └--------------┬-----------┘                       │
 │                          ▼                                    │
-│           ┌──────────────────────────┐                       │
+│           ┌--------------------------┐                       │
 │           │      Backend Server      │                       │
 │           │  Go HTTP · port 8080     │                       │
 │           │  Alert Engine            │                       │
@@ -76,16 +76,16 @@ Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a 
 │           │  WebSocket Broadcaster   │                       │
 │           │  Prometheus /metrics     │                       │
 │           │  PostgreSQL / MemStore   │                       │
-│           └────────┬─────────────────┘                       │
+│           └--------┬-----------------┘                       │
 │                    │                                          │
-│          ┌─────────┴──────────┐                              │
+│          ┌---------┴----------┐                              │
 │          ▼                    ▼                              │
-│  ┌───────────────┐   ┌─────────────────────┐                │
+│  ┌---------------┐   ┌---------------------┐                │
 │  │  React UI     │   │  veye CLI (TUI)      │               │
 │  │  port 5173    │   │  status / alerts     │               │
 │  │  Dark/Light   │   │  logs / rca / watch  │               │
-│  └───────────────┘   └─────────────────────┘                │
-└──────────────────────────────────────────────────────────────┘
+│  └---------------┘   └---------------------┘                │
+└--------------------------------------------------------------┘
 ```
 
 ---
@@ -111,13 +111,13 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 ### veye watch — Interactive TUI Dashboard
 
 ```
-┌──────────────────────── VisualEyes ─────────────────────────┐
+┌------------------------ VisualEyes -------------------------┐
 │  System        CPU: 23.4%  Mem: 6.1/16GB  Load: 0.87        │
 │  Kubernetes    Nodes: 1    Pods: 13/13     Alerts: 2         │
-├──────────────────── Active Alerts ──────────────────────────┤
+├-------------------- Active Alerts --------------------------┤
 │  [SEV1] payment-service  CrashLoopBackOff  2m ago           │
 │  [SEV2] db-worker        OOMKilled         8m ago           │
-├──────────────────────── RCA Result ─────────────────────────┤
+├------------------------ RCA Result -------------------------┤
 │  ROOT CAUSE (94% confidence):                               │
 │  payment-service cannot connect to Redis at                 │
 │  redis.prod.svc:6379 — connection refused.                  │
@@ -125,7 +125,7 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 │  PROPOSED FIX:                                              │
 │  kubectl get svc redis -n prod                              │
 │  Execute? [y / dry / n]: _                                  │
-└──────────────────────────────────────────────────────────────┘
+└--------------------------------------------------------------┘
 ```
 
 ### veye alerts
@@ -290,23 +290,23 @@ make cross      # Cross-compile all binaries → dist/ (5 platforms)
 
 ```
 VisualEyes/
-├── agents/
-│   ├── system/          # Host metrics agent — CPU, mem, disk, net, load
-│   └── kubernetes/      # K8s agent — kubelet API, pod/node metrics, events
-├── backend/
-│   ├── alerts/          # Alert engine: rule eval, dedup, noise filter
-│   ├── api/             # HTTP handlers, routes, middleware
-│   ├── rca/             # AI RCA: Claude client, context builder, executor
-│   ├── storage/         # Interface, PostgreSQL (GORM), in-memory
-│   └── ws/              # WebSocket broadcaster
-├── cli/
-│   └── cmd/             # veye commands: status, alerts, logs, rca, watch
-├── configs/             # Default YAML config
-├── deployments/
-│   └── kubernetes/      # RBAC, ConfigMap, DaemonSet
-├── docs/images/         # Screenshots, architecture diagrams
-├── ui/                  # React 19 + MUI 7 + Vite dashboard
-└── docker-compose.yml
+├-- agents/
+│   ├-- system/          # Host metrics agent — CPU, mem, disk, net, load
+│   └-- kubernetes/      # K8s agent — kubelet API, pod/node metrics, events
+├-- backend/
+│   ├-- alerts/          # Alert engine: rule eval, dedup, noise filter
+│   ├-- api/             # HTTP handlers, routes, middleware
+│   ├-- rca/             # AI RCA: Claude client, context builder, executor
+│   ├-- storage/         # Interface, PostgreSQL (GORM), in-memory
+│   └-- ws/              # WebSocket broadcaster
+├-- cli/
+│   └-- cmd/             # veye commands: status, alerts, logs, rca, watch
+├-- configs/             # Default YAML config
+├-- deployments/
+│   └-- kubernetes/      # RBAC, ConfigMap, DaemonSet
+├-- docs/images/         # Screenshots, architecture diagrams
+├-- ui/                  # React 19 + MUI 7 + Vite dashboard
+└-- docker-compose.yml
 ```
 
 ---

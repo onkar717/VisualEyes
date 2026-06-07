@@ -51,7 +51,7 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 		return
 	}
 
-	// ── MTTR summary bar ──────────────────────────────────────────────────────
+	// MTTR summary bar
 	if resp.MTTRCount > 0 {
 		mttrBox := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -68,7 +68,7 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 		fmt.Println()
 	}
 
-	// ── Column styles ─────────────────────────────────────────────────────────
+	// Column styles
 	colCode   := lipgloss.NewStyle().Width(14).Foreground(styles.Cyan)
 	colSev    := lipgloss.NewStyle().Width(6)
 	colStatus := lipgloss.NewStyle().Width(14)
@@ -85,7 +85,7 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 		colTitle.Bold(true).Render("Title"),
 	)
 	fmt.Println(header)
-	fmt.Println("  " + strings.Repeat("─", 88))
+	fmt.Println("  " + strings.Repeat("-", 88))
 
 	for _, inc := range resp.Incidents {
 		sevStyle := sevStyle(inc.Severity)
@@ -121,7 +121,7 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 			if len(rc) > 100 {
 				rc = rc[:97] + "..."
 			}
-			fmt.Printf("  %s %s\n", styles.Mute.Render("  └─"), styles.Mute.Render(rc))
+			fmt.Printf("  %s %s\n", styles.Mute.Render("  └-"), styles.Mute.Render(rc))
 		}
 
 		// Contributing factors.

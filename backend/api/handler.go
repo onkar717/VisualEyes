@@ -833,7 +833,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 		Issues:    []ScanIssue{},
 	}
 
-	// ── Active alerts ────────────────────────────────────────────────────────
+	// Active alerts
 	if h.alertStore != nil {
 		active, err := h.alertStore.GetActiveAlerts()
 		if err == nil {
@@ -857,7 +857,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// ── System metrics ────────────────────────────────────────────────────────
+	// System metrics
 	metrics := h.systemStore.GetAllMetrics()
 	for _, m := range metrics {
 		switch m.Name {
@@ -909,7 +909,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// ── K8s metrics ───────────────────────────────────────────────────────────
+	// K8s metrics
 	k8sMetrics := h.kubernetesStore.GetAllMetrics()
 	for _, m := range k8sMetrics {
 		if m.Name == "kubernetes.pod.cpu.usage" && m.Value > 0.9 {
@@ -925,7 +925,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// ── Overall status ────────────────────────────────────────────────────────
+	// Overall status
 	result.IssueCount = len(result.Issues)
 	result.Overall = "healthy"
 	for _, issue := range result.Issues {

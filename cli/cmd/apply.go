@@ -109,7 +109,7 @@ Use --dry-run to print commands without executing them.`,
 			}
 		}
 
-		fmt.Println(strings.Repeat("─", 60))
+		fmt.Println(strings.Repeat("-", 60))
 		fmt.Printf("  Applied: %s   Skipped: %s   Failed: %s\n\n",
 			styles.Good.Render(fmt.Sprintf("%d", applied)),
 			styles.Mute.Render(fmt.Sprintf("%d", skipped)),

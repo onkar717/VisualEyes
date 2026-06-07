@@ -267,7 +267,7 @@ func (m Model) renderAlerts(h int) string {
 		styles.KeyStyle.Width(20).Render("RESOURCE"),
 		styles.KeyStyle.Width(18).Render("VALUE / THRESH"),
 	))
-	sb.WriteString("  " + styles.Mute.Render(strings.Repeat("─", 72)) + "\n")
+	sb.WriteString("  " + styles.Mute.Render(strings.Repeat("-", 72)) + "\n")
 
 	for i, a := range m.alerts {
 		sev := styles.SeverityBadge(a.Severity)

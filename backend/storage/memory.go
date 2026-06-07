@@ -48,8 +48,7 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-// ─── MetricStore ──────────────────────────────────────────────────────────────
-
+// MetricStore
 func (s *MemoryStore) StoreMetrics(ms []models.Metric) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,8 +78,7 @@ func (s *MemoryStore) GetAllMetrics() []models.Metric {
 	return out
 }
 
-// ─── QueryableStore ───────────────────────────────────────────────────────────
-
+// QueryableStore
 func (s *MemoryStore) QueryByName(name string, since time.Time, limit int) ([]models.Metric, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -128,8 +126,7 @@ func tagsMatch(src, filter map[string]string) bool {
 	return true
 }
 
-// ─── AlertStore ───────────────────────────────────────────────────────────────
-
+// AlertStore
 func (s *MemoryStore) SaveAlert(a *models.Alert) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -190,8 +187,7 @@ func (s *MemoryStore) GetAlertByID(id uint) (*models.Alert, error) {
 	return nil, fmt.Errorf("alert %d not found", id)
 }
 
-// ─── LogStore ─────────────────────────────────────────────────────────────────
-
+// LogStore
 func (s *MemoryStore) StoreLogs(logs []models.PodLog) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -241,8 +237,7 @@ func (s *MemoryStore) GetLogsSince(pod, namespace string, since time.Time) ([]mo
 	return out, nil
 }
 
-// ─── RCAStore ─────────────────────────────────────────────────────────────────
-
+// RCAStore
 func (s *MemoryStore) SaveRCAResult(r *models.RCAResult) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -272,8 +267,7 @@ func (s *MemoryStore) GetRCAResult(alertID uint) (*models.RCAResult, error) {
 	return &cp, nil
 }
 
-// ─── NotificationStore ───────────────────────────────────────────────────────
-
+// NotificationStore
 func (s *MemoryStore) SaveNotificationEvent(e *models.NotificationEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -313,8 +307,7 @@ func (s *MemoryStore) GetRecentNotificationEvents(limit int) ([]models.Notificat
 	return out, nil
 }
 
-// ─── IncidentStore ────────────────────────────────────────────────────────────
-
+// IncidentStore
 func (s *MemoryStore) SaveIncident(inc *models.Incident) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

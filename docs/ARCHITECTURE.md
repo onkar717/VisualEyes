@@ -36,44 +36,44 @@ Each component is an independent Go binary. They communicate only through the ba
 
 ```
 visual-eyes-agent
-  └─ gopsutil: collect CPU/mem/disk/net/load every 10s
-  └─ HTTP POST /api/system-metrics  →  backend
-       └─ storage.Store(SystemMetricRecord)
-       └─ alertEngine.Evaluate(metrics)
-       └─ ws.Broadcaster.Publish(metrics)  →  connected WebSocket clients
-       └─ prometheus.Registry.Update(metrics)
+  └- gopsutil: collect CPU/mem/disk/net/load every 10s
+  └- HTTP POST /api/system-metrics  →  backend
+       └- storage.Store(SystemMetricRecord)
+       └- alertEngine.Evaluate(metrics)
+       └- ws.Broadcaster.Publish(metrics)  →  connected WebSocket clients
+       └- prometheus.Registry.Update(metrics)
 ```
 
 ### Kubernetes Metrics Path
 
 ```
 visual-eyes-kube-agent
-  └─ kubelet /stats/summary: CPU + mem per pod + node every 15s
-  └─ K8s API: pod status, restart counts, events
-  └─ HTTP POST /api/kubernetes-metrics  →  backend
-       └─ storage.Store(KubernetesMetricRecord)
-       └─ alertEngine.Evaluate(k8sMetrics)
-       └─ ws.Broadcaster.Publish(k8sMetrics)
+  └- kubelet /stats/summary: CPU + mem per pod + node every 15s
+  └- K8s API: pod status, restart counts, events
+  └- HTTP POST /api/kubernetes-metrics  →  backend
+       └- storage.Store(KubernetesMetricRecord)
+       └- alertEngine.Evaluate(k8sMetrics)
+       └- ws.Broadcaster.Publish(k8sMetrics)
 ```
 
 ### veye CLI Read Path
 
 ```
 veye status / alerts / logs / rca
-  └─ HTTP GET /api/metrics/snapshot
-  └─ HTTP GET /api/alerts
-  └─ HTTP GET /api/logs
-  └─ HTTP GET /api/rca
-  └─ render in Bubbletea TUI
+  └- HTTP GET /api/metrics/snapshot
+  └- HTTP GET /api/alerts
+  └- HTTP GET /api/logs
+  └- HTTP GET /api/rca
+  └- render in Bubbletea TUI
 ```
 
 ### React UI Live Path
 
 ```
 React UI  →  WebSocket ws://localhost:8080/ws
-  └─ on connect: sends initial state snapshot
-  └─ on each agent push: backend broadcasts delta
-  └─ React Query polls REST endpoints for alerts/RCA/logs
+  └- on connect: sends initial state snapshot
+  └- on each agent push: backend broadcasts delta
+  └- React Query polls REST endpoints for alerts/RCA/logs
 ```
 
 ---
@@ -84,20 +84,20 @@ React UI  →  WebSocket ws://localhost:8080/ws
 1. Agent pushes metrics to POST /api/*-metrics
 
 2. alertEngine.Evaluate(payload)
-   ├─ Load rules from configs/config.yaml
-   ├─ Evaluate each rule against current metric values
-   ├─ Dedup check: is this rule already firing for this resource?
-   │   └─ yes → update timestamp, skip re-fire
-   │   └─ no  → create new Alert{ID, Severity, Resource, Reason, FiredAt}
-   ├─ Noise filter: suppress if metric recovers within grace period
-   └─ Persist via storage.StoreAlert(alert)
+   ├- Load rules from configs/config.yaml
+   ├- Evaluate each rule against current metric values
+   ├- Dedup check: is this rule already firing for this resource?
+   │   └- yes → update timestamp, skip re-fire
+   │   └- no  → create new Alert{ID, Severity, Resource, Reason, FiredAt}
+   ├- Noise filter: suppress if metric recovers within grace period
+   └- Persist via storage.StoreAlert(alert)
 
 3. If alert.Severity <= SEV2 (configurable):
-   └─ rcaProcessor.TriggerAsync(alert)  →  RCA pipeline (async goroutine)
+   └- rcaProcessor.TriggerAsync(alert)  →  RCA pipeline (async goroutine)
 
 4. ws.Broadcaster.Publish(AlertEvent)
-   └─ React UI updates Alerts panel immediately
-   └─ veye watch updates TUI alerts list
+   └- React UI updates Alerts panel immediately
+   └- veye watch updates TUI alerts list
 ```
 
 **Alert severity levels:**
@@ -117,28 +117,28 @@ The RCA processor runs entirely in `backend/rca/`. Steps:
 
 ```
 1. context_builder.Build(alert)
-   ├─ Pull last N metric snapshots for affected resource
-   ├─ Pull recent pod logs for affected pod (if K8s alert)
-   ├─ Pull recent events for affected namespace
-   └─ Serialize into structured context string
+   ├- Pull last N metric snapshots for affected resource
+   ├- Pull recent pod logs for affected pod (if K8s alert)
+   ├- Pull recent events for affected namespace
+   └- Serialize into structured context string
 
 2. claude_client.Analyze(context)
-   ├─ System prompt: SRE role, safety constraints, output format
-   ├─ User message: structured incident context
-   ├─ Claude API call (claude-sonnet-4-6 or configured model)
-   └─ Parse response: RootCause, ContributingFactors, RemediationSteps[]
+   ├- System prompt: SRE role, safety constraints, output format
+   ├- User message: structured incident context
+   ├- Claude API call (claude-sonnet-4-6 or configured model)
+   └- Parse response: RootCause, ContributingFactors, RemediationSteps[]
 
 3. executor.Validate(remediationSteps)
-   ├─ Each command checked against allowlist (kubectl get/describe/logs/top)
-   ├─ Destructive commands (delete, patch, scale 0) flagged is_destructive=true
-   └─ Commands not in allowlist → rejected, logged
+   ├- Each command checked against allowlist (kubectl get/describe/logs/top)
+   ├- Destructive commands (delete, patch, scale 0) flagged is_destructive=true
+   └- Commands not in allowlist → rejected, logged
 
 4. storage.StoreRCAResult(result)
-   └─ Persisted with incident_id, root_cause, steps[], confidence, created_at
+   └- Persisted with incident_id, root_cause, steps[], confidence, created_at
 
 5. ws.Broadcaster.Publish(RCAEvent)
-   └─ React UI opens RCA drawer
-   └─ veye watch surfaces RCA in TUI
+   └- React UI opens RCA drawer
+   └- veye watch surfaces RCA in TUI
 ```
 
 **Allowlisted safe commands:**

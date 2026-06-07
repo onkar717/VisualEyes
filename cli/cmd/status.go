@@ -26,7 +26,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 
 	fmt.Println()
 
-	// ── Header ─────────────────────────────────────────────────────────────────
+	// Header
 	statusStyle := styles.Good
 	if health.Status != "healthy" {
 		statusStyle = styles.Bad
@@ -41,7 +41,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	fmt.Println(styles.Box.Render(header))
 	fmt.Println()
 
-	// ── System metrics ─────────────────────────────────────────────────────────
+	// System metrics
 	fmt.Println(styles.SectionHeader.Render("  SYSTEM METRICS"))
 	if snap != nil {
 		printMetricRow("CPU usage",    snap.Metrics["cpu"]["usage"], "%")
@@ -53,7 +53,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		fmt.Println(styles.Mute.Render("  no system metrics yet"))
 	}
 
-	// ── Kubernetes ─────────────────────────────────────────────────────────────
+	// Kubernetes
 	fmt.Println()
 	fmt.Println(styles.SectionHeader.Render("  KUBERNETES"))
 	if k8s != nil {
@@ -74,7 +74,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		fmt.Println(styles.Mute.Render("  no kubernetes metrics yet"))
 	}
 
-	// ── Alerts ─────────────────────────────────────────────────────────────────
+	// Alerts
 	fmt.Println()
 	fmt.Println(styles.SectionHeader.Render("  ALERTS"))
 	if len(alerts) == 0 {
