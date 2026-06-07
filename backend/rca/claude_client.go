@@ -2,9 +2,7 @@ package rca
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
@@ -12,46 +10,16 @@ import (
 	"github.com/onkar717/visual-eyes/backend/models"
 )
 
-const systemPrompt = `You are an expert Site Reliability Engineer (SRE) assistant embedded in a Kubernetes monitoring platform called VisualEyes.
-
-Your job is to analyse metric alerts and produce:
-1. A concise explanation of what is happening (2-3 sentences, plain English, no jargon).
-2. The likely root cause (1-2 sentences).
-3. A prioritised list of remediation commands.
-
-STRICT OUTPUT RULES:
-- Output ONLY valid JSON, no markdown, no code fences, no explanation outside the JSON.
-- Use this exact schema:
-{
-  "explanation": "string",
-  "root_cause": "string",
-  "confidence": 0-100,
-  "commands": [
-    {
-      "command": "kubectl ...",
-      "description": "one line what this does",
-      "is_auto_safe": true|false,
-      "risk": "low|medium|high"
-    }
-  ]
-}
-
-AUTO-SAFE COMMAND RULES:
-- Mark is_auto_safe=true ONLY for these command prefixes:
-    kubectl delete pod
-    kubectl rollout restart
-- Everything else must have is_auto_safe=false.
-- Never suggest cluster-wide destructive commands (delete namespace, delete node, etc.).
-- If no fix is needed or safe, return commands=[].
-
-CONFIDENCE: set 0-100 based on how much signal you have. Low signal = low confidence.`
-
-// RCAResponse is the structured JSON Claude returns.
+// RCAResponse is the structured JSON any LLM returns from the final pipeline stage.
 type RCAResponse struct {
-	Explanation string       `json:"explanation"`
-	RootCause   string       `json:"root_cause"`
-	Confidence  int          `json:"confidence"`
-	Commands    []FixCommand `json:"commands"`
+	Explanation         string       `json:"explanation"`
+	RootCause           string       `json:"root_cause"`
+	Confidence          int          `json:"confidence"`
+	Severity            string       `json:"severity"` // SEV1|SEV2|SEV3|SEV4
+	Category            string       `json:"category"` // crashloop|oom|high_cpu|high_memory|disk|network|other
+	ContributingFactors []string     `json:"contributing_factors"`
+	AffectedServices    []string     `json:"affected_services"`
+	Commands            []FixCommand `json:"commands"`
 }
 
 // FixCommand is one proposed remediation action.
@@ -62,7 +30,7 @@ type FixCommand struct {
 	Risk        string `json:"risk"`
 }
 
-// ClaudeClient wraps the Anthropic SDK to produce RCA analyses.
+// ClaudeClient wraps the Anthropic SDK and implements LLMProvider.
 type ClaudeClient struct {
 	client    *anthropic.Client
 	model     string
@@ -81,73 +49,45 @@ func NewClaudeClient(apiKey, model string, maxTokens int) *ClaudeClient {
 	return &ClaudeClient{client: &client, model: model, maxTokens: maxTokens}
 }
 
-// Analyze sends the alert context to Claude and returns a parsed RCAResponse.
-func (c *ClaudeClient) Analyze(ctx context.Context, ac AlertContext) (*RCAResponse, int, error) {
-	userMessage := fmt.Sprintf(
-		"Analyse the following Kubernetes alert and provide root cause analysis.\n\n%s",
-		ac.Format(),
-	)
+// Name implements LLMProvider.
+func (c *ClaudeClient) Name() string { return c.model }
 
-	slog.Debug("calling claude for rca",
-		"model", c.model,
-		"alert_id", ac.Alert.ID,
-		"rule", ac.Alert.RuleName,
-	)
-
+// Complete implements LLMProvider — single-turn chat with system + user message.
+func (c *ClaudeClient) Complete(ctx context.Context, systemPrompt, userPrompt string, maxTokens int) (string, int, error) {
+	if maxTokens <= 0 {
+		maxTokens = c.maxTokens
+	}
 	msg, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
-		MaxTokens: int64(c.maxTokens),
+		MaxTokens: int64(maxTokens),
 		System: []anthropic.TextBlockParam{
 			{Text: systemPrompt},
 		},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userMessage)),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
 		},
 	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("claude api error: %w", err)
+		return "", 0, fmt.Errorf("claude api: %w", err)
 	}
-
-	inputTokens := int(msg.Usage.InputTokens)
-
 	if len(msg.Content) == 0 {
-		return nil, inputTokens, fmt.Errorf("claude returned empty response")
+		return "", int(msg.Usage.InputTokens), fmt.Errorf("claude returned empty response")
 	}
-
-	raw := ""
 	for _, block := range msg.Content {
 		if block.Type == "text" {
-			raw = block.Text
-			break
+			return block.Text, int(msg.Usage.InputTokens), nil
 		}
 	}
+	return "", int(msg.Usage.InputTokens), fmt.Errorf("claude returned no text block")
+}
 
-	// Strip any accidental markdown fences.
-	raw = strings.TrimSpace(raw)
-	raw = strings.TrimPrefix(raw, "```json")
-	raw = strings.TrimPrefix(raw, "```")
-	raw = strings.TrimSuffix(raw, "```")
-	raw = strings.TrimSpace(raw)
-
-	var resp RCAResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		return nil, inputTokens, fmt.Errorf("parse claude response: %w\nraw: %s", err, raw)
-	}
-
-	slog.Info("rca analysis complete",
-		"alert_id", ac.Alert.ID,
-		"rule", ac.Alert.RuleName,
-		"confidence", resp.Confidence,
-		"commands", len(resp.Commands),
-		"input_tokens", inputTokens,
-	)
-
-	// Enforce the auto-safe allowlist regardless of what Claude said.
-	for i := range resp.Commands {
-		resp.Commands[i].IsAutoSafe = isSafe(resp.Commands[i].Command)
-	}
-
-	return &resp, inputTokens, nil
+// stripFences removes accidental ```json / ``` wrappers from LLM output.
+func stripFences(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	return strings.TrimSpace(s)
 }
 
 // ToFixCommands converts the response into models.FixCommand slices.
@@ -156,7 +96,7 @@ func (r *RCAResponse) ToFixCommands() []models.FixCommand {
 	for i, c := range r.Commands {
 		cmds[i] = models.FixCommand{
 			Command:    c.Command,
-			IsAutoSafe: c.IsAutoSafe,
+			IsAutoSafe: isSafe(c.Command),
 			Status:     models.RemediationPending,
 		}
 	}
