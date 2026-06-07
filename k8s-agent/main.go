@@ -37,14 +37,22 @@ func main() {
 	eventsEndpoint := strings.Replace(metricsEndpoint, "/api/kubernetes-metrics", "/api/events", 1)
 	nodeName := os.Getenv("NODE_NAME")
 
+	// Namespace filter: env var VISUAL_EYES_AGENT_NAMESPACES overrides config.
+	// Comma-separated, e.g. "default,kube-system". Empty = all namespaces.
+	allowedNamespaces := cfg.Agent.Namespaces
+	if nsEnv := os.Getenv("VISUAL_EYES_AGENT_NAMESPACES"); nsEnv != "" {
+		allowedNamespaces = strings.Split(nsEnv, ",")
+	}
+
 	slog.Info("VisualEyes Kubernetes Agent starting",
 		"metrics_endpoint", metricsEndpoint,
 		"logs_endpoint", logsEndpoint,
 		"node", nodeName,
+		"allowed_namespaces", allowedNamespaces,
 	)
 
 	// Kubernetes client
-	collector, err := metrics.New()
+	collector, err := metrics.New(allowedNamespaces)
 	if err != nil {
 		slog.Error("failed to create kubernetes metrics collector", "error", err)
 		os.Exit(1)
