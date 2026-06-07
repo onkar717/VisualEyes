@@ -109,69 +109,19 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 
 ---
 
-## 💻 Sample Output
+## 💻 Screenshots
 
-### veye watch   Interactive TUI Dashboard
+### veye CLI — Live System Status
 
-```
-┌------------------------ VisualEyes -------------------------┐
-│  System        CPU: 23.4%  Mem: 6.1/16GB  Load: 0.87        │
-│  Kubernetes    Nodes: 1    Pods: 13/13     Alerts: 2         │
-├-------------------- Active Alerts --------------------------┤
-│  [SEV1] payment-service  CrashLoopBackOff  2m ago           │
-│  [SEV2] db-worker        OOMKilled         8m ago           │
-├------------------------ RCA Result -------------------------┤
-│  ROOT CAUSE (94% confidence):                               │
-│  payment-service cannot connect to Redis at                 │
-│  redis.prod.svc:6379   connection refused.                  │
-│                                                              │
-│  PROPOSED FIX:                                              │
-│  kubectl get svc redis -n prod                              │
-│  Execute? [y / dry / n]: _                                  │
-└--------------------------------------------------------------┘
-```
+![veye status output](docs/images/veye-cli.png)
 
-### veye alerts
+### Web Dashboard — System Overview
 
-```
-$ veye alerts
+![VisualEyes dashboard system overview](docs/images/veye-dashboard.png)
 
-ID        SEVERITY  COMPONENT          REASON              AGE
--------   --------  -----------------  ------------------  ----
-a1b2c3    SEV1      payment-service    CrashLoopBackOff    2m
-d4e5f6    SEV2      db-worker          OOMKilled           8m
-g7h8i9    SEV3      frontend-deploy    HighCPUThrottle     14m
+### Web Dashboard — Active Alerts
 
-3 active alerts. Run: veye rca <id> for root cause analysis.
-```
-
-### veye rca
-
-```
-$ veye rca a1b2c3
-
-[VisualEyes RCA] Incident a1b2c3   payment-service (SEV1)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ROOT CAUSE:
-  Container 'payment-service' is CrashLoopBackOff.
-  Exit code 1   unable to connect to Redis cache at
-  redis.prod.svc.cluster.local:6379. TCP connection refused.
-
-CONTRIBUTING FACTORS:
-  • Redis service has 0 ready endpoints (selector mismatch)
-  • Pod redis-0 is Pending   PVC not bound
-
-REMEDIATION PLAN:
-  Step 1: Check Redis pod status
-  $ kubectl get pods -n prod -l app=redis
-  Execute? [y/dry/n]: y
-  ✓ Output: redis-0 is Pending (PVC unbound)
-
-  Step 2: Check PersistentVolumeClaim
-  $ kubectl describe pvc redis-data -n prod
-  Execute? [y/dry/n]:
-```
+![VisualEyes alerts page](docs/images/veye-alerts.png)
 
 ---
 
