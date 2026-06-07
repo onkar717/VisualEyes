@@ -13,6 +13,7 @@ import (
 
 	k8sexec "github.com/onkar717/visual-eyes/k8s-agent/exec"
 	"github.com/onkar717/visual-eyes/k8s-agent/events"
+	"github.com/onkar717/visual-eyes/k8s-agent/infra"
 	"github.com/onkar717/visual-eyes/k8s-agent/logs"
 	"github.com/onkar717/visual-eyes/k8s-agent/metrics"
 	"github.com/onkar717/visual-eyes/server/config"
@@ -179,18 +180,33 @@ func main() {
 		execPort = "8090"
 	}
 	exectr, execErr := k8sexec.NewExecutor()
+	agentMux := http.NewServeMux()
+
 	if execErr != nil {
 		slog.Warn("exec endpoint disabled — not running in-cluster", "error", execErr)
 	} else {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/exec", makeExecHandler(exectr))
-		go func() {
-			slog.Info("exec endpoint listening", "port", execPort)
-			if err := http.ListenAndServe(":"+execPort, mux); err != nil && err != http.ErrServerClosed {
-				slog.Warn("exec server stopped", "error", err)
-			}
-		}()
+		agentMux.HandleFunc("/exec", makeExecHandler(exectr))
 	}
+
+	// Infra endpoint: exposes ResourceQuota, PVC, and HPA state for RCA infra-diagnosis.
+	if k8sClient := collector.Client(); k8sClient != nil {
+		agentMux.HandleFunc("/infra", func(w http.ResponseWriter, r *http.Request) {
+			snap, err := infra.Collect(r.Context(), k8sClient)
+			if err != nil {
+				http.Error(w, "infra collect failed", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(snap)
+		})
+	}
+
+	go func() {
+		slog.Info("agent endpoint listening", "port", execPort)
+		if err := http.ListenAndServe(":"+execPort, agentMux); err != nil && err != http.ErrServerClosed {
+			slog.Warn("agent server stopped", "error", err)
+		}
+	}()
 
 	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
