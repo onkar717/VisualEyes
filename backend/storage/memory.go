@@ -10,8 +10,8 @@ import (
 )
 
 // MemoryStore is a fully in-memory implementation of MetricStore, QueryableStore,
-// AlertStore, LogStore, and RCAStore. It is used as a fallback when PostgreSQL
-// is unreachable (dev / no-DB mode).
+// AlertStore, LogStore, RCAStore, and NotificationStore. Used as a fallback when
+// PostgreSQL is unreachable (dev / no-DB mode).
 type MemoryStore struct {
 	mu sync.RWMutex
 
@@ -24,12 +24,16 @@ type MemoryStore struct {
 	alertSeq uint
 
 	// logs
-	logs []*models.PodLog
+	logs   []*models.PodLog
 	logSeq uint
 
 	// rca results: alertID → result
 	rcaResults map[uint]*models.RCAResult
 	rcaSeq     uint
+
+	// notification events
+	notifEvents []*models.NotificationEvent
+	notifSeq    uint
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -262,4 +266,45 @@ func (s *MemoryStore) GetRCAResult(alertID uint) (*models.RCAResult, error) {
 	}
 	cp := *r
 	return &cp, nil
+}
+
+// ─── NotificationStore ───────────────────────────────────────────────────────
+
+func (s *MemoryStore) SaveNotificationEvent(e *models.NotificationEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.notifSeq++
+	e.ID = s.notifSeq
+	cp := *e
+	s.notifEvents = append(s.notifEvents, &cp)
+	// cap at 1000 events
+	if len(s.notifEvents) > 1000 {
+		s.notifEvents = s.notifEvents[len(s.notifEvents)-1000:]
+	}
+	return nil
+}
+
+func (s *MemoryStore) GetNotificationEvents(alertID uint) ([]models.NotificationEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []models.NotificationEvent
+	for _, e := range s.notifEvents {
+		if e.AlertID == alertID {
+			out = append(out, *e)
+		}
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]models.NotificationEvent, 0, limit)
+	for i := len(s.notifEvents) - 1; i >= 0; i-- {
+		out = append(out, *s.notifEvents[i])
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }

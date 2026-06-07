@@ -21,29 +21,24 @@ import (
 
 // Handler is the central HTTP handler for all VisualEyes API endpoints.
 type Handler struct {
-	systemStore     storage.MetricStore
-	kubernetesStore storage.MetricStore
-	alertStore      storage.AlertStore
-	logStore        storage.LogStore
-	rcaStore        storage.RCAStore
-	broadcaster     *ws.Broadcaster
-	hostname        string
-	corsOrigins     string
-	startedAt       time.Time
-	rateLimiter     interface{ Stop() }
+	systemStore       storage.MetricStore
+	kubernetesStore   storage.MetricStore
+	alertStore        storage.AlertStore
+	logStore          storage.LogStore
+	rcaStore          storage.RCAStore
+	notificationStore storage.NotificationStore
+	broadcaster       *ws.Broadcaster
+	hostname          string
+	corsOrigins       string
+	startedAt         time.Time
+	rateLimiter       interface{ Stop() }
 }
 
-// SetAlertStore injects the alert store after construction (Commit 3).
-func (h *Handler) SetAlertStore(s storage.AlertStore) { h.alertStore = s }
-
-// SetLogStore injects the log store after construction (Commit 4).
-func (h *Handler) SetLogStore(s storage.LogStore) { h.logStore = s }
-
-// SetRCAStore injects the RCA store after construction (Commit 5).
-func (h *Handler) SetRCAStore(s storage.RCAStore) { h.rcaStore = s }
-
-// SetBroadcaster injects the WebSocket broadcaster (Commit 6).
-func (h *Handler) SetBroadcaster(b *ws.Broadcaster) { h.broadcaster = b }
+func (h *Handler) SetAlertStore(s storage.AlertStore)             { h.alertStore = s }
+func (h *Handler) SetLogStore(s storage.LogStore)                 { h.logStore = s }
+func (h *Handler) SetRCAStore(s storage.RCAStore)                 { h.rcaStore = s }
+func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notificationStore = s }
+func (h *Handler) SetBroadcaster(b *ws.Broadcaster)               { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -882,4 +877,58 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// HandleIncidents returns recent notification delivery events.
+// GET /api/incidents?limit=50&alert_id=<id>
+func (h *Handler) HandleIncidents(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.notificationStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	q := r.URL.Query()
+
+	// Optional filter by alert ID.
+	if alertIDStr := q.Get("alert_id"); alertIDStr != "" {
+		var alertID uint
+		if _, err := fmt.Sscanf(alertIDStr, "%d", &alertID); err != nil {
+			http.Error(w, "invalid alert_id", http.StatusBadRequest)
+			return
+		}
+		events, err := h.notificationStore.GetNotificationEvents(alertID)
+		if err != nil {
+			slog.Error("get notification events", "alert_id", alertID, "error", err)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, events)
+		return
+	}
+
+	limit := 50
+	if l := q.Get("limit"); l != "" {
+		if _, err := fmt.Sscanf(l, "%d", &limit); err != nil || limit <= 0 {
+			limit = 50
+		}
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	events, err := h.notificationStore.GetRecentNotificationEvents(limit)
+	if err != nil {
+		slog.Error("get recent notification events", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, events)
 }
