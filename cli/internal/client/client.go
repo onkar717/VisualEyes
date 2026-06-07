@@ -285,6 +285,12 @@ func (c *Client) HealthScore() (float64, error) {
 	return r.HealthScore, c.get("/healthz", &r)
 }
 
+// GetIncident calls GET /api/incidents/full/{id} — single incident detail.
+func (c *Client) GetIncident(id uint) (*Incident, error) {
+	var inc Incident
+	return &inc, c.get(fmt.Sprintf("/api/incidents/full/%d", id), &inc)
+}
+
 // Incidents calls /api/incidents and returns recent notification delivery events.
 func (c *Client) Incidents(limit int, alertID uint) ([]NotificationEvent, error) {
 	var r []NotificationEvent

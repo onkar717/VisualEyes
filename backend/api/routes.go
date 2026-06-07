@@ -40,9 +40,9 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// Notification delivery history
 	mux.HandleFunc("/api/incidents", h.HandleIncidents)
 
-	// Incident lifecycle (SEV1-4, MTTR, status)
+	// Incident lifecycle (SEV1-4, MTTR, status, single-incident GET)
 	mux.HandleFunc("/api/incidents/full", h.HandleIncidentsFull)
-	mux.HandleFunc("/api/incidents/full/", h.HandleIncidentStatus) // PATCH /api/incidents/full/{id}
+	mux.HandleFunc("/api/incidents/full/", h.HandleIncidentByIDOrStatus) // GET|PATCH /api/incidents/full/{id}
 
 	// WebSocket real-time stream
 	mux.HandleFunc("/ws", h.WebSocketStream)

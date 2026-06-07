@@ -1103,3 +1103,37 @@ func (h *Handler) HandleIncidentStatus(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, inc)
 }
+
+// HandleIncidentByIDOrStatus dispatches GET → HandleGetIncident, PATCH → HandleIncidentStatus.
+func (h *Handler) HandleIncidentByIDOrStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		h.HandleGetIncident(w, r)
+	} else {
+		h.HandleIncidentStatus(w, r)
+	}
+}
+
+// HandleGetIncident returns a single incident by ID.
+// GET /api/incidents/full/{id}
+func (h *Handler) HandleGetIncident(w http.ResponseWriter, r *http.Request) {
+	if h.preflight(w, r) {
+		return
+	}
+	if h.incidentStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "incident store not initialised")
+		return
+	}
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/incidents/full/")
+	idStr = strings.TrimSuffix(idStr, "/")
+	var id uint
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id == 0 {
+		writeError(w, http.StatusBadRequest, "invalid incident id")
+		return
+	}
+	inc, err := h.incidentStore.GetIncidentByID(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "incident not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, inc)
+}
