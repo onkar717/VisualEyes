@@ -2,18 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/onkar717/visual-eyes/agents/kubernetes/events"
-	"github.com/onkar717/visual-eyes/agents/kubernetes/logs"
-	"github.com/onkar717/visual-eyes/agents/kubernetes/metrics"
-	"github.com/onkar717/visual-eyes/backend/config"
-	sharedhttp "github.com/onkar717/visual-eyes/backend/http"
+	k8sexec "github.com/onkar717/visual-eyes/k8s-agent/exec"
+	"github.com/onkar717/visual-eyes/k8s-agent/events"
+	"github.com/onkar717/visual-eyes/k8s-agent/logs"
+	"github.com/onkar717/visual-eyes/k8s-agent/metrics"
+	"github.com/onkar717/visual-eyes/server/config"
+	sharedhttp "github.com/onkar717/visual-eyes/server/http"
 )
 
 func main() {
@@ -130,6 +133,26 @@ func main() {
 		}()
 	}
 
+	// Exec endpoint — allows the server to run commands inside pods in-cluster.
+	// Listens on VISUAL_EYES_EXEC_PORT (default 8090).
+	execPort := os.Getenv("VISUAL_EYES_EXEC_PORT")
+	if execPort == "" {
+		execPort = "8090"
+	}
+	exectr, execErr := k8sexec.NewExecutor()
+	if execErr != nil {
+		slog.Warn("exec endpoint disabled — not running in-cluster", "error", execErr)
+	} else {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/exec", makeExecHandler(exectr))
+		go func() {
+			slog.Info("exec endpoint listening", "port", execPort)
+			if err := http.ListenAndServe(":"+execPort, mux); err != nil && err != http.ErrServerClosed {
+				slog.Warn("exec server stopped", "error", err)
+			}
+		}()
+	}
+
 	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -137,6 +160,65 @@ func main() {
 	<-sigChan
 	slog.Info("shutdown signal received — stopping agent")
 	cancel()
+}
+
+type execRequest struct {
+	Namespace string   `json:"namespace"`
+	Pod       string   `json:"pod"`
+	Container string   `json:"container"`
+	Command   []string `json:"command"`
+}
+
+type execResponse struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+	Error  string `json:"error,omitempty"`
+}
+
+func makeExecHandler(e *k8sexec.Executor) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req execRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if req.Pod == "" || len(req.Command) == 0 {
+			http.Error(w, "pod and command required", http.StatusBadRequest)
+			return
+		}
+		if req.Namespace == "" {
+			req.Namespace = "default"
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		result, err := e.Exec(ctx, k8sexec.ExecOptions{
+			Namespace: req.Namespace,
+			Pod:       req.Pod,
+			Container: req.Container,
+			Command:   req.Command,
+		})
+
+		resp := execResponse{}
+		if result != nil {
+			resp.Stdout = result.Stdout
+			resp.Stderr = result.Stderr
+		}
+		if err != nil {
+			resp.Error = err.Error()
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		json.NewEncoder(w).Encode(resp)
+	}
 }
 
 func defaultConfig() *config.Config {
