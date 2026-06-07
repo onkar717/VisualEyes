@@ -1,7 +1,7 @@
 # Dockerfile for VisualEyes Backend Server
 # Multi-stage build for optimized production image
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -23,10 +23,10 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o visual-eyes-server ./backend
 
 # Final stage - minimal runtime image
-FROM alpine:latest
+FROM alpine:3.21
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata wget
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appgroup && \
@@ -50,7 +50,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/metrics/snapshot || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ping || exit 1
 
 # Environment variables will be set by docker-compose or at runtime
 # Default values: GIN_MODE=release, PORT=8080

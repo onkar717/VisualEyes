@@ -1,7 +1,7 @@
 # Dockerfile for VisualEyes Frontend UI
 # Multi-stage build: Build React app + Serve with nginx
 
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies including devDeps needed for build (vite, tsc)
+RUN npm ci
 
 # Copy source code
 COPY . .

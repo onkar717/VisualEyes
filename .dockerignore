@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Compiled binaries
+bin/
+
+# Node (UI build context handled by ui/Dockerfile)
+ui/node_modules
+ui/dist
+
+# Dev environment
+.env
+*.env
+.claude/
+
+# Test artifacts
+**/*_test.go
+
+# Docs — not needed in runtime image
+docs/
+tests/
+scripts/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

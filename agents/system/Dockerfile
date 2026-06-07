@@ -1,7 +1,7 @@
 # Dockerfile for VisualEyes System Agent
 # Multi-stage build for optimized production image
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o visual-eyes-system-agent ./agents/system
 
 # Final stage - minimal runtime image
-FROM alpine:latest
+FROM alpine:3.21
 
 # Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata
@@ -49,8 +49,8 @@ USER appuser
 # Default values: VISUAL_EYES_CONFIG=/app/configs/config.yaml
 
 # Health check - verify agent is running
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD pgrep -f visual-eyes-system-agent || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD test -f /proc/1/status || exit 1
 
 # Run the binary
 ENTRYPOINT ["./visual-eyes-system-agent"]
