@@ -35,6 +35,7 @@ type ContextBuilder struct {
 	prometheusEnabled bool
 	lokiURL        string
 	lokiEnabled    bool
+	lokiClient     *LokiClient // non-nil when lokiEnabled and lokiURL set
 }
 
 // NewContextBuilder creates a ContextBuilder with the given stores and limits.
@@ -60,9 +61,13 @@ func (b *ContextBuilder) SetPrometheus(url string, enabled bool) {
 }
 
 // SetLoki injects Loki connection info into context.
+// When enabled and url is non-empty, a LokiClient is created for live log queries.
 func (b *ContextBuilder) SetLoki(url string, enabled bool) {
 	b.lokiURL = url
 	b.lokiEnabled = enabled
+	if enabled && url != "" {
+		b.lokiClient = NewLokiClient(url)
+	}
 }
 
 // Build assembles a complete AlertContext for the given alert.
@@ -93,15 +98,25 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Pod logs (current + previous container for crashloop detection).
-	if b.logStore != nil && looksLikePod(alert.ResourceID) {
-		if logLines, err := b.logStore.GetLogs(alert.ResourceID, alert.Namespace, b.logLines); err == nil {
-			// Split by stream: "prev" goes to PrevLogs, rest to PodLogs.
-			for _, l := range logLines {
-				if l.Stream == "prev" || l.Stream == "previous" {
-					ctx.PrevLogs = append(ctx.PrevLogs, l)
-				} else {
-					ctx.PodLogs = append(ctx.PodLogs, l)
+	// Pod logs — prefer Loki when enabled; fall back to stored push logs.
+	if looksLikePod(alert.ResourceID) {
+		if b.lokiClient != nil {
+			// Query Loki for live logs (last 30 min, up to logLines).
+			if lokiLines, err := b.lokiClient.QueryLogs(alert.ResourceID, alert.Namespace,
+				30*time.Minute, b.logLines); err == nil && len(lokiLines) > 0 {
+				ctx.PodLogs = lokiLines
+			}
+		}
+		// Always supplement with stored logs (includes prev-stream from k8s-agent).
+		if b.logStore != nil {
+			if logLines, err := b.logStore.GetLogs(alert.ResourceID, alert.Namespace, b.logLines); err == nil {
+				for _, l := range logLines {
+					if l.Stream == "prev" || l.Stream == "previous" {
+						ctx.PrevLogs = append(ctx.PrevLogs, l)
+					} else if b.lokiClient == nil {
+						// Only use stored stdout/stderr if Loki is not providing them.
+						ctx.PodLogs = append(ctx.PodLogs, l)
+					}
 				}
 			}
 		}
