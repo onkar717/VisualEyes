@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -122,6 +123,35 @@ type NotificationEvent struct {
 	CreatedAt string `json:"createdAt"`
 }
 
+// Incident mirrors models.Incident — full lifecycle record.
+type Incident struct {
+	ID                  uint   `json:"id"`
+	IncidentCode        string `json:"incidentCode"`
+	AlertID             uint   `json:"alertID"`
+	RCAID               *uint  `json:"rcaID,omitempty"`
+	Title               string `json:"title"`
+	Severity            string `json:"severity"` // SEV1|SEV2|SEV3|SEV4
+	Category            string `json:"category"`
+	Status              string `json:"status"` // OPEN|INVESTIGATING|MITIGATED|RESOLVED
+	RootCause           string `json:"rootCause"`
+	ContributingFactors string `json:"contributingFactors"` // JSON []string
+	AffectedServices    string `json:"affectedServices"`    // JSON []string
+	ConfidenceScore     int    `json:"confidenceScore"`
+	MTTRSeconds         *int   `json:"mttrSeconds,omitempty"`
+	DetectedAt          string `json:"detectedAt"`
+	MitigatedAt         string `json:"mitigatedAt,omitempty"`
+	ResolvedAt          string `json:"resolvedAt,omitempty"`
+	CreatedAt           string `json:"createdAt"`
+}
+
+// IncidentListResponse is the /api/incidents/full response envelope.
+type IncidentListResponse struct {
+	Incidents      []Incident `json:"incidents"`
+	Count          int        `json:"count"`
+	MTTRAvgSeconds float64    `json:"mttr_avg_seconds"`
+	MTTRCount      int        `json:"mttr_count"`
+}
+
 // K8sMetrics is the /api/kubernetes/metrics response.
 type K8sMetrics struct {
 	Timestamp string `json:"timestamp"`
@@ -213,6 +243,46 @@ func (c *Client) RCA(alertID uint) (*RCAResult, error) {
 func (c *Client) Scan() (*ScanResult, error) {
 	var r ScanResult
 	return &r, c.get("/api/scan", &r)
+}
+
+// FullIncidents calls /api/incidents/full and returns structured incident records.
+func (c *Client) FullIncidents(limit int, severity, status string) (*IncidentListResponse, error) {
+	var r IncidentListResponse
+	q := fmt.Sprintf("/api/incidents/full?limit=%d", limit)
+	if severity != "" {
+		q += "&severity=" + severity
+	}
+	if status != "" {
+		q += "&status=" + status
+	}
+	return &r, c.get(q, &r)
+}
+
+// UpdateIncidentStatus PATCHes an incident to a new status.
+func (c *Client) UpdateIncidentStatus(id uint, status string) (*Incident, error) {
+	body := fmt.Sprintf(`{"status":%q}`, status)
+	resp, err := c.http.Post(
+		fmt.Sprintf("%s/api/incidents/full/%d", c.base, id),
+		"application/json",
+		strings.NewReader(body),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("patch incident: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("patch incident: HTTP %d", resp.StatusCode)
+	}
+	var inc Incident
+	return &inc, json.NewDecoder(resp.Body).Decode(&inc)
+}
+
+// HealthScore extracts the health_score from /healthz.
+func (c *Client) HealthScore() (float64, error) {
+	var r struct {
+		HealthScore float64 `json:"health_score"`
+	}
+	return r.HealthScore, c.get("/healthz", &r)
 }
 
 // Incidents calls /api/incidents and returns recent notification delivery events.

@@ -25,7 +25,8 @@ go.work.sum
 .idea/
 
 # OS
-.DS_Store
+.DS_Store   
+
 Thumbs.db
 
 # Logs (runtime log files, not source packages)
