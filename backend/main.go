@@ -56,17 +56,47 @@ func main() {
 	systemStore := store
 	k8sStore := store
 
-	// ── Notifications ─────────────────────────────────────────────────────────
-	var baseNotifier notifications.Notifier = notifications.Noop{}
-	channel := "noop"
+	// ── Notifications (multi-channel fan-out) ────────────────────────────────
+	var activeNotifiers []notifications.Notifier
+	var channelNames []string
+
 	if cfg.Notifications.Slack.Enabled && cfg.Notifications.Slack.WebhookURL != "" {
-		baseNotifier = notifications.NewSlackNotifier(cfg.Notifications.Slack.WebhookURL)
-		channel = "slack"
+		activeNotifiers = append(activeNotifiers, notifications.NewSlackNotifier(cfg.Notifications.Slack.WebhookURL))
+		channelNames = append(channelNames, "slack")
 		slog.Info("slack notifications enabled")
 	}
+	if cfg.Notifications.PagerDuty.Enabled && cfg.Notifications.PagerDuty.RoutingKey != "" {
+		activeNotifiers = append(activeNotifiers, notifications.NewPagerDutyNotifier(cfg.Notifications.PagerDuty.RoutingKey))
+		channelNames = append(channelNames, "pagerduty")
+		slog.Info("pagerduty notifications enabled")
+	}
+	if cfg.Notifications.Webhook.Enabled && cfg.Notifications.Webhook.URL != "" {
+		activeNotifiers = append(activeNotifiers, notifications.NewWebhookNotifier(cfg.Notifications.Webhook.URL, cfg.Notifications.Webhook.Secret))
+		channelNames = append(channelNames, "webhook")
+		slog.Info("webhook notifications enabled", "url", cfg.Notifications.Webhook.URL)
+	}
+
+	var baseNotifier notifications.Notifier
+	switch len(activeNotifiers) {
+	case 0:
+		baseNotifier = notifications.Noop{}
+		channelNames = []string{"noop"}
+	case 1:
+		baseNotifier = activeNotifiers[0]
+	default:
+		baseNotifier = notifications.NewMultiNotifier(activeNotifiers...)
+	}
+
 	// Wrap with LoggingNotifier so every delivery attempt is persisted.
 	var notifier notifications.Notifier = baseNotifier
 	if ns, ok := store.(storage.NotificationStore); ok {
+		channel := "noop"
+		if len(channelNames) > 0 {
+			channel = channelNames[0]
+			if len(channelNames) > 1 {
+				channel = "multi"
+			}
+		}
 		notifier = notifications.NewLoggingNotifier(baseNotifier, channel, ns)
 	}
 
@@ -134,7 +164,11 @@ func main() {
 		}
 	}()
 
-	if cfg.RCA.Enabled && cfg.RCA.APIKey != "" {
+	// ── RCA LLM provider selection ────────────────────────────────────────────
+	llmProvider := rca.BuildLLMProvider(cfg)
+	rcaEnabled := cfg.RCA.Enabled && llmProvider != nil
+
+	if rcaEnabled {
 		qs, qsOK := store.(storage.QueryableStore)
 		ls, lsOK := store.(storage.LogStore)
 		as, asOK := store.(storage.AlertStore)
@@ -147,18 +181,20 @@ func main() {
 			}
 			ctxBuilder := rca.NewContextBuilder(qs, logStore, as,
 				cfg.RCA.LogLines, cfg.RCA.MetricSamples)
-			claudeClient := rca.NewClaudeClient(cfg.RCA.APIKey, cfg.RCA.Model, cfg.RCA.MaxTokens)
 			executor := rca.NewExecutor(30 * time.Second)
-			processor := rca.NewProcessor(ctxBuilder, claudeClient, executor, rs, as)
+			processor := rca.NewProcessor(ctxBuilder, llmProvider, executor, rs, as)
 
 			handler.SetRCAStore(rs)
+			if is, ok := store.(storage.IncidentStore); ok {
+				processor.SetIncidentStore(is)
+				handler.SetIncidentStore(is)
+			}
 
 			go processor.RunWorker(appCtx, rcaTrigger, 2)
-			slog.Info("rca engine started", "model", cfg.RCA.Model)
+			slog.Info("rca engine started", "provider", cfg.RCA.Provider, "model", cfg.RCA.Model)
 		}
 	} else {
-		slog.Info("rca engine disabled — set rca.enabled=true and ANTHROPIC_API_KEY to enable")
-		// Still drain the trigger channel so the alert engine doesn't block.
+		slog.Info("rca engine disabled — set rca.enabled=true and a provider API key to enable")
 		go func() {
 			for range rcaTrigger {
 			}
