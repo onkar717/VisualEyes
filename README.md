@@ -1,7 +1,22 @@
+<div align="center">
+
+```
+ ██╗   ██╗██╗███████╗██╗   ██╗ █████╗ ██╗     ███████╗██╗   ██╗███████╗███████╗
+ ██║   ██║██║██╔════╝██║   ██║██╔══██╗██║     ██╔════╝╚██╗ ██╔╝██╔════╝██╔════╝
+ ██║   ██║██║███████╗██║   ██║███████║██║     █████╗   ╚████╔╝ █████╗  ███████╗
+ ╚██╗ ██╔╝██║╚════██║██║   ██║██╔══██║██║     ██╔══╝    ╚██╔╝  ██╔══╝  ╚════██║
+  ╚████╔╝ ██║███████║╚██████╔╝██║  ██║███████╗███████╗   ██║   ███████╗███████║
+   ╚═══╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝   ╚══════╝╚══════╝
+```
+
+**Cloud-Native Observability · AI-Powered RCA · Real-Time Monitoring**
+
+</div>
+
 # VisualEyes
 
-[![CI](https://github.com/onkar717/visual-eyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/visual-eyes/actions/workflows/ci.yaml)
-[![Release](https://github.com/onkar717/visual-eyes/actions/workflows/release.yml/badge.svg)](https://github.com/onkar717/visual-eyes/releases)
+[![CI](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml)
+[![Release](https://github.com/onkar717/VisualEyes/actions/workflows/release.yml/badge.svg)](https://github.com/onkar717/VisualEyes/releases)
 [![Go Version](https://img.shields.io/badge/go-1.24-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
