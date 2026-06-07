@@ -34,7 +34,7 @@ type Handler struct {
 	eventBuffer         *storage.EventBuffer // ring buffer for K8s Warning events
 	broadcaster         *ws.Broadcaster
 	hostname          string
-	corsOrigins       string
+	corsOrigins       map[string]bool
 	startedAt         time.Time
 	rateLimiter       interface{ Stop() }
 }
@@ -64,16 +64,19 @@ func NewHandler(systemStore, kubernetesStore storage.MetricStore, corsOrigins []
 		return nil, fmt.Errorf("os.Hostname: %w", err)
 	}
 
-	origins := strings.Join(corsOrigins, ",")
-	if origins == "" {
-		origins = "http://localhost:3000,http://localhost:5173"
+	allowed := make(map[string]bool, len(corsOrigins))
+	if len(corsOrigins) == 0 {
+		corsOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
+	}
+	for _, o := range corsOrigins {
+		allowed[o] = true
 	}
 
 	return &Handler{
 		systemStore:     systemStore,
 		kubernetesStore: kubernetesStore,
 		hostname:        hostname,
-		corsOrigins:     origins,
+		corsOrigins:     allowed,
 		startedAt:       time.Now(),
 	}, nil
 }
@@ -86,14 +89,19 @@ func roundValue(value float64) float64 {
 	return float64(int64(value*100)) / 100
 }
 
-func (h *Handler) cors(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", h.corsOrigins)
+func (h *Handler) cors(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if h.corsOrigins[origin] {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Length, X-Request-ID")
+	w.Header().Set("Vary", "Origin")
 }
 
 func (h *Handler) preflight(w http.ResponseWriter, r *http.Request) bool {
-	h.cors(w)
+	h.cors(w, r)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return true
@@ -688,7 +696,7 @@ func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 // Healthz returns component health + cluster health score as JSON.
 // HTTP 503 if any core component is unhealthy.
 func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	systemOK := h.systemStore != nil
 	k8sOK := h.kubernetesStore != nil
 	uptime := time.Since(h.startedAt).Round(time.Second).String()
@@ -962,7 +970,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 // HandleIncidents returns recent notification delivery events.
 // GET /api/incidents?limit=50&alert_id=<id>
 func (h *Handler) HandleIncidents(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1016,7 +1024,7 @@ func (h *Handler) HandleIncidents(w http.ResponseWriter, r *http.Request) {
 // HandleIncidentsFull returns structured incidents with SEV/status/MTTR.
 // GET /api/incidents/full?limit=50&severity=SEV1&status=OPEN
 func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1064,7 +1072,7 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 // HandleClusters lists all registered clusters.
 // GET /api/clusters
 func (h *Handler) HandleClusters(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1088,7 +1096,7 @@ func (h *Handler) HandleClusters(w http.ResponseWriter, r *http.Request) {
 // GET /api/clusters/{name}
 // GET /api/clusters/{name}/incidents
 func (h *Handler) HandleClusterDetail(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1121,7 +1129,7 @@ func (h *Handler) HandleClusterDetail(w http.ResponseWriter, r *http.Request) {
 // HandleClusterHeartbeat accepts a health snapshot from a cluster agent.
 // POST /api/clusters/heartbeat
 func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1186,7 +1194,7 @@ func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request)
 // HandleSnapshots returns point-in-time health trend data for a cluster.
 // GET /api/snapshots?cluster=NAME&hours=24&limit=288
 func (h *Handler) HandleSnapshots(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1222,7 +1230,7 @@ func (h *Handler) HandleSnapshots(w http.ResponseWriter, r *http.Request) {
 // GET  /api/remediation-log?limit=N          fetch recent entries (default 50)
 // POST /api/remediation-log                  record a step execution
 func (h *Handler) HandleRemediationLog(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1286,7 +1294,7 @@ func (h *Handler) HandleRemediationLog(w http.ResponseWriter, r *http.Request) {
 // HandleStats returns aggregate incident statistics.
 // GET /api/stats
 func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
@@ -1309,7 +1317,7 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 // HandleIncidentStatus updates an incident's status (OPEN→INVESTIGATING→MITIGATED→RESOLVED).
 // PATCH /api/incidents/full/<id>
 func (h *Handler) HandleIncidentStatus(w http.ResponseWriter, r *http.Request) {
-	h.cors(w)
+	h.cors(w, r)
 	if h.preflight(w, r) {
 		return
 	}
