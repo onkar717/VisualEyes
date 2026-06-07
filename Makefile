@@ -1,4 +1,4 @@
-.PHONY: build build-system-agent build-kube-agent build-server run-system-agent run-kube-agent run-server run-ui install-ui build-ui build-docker build-docker-tag push-docker build-and-push build-docker-server run-docker-server push-docker-server build-docker-ui run-docker-ui push-docker-ui build-docker-system-agent run-docker-system-agent push-docker-system-agent docker-up docker-down docker-logs deploy-k8s undeploy-k8s status-k8s run-all test clean fmt lint deps help
+.PHONY: build build-system-agent build-kube-agent build-server build-cli cross run-system-agent run-kube-agent run-server run-ui install-ui build-ui build-docker build-docker-tag push-docker build-and-push build-docker-server run-docker-server push-docker-server build-docker-ui run-docker-ui push-docker-ui build-docker-system-agent run-docker-system-agent push-docker-system-agent docker-up docker-down docker-logs deploy-k8s undeploy-k8s status-k8s run-all test clean fmt lint deps help
 
 # Go parameters
 GOCMD=go
@@ -11,26 +11,50 @@ GOLINT=golangci-lint
 # Binary name
 BINARY_NAME_AGENT=visual-eyes-agent
 BINARY_NAME_SERVER=visual-eyes-server
+BINARY_NAME_CLI=veye
+
+# Version
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS=-ldflags "-X main.Version=$(VERSION)"
 
 # Main paths
 SYSTEM_AGENT_PATH=./agents/system
 KUBE_AGENT_PATH=./agents/kubernetes
 SERVER_PATH=./backend
+CLI_PATH=./cli
 
 # Build all
-build: build-system-agent build-kube-agent build-server
+build: build-system-agent build-kube-agent build-server build-cli
 
 # Build system agent
 build-system-agent:
-	$(GOBUILD) -o bin/$(BINARY_NAME_AGENT) $(SYSTEM_AGENT_PATH)
+	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME_AGENT) $(SYSTEM_AGENT_PATH)
 
 # Build kubernetes agent
 build-kube-agent:
-	$(GOBUILD) -o bin/visual-eyes-kube-agent $(KUBE_AGENT_PATH)
+	$(GOBUILD) $(LDFLAGS) -o bin/visual-eyes-kube-agent $(KUBE_AGENT_PATH)
 
 # Build server
 build-server:
-	$(GOBUILD) -o bin/$(BINARY_NAME_SERVER) $(SERVER_PATH)
+	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME_SERVER) $(SERVER_PATH)
+
+# Build CLI
+build-cli:
+	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME_CLI) $(CLI_PATH)
+
+# Cross-compile all binaries for release
+cross:
+	mkdir -p dist
+	GOOS=linux   GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/visual-eyes-linux-amd64   $(SERVER_PATH)
+	GOOS=linux   GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o dist/visual-eyes-linux-arm64   $(SERVER_PATH)
+	GOOS=darwin  GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/visual-eyes-darwin-amd64  $(SERVER_PATH)
+	GOOS=darwin  GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o dist/visual-eyes-darwin-arm64  $(SERVER_PATH)
+	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/visual-eyes-windows-amd64.exe $(SERVER_PATH)
+	GOOS=linux   GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/veye-linux-amd64          $(CLI_PATH)
+	GOOS=linux   GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o dist/veye-linux-arm64          $(CLI_PATH)
+	GOOS=darwin  GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/veye-darwin-amd64         $(CLI_PATH)
+	GOOS=darwin  GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o dist/veye-darwin-arm64         $(CLI_PATH)
+	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o dist/veye-windows-amd64.exe    $(CLI_PATH)
 
 # Run system agent locally
 run-system-agent:
