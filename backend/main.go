@@ -195,6 +195,13 @@ func main() {
 		}
 	} else {
 		slog.Info("rca engine disabled — set rca.enabled=true and a provider API key to enable")
+		// Wire store anyway so /api/rca/* returns empty results instead of 503.
+		if rs, ok := store.(storage.RCAStore); ok {
+			handler.SetRCAStore(rs)
+		}
+		if is, ok := store.(storage.IncidentStore); ok {
+			handler.SetIncidentStore(is)
+		}
 		go func() {
 			for range rcaTrigger {
 			}
