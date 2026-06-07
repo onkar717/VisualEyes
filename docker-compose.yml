@@ -44,6 +44,8 @@ services:
       VISUAL_EYES_LOGGING_LEVEL: ${LOG_LEVEL:-info}
       VISUAL_EYES_LOGGING_FORMAT: ${LOG_FORMAT:-json}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      VISUAL_EYES_RCA_ENABLED: ${VISUAL_EYES_RCA_ENABLED:-false}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

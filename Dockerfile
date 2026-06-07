@@ -2,7 +2,7 @@
 # This image is used by the Kubernetes DaemonSet deployment
 # For local development, use 'make build' and 'make run-kube-agent'
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 COPY . .
@@ -10,7 +10,7 @@ COPY . .
 RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o visual-eyes-kube-agent ./agents/kubernetes
 
-FROM alpine:latest
+FROM alpine:3.21
 
 RUN apk --no-cache add ca-certificates
 
