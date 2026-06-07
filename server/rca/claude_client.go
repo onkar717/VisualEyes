@@ -10,19 +10,30 @@ import (
 	"github.com/onkar717/visual-eyes/server/models"
 )
 
+// ServiceImpact mirrors models.ServiceImpact for JSON parsing from LLM output.
+type ServiceImpact struct {
+	Service      string   `json:"service"`
+	Namespace    string   `json:"namespace"`
+	ImpactLevel  string   `json:"impact_level"` // down|degraded|at_risk
+	AffectedPods []string `json:"affected_pods,omitempty"`
+	ErrorRatePct float64  `json:"error_rate_pct,omitempty"`
+	P99LatencyMs float64  `json:"p99_latency_ms,omitempty"`
+}
+
 // RCAResponse is the structured JSON any LLM returns from the final pipeline stage.
 type RCAResponse struct {
-	Explanation         string       `json:"explanation"`
-	RootCause           string       `json:"root_cause"`
-	Confidence          int          `json:"confidence"`
-	Severity            string       `json:"severity"` // SEV1|SEV2|SEV3|SEV4
-	Category            string       `json:"category"` // crashloop|oom|high_cpu|high_memory|disk|network|other
-	ContributingFactors []string     `json:"contributing_factors"`
-	AffectedServices    []string     `json:"affected_services"`
-	Commands            []FixCommand `json:"commands"`
-	HasIssue            bool         `json:"has_issue"`    // false = cluster healthy, skip remediation
-	RunbookUsed         string       `json:"runbook_used"` // matched runbook filename
-	RawOutput           string       `json:"-"`            // raw commander text for audit
+	Explanation         string          `json:"explanation"`
+	RootCause           string          `json:"root_cause"`
+	Confidence          int             `json:"confidence"`
+	Severity            string          `json:"severity"` // SEV1|SEV2|SEV3|SEV4
+	Category            string          `json:"category"` // crashloop|oom|high_cpu|high_memory|disk|network|other
+	ContributingFactors []string        `json:"contributing_factors"`
+	AffectedServices    []string        `json:"affected_services"`
+	ServiceImpacts      []ServiceImpact `json:"service_impacts,omitempty"`
+	Commands            []FixCommand    `json:"commands"`
+	HasIssue            bool            `json:"has_issue"`    // false = cluster healthy, skip remediation
+	RunbookUsed         string          `json:"runbook_used"` // matched runbook filename
+	RawOutput           string          `json:"-"`            // raw commander text for audit
 }
 
 // FixCommand is one proposed remediation action.

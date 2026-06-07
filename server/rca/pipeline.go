@@ -100,6 +100,16 @@ Output ONLY valid JSON:
   "category": "crashloop|oom|high_cpu|high_memory|disk|image_pull|node_not_ready|pending|network|other",
   "contributing_factors": ["factor1", "factor2"],
   "affected_services": ["svc1"],
+  "service_impacts": [
+    {
+      "service": "actual-service-name",
+      "namespace": "actual-namespace",
+      "impact_level": "down|degraded|at_risk",
+      "affected_pods": ["pod-name"],
+      "error_rate_pct": 0.0,
+      "p99_latency_ms": 0.0
+    }
+  ],
   "confidence": 0-100,
   "commands": [
     {

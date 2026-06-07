@@ -6,6 +6,25 @@ import (
 	"time"
 )
 
+// ServiceImpactLevel classifies how severely a service is affected.
+type ServiceImpactLevel string
+
+const (
+	ServiceDown     ServiceImpactLevel = "down"     // service offline / error-rate ~100%
+	ServiceDegraded ServiceImpactLevel = "degraded" // elevated errors or latency
+	ServiceAtRisk   ServiceImpactLevel = "at_risk"  // warning signs, not yet degraded
+)
+
+// ServiceImpact describes the measured blast radius for one affected service.
+type ServiceImpact struct {
+	Service      string             `json:"service"`
+	Namespace    string             `json:"namespace"`
+	ImpactLevel  ServiceImpactLevel `json:"impactLevel"`
+	AffectedPods []string           `json:"affectedPods,omitempty"`
+	ErrorRatePct float64            `json:"errorRatePct,omitempty"` // 0-100, from Prometheus 5xx rate
+	P99LatencyMs float64            `json:"p99LatencyMs,omitempty"` // from histogram_quantile
+}
+
 // IncidentSeverity follows Google/PagerDuty SRE conventions.
 type IncidentSeverity string
 
@@ -45,6 +64,9 @@ type Incident struct {
 	ContributingFactors string `gorm:"type:text" json:"contributingFactors"` // JSON []string
 	AffectedServices    string `gorm:"type:text" json:"affectedServices"`    // JSON []string
 	ConfidenceScore     int    `json:"confidenceScore"`
+
+	// Service impact — JSON-encoded []ServiceImpact
+	ServiceImpacts string `gorm:"type:text" json:"serviceImpacts,omitempty"`
 
 	// Remediation observability
 	AutoRemediated  bool    `gorm:"default:false" json:"autoRemediated"`  // true if any command auto-executed

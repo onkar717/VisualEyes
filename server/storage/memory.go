@@ -514,6 +514,46 @@ func (s *MemoryStore) GetStats() (IncidentStats, error) {
 	return st, nil
 }
 
+func (s *MemoryStore) MTTRStatsBySeverity() (map[string]float64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	totals := make(map[string]float64)
+	counts := make(map[string]int)
+	for _, inc := range s.incidents {
+		if inc.MTTRSeconds != nil {
+			sev := string(inc.Severity)
+			totals[sev] += float64(*inc.MTTRSeconds)
+			counts[sev]++
+		}
+	}
+	out := make(map[string]float64, len(totals))
+	for sev, total := range totals {
+		out[sev] = total / float64(counts[sev])
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) FindOpenByCategory(category, namespace string, windowHours int) (*models.Incident, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cutoff := time.Now().Add(-time.Duration(windowHours) * time.Hour)
+	for i := len(s.incidents) - 1; i >= 0; i-- {
+		inc := s.incidents[i]
+		if inc.Category != category {
+			continue
+		}
+		if inc.Status != models.IncidentOpen && inc.Status != models.IncidentInvestigating {
+			continue
+		}
+		if inc.CreatedAt.Before(cutoff) {
+			continue
+		}
+		cp := *inc
+		return &cp, nil
+	}
+	return nil, fmt.Errorf("not found")
+}
+
 // ClusterSnapshotStore
 func (s *MemoryStore) SaveSnapshot(snap *models.ClusterSnapshot) error {
 	s.mu.Lock()
