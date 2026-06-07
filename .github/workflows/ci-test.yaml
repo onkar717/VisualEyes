@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-backend:
-    name: Backend Tests (race detector)
+    name: Backend Tests (race detector + coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,11 +29,18 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run tests with race detector
-        run: go test -v -race -count=1 ./backend/...
+      - name: Run tests with race detector and coverage
+        run: go test -v -race -count=1 -coverprofile=coverage-backend.out -covermode=atomic ./backend/...
+
+      - name: Upload backend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage-backend.out
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   test-agents:
-    name: Agent Tests (race detector)
+    name: Agent Tests (race detector + coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,11 +58,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Run agent tests with race detector
-        run: go test -v -race -count=1 ./agents/...
+      - name: Run agent tests with race detector and coverage
+        run: go test -v -race -count=1 -coverprofile=coverage-agents.out -covermode=atomic ./agents/...
+
+      - name: Upload agent coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage-agents.out
+          flags: agents
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   test-cli:
-    name: CLI Tests (race detector)
+    name: CLI Tests (race detector + coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,8 +87,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Run CLI tests with race detector
-        run: go test -v -race -count=1 ./cli/...
+      - name: Run CLI tests with race detector and coverage
+        run: go test -v -race -count=1 -coverprofile=coverage-cli.out -covermode=atomic ./cli/...
+
+      - name: Upload CLI coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage-cli.out
+          flags: cli
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   test-ui:
     name: UI Lint & Type Check
