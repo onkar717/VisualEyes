@@ -199,9 +199,3 @@ func version() string {
 	return "dev"
 }
 
-// Ensure the config.ServerConfig duration fields are non-zero before using them.
-func init() {
-	// Viper parses duration strings like "15s" correctly, but if the field is
-	// zero (e.g. first run with no config file), set safe defaults.
-	_ = time.Second // silence unused import if durations are removed
-}
