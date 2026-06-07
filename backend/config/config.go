@@ -21,13 +21,28 @@ type Config struct {
 
 // NotificationsConfig holds alert delivery integrations.
 type NotificationsConfig struct {
-	Slack SlackConfig `mapstructure:"slack"`
+	Slack      SlackConfig      `mapstructure:"slack"`
+	PagerDuty  PagerDutyConfig  `mapstructure:"pagerduty"`
+	Webhook    WebhookConfig    `mapstructure:"webhook"`
 }
 
 // SlackConfig configures the Slack incoming webhook notifier.
 type SlackConfig struct {
 	Enabled    bool   `mapstructure:"enabled"`
 	WebhookURL string `mapstructure:"webhook_url"`
+}
+
+// PagerDutyConfig configures PagerDuty Events v2 integration.
+type PagerDutyConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	RoutingKey string `mapstructure:"routing_key"` // Integration key from PD service
+}
+
+// WebhookConfig configures a generic HTTP webhook notifier.
+type WebhookConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	URL     string `mapstructure:"url"`
+	Secret  string `mapstructure:"secret"` // HMAC-SHA256 signing secret (optional)
 }
 
 type ServerConfig struct {
@@ -89,12 +104,20 @@ type AlertRule struct {
 }
 
 type RCAConfig struct {
-	Enabled     bool   `mapstructure:"enabled"`
-	APIKey      string `mapstructure:"api_key"`
-	Model       string `mapstructure:"model"`
-	MaxTokens   int    `mapstructure:"max_tokens"`
-	LogLines    int    `mapstructure:"log_lines"`
-	MetricSamples int  `mapstructure:"metric_samples"`
+	Enabled       bool   `mapstructure:"enabled"`
+	// Provider selects the LLM backend: "claude" (default) | "openai" | "groq" | "mistral"
+	Provider      string `mapstructure:"provider"`
+	// APIKey is used for Claude. Provider-specific keys below are preferred when set.
+	APIKey        string `mapstructure:"api_key"`
+	OpenAIAPIKey  string `mapstructure:"openai_api_key"`
+	GroqAPIKey    string `mapstructure:"groq_api_key"`
+	MistralAPIKey string `mapstructure:"mistral_api_key"`
+	// BaseURL overrides the provider's default endpoint (e.g. local proxy, Azure OpenAI).
+	BaseURL       string `mapstructure:"base_url"`
+	Model         string `mapstructure:"model"`
+	MaxTokens     int    `mapstructure:"max_tokens"`
+	LogLines      int    `mapstructure:"log_lines"`
+	MetricSamples int    `mapstructure:"metric_samples"`
 }
 
 type LoggingConfig struct {
@@ -142,17 +165,62 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
 
-	// Allow ANTHROPIC_API_KEY to set rca.api_key without prefix.
+	// Allow unprefixed env vars for LLM provider API keys.
 	if cfg.RCA.APIKey == "" {
 		cfg.RCA.APIKey = v.GetString("ANTHROPIC_API_KEY")
 	}
+	if cfg.RCA.OpenAIAPIKey == "" {
+		cfg.RCA.OpenAIAPIKey = v.GetString("OPENAI_API_KEY")
+	}
+	if cfg.RCA.GroqAPIKey == "" {
+		cfg.RCA.GroqAPIKey = v.GetString("GROQ_API_KEY")
+	}
+	if cfg.RCA.MistralAPIKey == "" {
+		cfg.RCA.MistralAPIKey = v.GetString("MISTRAL_API_KEY")
+	}
+	// Auto-detect provider from available keys when provider not explicitly set.
+	if cfg.RCA.Provider == "claude" || cfg.RCA.Provider == "" {
+		if cfg.RCA.APIKey == "" && cfg.RCA.OpenAIAPIKey != "" {
+			cfg.RCA.Provider = "openai"
+			if cfg.RCA.Model == "claude-sonnet-4-6" {
+				cfg.RCA.Model = "gpt-4o"
+			}
+		} else if cfg.RCA.APIKey == "" && cfg.RCA.GroqAPIKey != "" {
+			cfg.RCA.Provider = "groq"
+			if cfg.RCA.Model == "claude-sonnet-4-6" {
+				cfg.RCA.Model = "llama-3.3-70b-versatile"
+			}
+		} else if cfg.RCA.APIKey == "" && cfg.RCA.MistralAPIKey != "" {
+			cfg.RCA.Provider = "mistral"
+			if cfg.RCA.Model == "claude-sonnet-4-6" {
+				cfg.RCA.Model = "mistral-large-latest"
+			}
+		}
+	}
 
-	// Allow SLACK_WEBHOOK_URL env var to set notifications.slack.webhook_url.
+	// Slack
 	if cfg.Notifications.Slack.WebhookURL == "" {
 		if wh := v.GetString("SLACK_WEBHOOK_URL"); wh != "" {
 			cfg.Notifications.Slack.WebhookURL = wh
 			cfg.Notifications.Slack.Enabled = true
 		}
+	}
+	// PagerDuty
+	if cfg.Notifications.PagerDuty.RoutingKey == "" {
+		if rk := v.GetString("PAGERDUTY_ROUTING_KEY"); rk != "" {
+			cfg.Notifications.PagerDuty.RoutingKey = rk
+			cfg.Notifications.PagerDuty.Enabled = true
+		}
+	}
+	// Generic webhook
+	if cfg.Notifications.Webhook.URL == "" {
+		if u := v.GetString("WEBHOOK_URL"); u != "" {
+			cfg.Notifications.Webhook.URL = u
+			cfg.Notifications.Webhook.Enabled = true
+		}
+	}
+	if cfg.Notifications.Webhook.Secret == "" {
+		cfg.Notifications.Webhook.Secret = v.GetString("WEBHOOK_SECRET")
 	}
 
 	return &cfg, nil
@@ -208,13 +276,20 @@ func setDefaults(v *viper.Viper) {
 	// Notifications
 	v.SetDefault("notifications.slack.enabled", false)
 	v.SetDefault("notifications.slack.webhook_url", "")
+	v.SetDefault("notifications.pagerduty.enabled", false)
+	v.SetDefault("notifications.pagerduty.routing_key", "")
+	v.SetDefault("notifications.webhook.enabled", false)
+	v.SetDefault("notifications.webhook.url", "")
+	v.SetDefault("notifications.webhook.secret", "")
 
 	// RCA
 	v.SetDefault("rca.enabled", false)
+	v.SetDefault("rca.provider", "claude")
 	v.SetDefault("rca.model", "claude-sonnet-4-6")
 	v.SetDefault("rca.max_tokens", 4096)
 	v.SetDefault("rca.log_lines", 100)
 	v.SetDefault("rca.metric_samples", 20)
+	v.SetDefault("rca.base_url", "")
 
 	// Logging
 	v.SetDefault("logging.level", "info")
