@@ -1,0 +1,20 @@
+name: high_cpu
+description: Node or pod CPU usage is critically high causing throttling or degradation
+triggers:
+  - cpu.usage > 85
+  - kubernetes.node.cpu.usage > 0.8
+categories:
+  - high_cpu
+remediation:
+  - step: 1
+    description: Restart high-CPU deployment to clear runaway process
+    command_template: "kubectl rollout restart deployment/{deployment} -n {namespace}"
+    is_auto_safe: true
+  - step: 2
+    description: Scale deployment horizontally to distribute load
+    command_template: "kubectl scale deployment {deployment} -n {namespace} --replicas=3"
+    is_auto_safe: false
+  - step: 3
+    description: Set CPU limit to prevent node saturation
+    command_template: "kubectl patch deployment {deployment} -n {namespace} --type=json -p='[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/resources/limits/cpu\",\"value\":\"500m\"}]'"
+    is_auto_safe: false

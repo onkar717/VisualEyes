@@ -1,0 +1,24 @@
+name: disk_pressure
+description: Disk usage critically high — risk of node disk pressure taint and pod eviction
+triggers:
+  - disk.usage_percent > 90
+  - kubernetes.node.condition = DiskPressure
+categories:
+  - disk
+remediation:
+  - step: 1
+    description: Prune unused Docker images to free disk space immediately
+    command_template: "docker system prune -f --volumes"
+    is_auto_safe: true
+  - step: 2
+    description: Delete completed and failed pods to free overlay filesystem space
+    command_template: "kubectl delete pods -n {namespace} --field-selector=status.phase=Succeeded"
+    is_auto_safe: true
+  - step: 3
+    description: Delete evicted pods
+    command_template: "kubectl delete pods -n {namespace} --field-selector=status.phase=Failed"
+    is_auto_safe: true
+  - step: 4
+    description: Drain node if disk pressure taint is set
+    command_template: "kubectl drain {node} --ignore-daemonsets --delete-emptydir-data"
+    is_auto_safe: false

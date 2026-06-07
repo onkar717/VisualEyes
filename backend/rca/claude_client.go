@@ -32,13 +32,14 @@ type FixCommand struct {
 
 // ClaudeClient wraps the Anthropic SDK and implements LLMProvider.
 type ClaudeClient struct {
-	client    *anthropic.Client
-	model     string
-	maxTokens int
+	client      *anthropic.Client
+	model       string
+	maxTokens   int
+	temperature float64
 }
 
-// NewClaudeClient creates a ClaudeClient with the given API key and model.
-func NewClaudeClient(apiKey, model string, maxTokens int) *ClaudeClient {
+// NewClaudeClient creates a ClaudeClient with the given API key, model, and temperature.
+func NewClaudeClient(apiKey, model string, maxTokens int, temperature float64) *ClaudeClient {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 	if model == "" {
 		model = "claude-sonnet-4-6"
@@ -46,7 +47,10 @@ func NewClaudeClient(apiKey, model string, maxTokens int) *ClaudeClient {
 	if maxTokens <= 0 {
 		maxTokens = 4096
 	}
-	return &ClaudeClient{client: &client, model: model, maxTokens: maxTokens}
+	if temperature <= 0 {
+		temperature = 0.1
+	}
+	return &ClaudeClient{client: &client, model: model, maxTokens: maxTokens, temperature: temperature}
 }
 
 // Name implements LLMProvider.

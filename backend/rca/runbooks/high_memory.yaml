@@ -1,0 +1,16 @@
+name: high_memory
+description: Memory usage approaching limit — risk of OOM or swap pressure
+triggers:
+  - memory.usage_percent > 85
+  - kubernetes.node.memory.usage > 0.85
+categories:
+  - high_memory
+remediation:
+  - step: 1
+    description: Restart memory-heavy deployment to reclaim leaked memory
+    command_template: "kubectl rollout restart deployment/{deployment} -n {namespace}"
+    is_auto_safe: true
+  - step: 2
+    description: Increase memory limit before next OOM kill
+    command_template: "kubectl patch deployment {deployment} -n {namespace} --type=json -p='[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/resources/limits/memory\",\"value\":\"768Mi\"}]'"
+    is_auto_safe: false

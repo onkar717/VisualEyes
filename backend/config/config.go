@@ -114,10 +114,11 @@ type RCAConfig struct {
 	MistralAPIKey string `mapstructure:"mistral_api_key"`
 	// BaseURL overrides the provider's default endpoint (e.g. local proxy, Azure OpenAI).
 	BaseURL       string `mapstructure:"base_url"`
-	Model         string `mapstructure:"model"`
-	MaxTokens     int    `mapstructure:"max_tokens"`
-	LogLines      int    `mapstructure:"log_lines"`
-	MetricSamples int    `mapstructure:"metric_samples"`
+	Model         string  `mapstructure:"model"`
+	MaxTokens     int     `mapstructure:"max_tokens"`
+	Temperature   float64 `mapstructure:"temperature"` // LLM sampling temperature 0.0-1.0
+	LogLines      int     `mapstructure:"log_lines"`
+	MetricSamples int     `mapstructure:"metric_samples"`
 }
 
 type LoggingConfig struct {

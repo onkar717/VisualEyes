@@ -1,0 +1,20 @@
+name: image_pull
+description: Pod stuck in ImagePullBackOff or ErrImagePull — cannot pull container image
+triggers:
+  - pod.reason = ImagePullBackOff
+  - pod.reason = ErrImagePull
+categories:
+  - image_pull
+remediation:
+  - step: 1
+    description: Force delete stuck pod so Kubernetes retries with fresh pull
+    command_template: "kubectl delete pod {pod} -n {namespace} --grace-period=0 --force"
+    is_auto_safe: true
+  - step: 2
+    description: Patch deployment with corrected image tag
+    command_template: "kubectl set image deployment/{deployment} {container}={image} -n {namespace}"
+    is_auto_safe: false
+  - step: 3
+    description: Recreate image pull secret if registry credentials expired
+    command_template: "kubectl create secret docker-registry regcred --docker-server={registry} --docker-username={user} --docker-password={token} -n {namespace} --dry-run=client -o yaml | kubectl apply -f -"
+    is_auto_safe: false

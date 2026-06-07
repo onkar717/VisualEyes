@@ -82,6 +82,7 @@ rca:
   # api_key: ""               # prefer ANTHROPIC_API_KEY env var
   model: "claude-sonnet-4-5"
   max_tokens: 2048
+  temperature: 0.1
   log_lines: 100
   metric_samples: 20
 
