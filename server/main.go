@@ -87,8 +87,10 @@ func main() {
 		baseNotifier = notifications.NewMultiNotifier(activeNotifiers...)
 	}
 
-	// Wrap with LoggingNotifier so every delivery attempt is persisted.
-	var notifier notifications.Notifier = baseNotifier
+	// Wrap with SeverityFilter so only configured severities trigger external delivery.
+	var notifier notifications.Notifier = notifications.NewSeverityFilter(
+		baseNotifier, cfg.Notifications.AlertSeverities,
+	)
 	if ns, ok := store.(storage.NotificationStore); ok {
 		channel := "noop"
 		if len(channelNames) > 0 {
@@ -122,6 +124,9 @@ func main() {
 		}
 	}
 
+	// K8s event ring buffer — shared between handler (writer) and RCA context builder (reader).
+	eventBuffer := storage.NewEventBuffer(500)
+
 	// WebSocket Broadcaster
 	// broadcaster fans real-time metric snapshots to all connected WS clients.
 	broadcaster := ws.NewBroadcaster()
@@ -132,6 +137,7 @@ func main() {
 		slog.Error("failed to create handler", "error", err)
 		os.Exit(1)
 	}
+	handler.SetEventBuffer(eventBuffer)
 	if as, ok := store.(storage.AlertStore); ok {
 		handler.SetAlertStore(as)
 	}
@@ -192,8 +198,11 @@ func main() {
 				cfg.RCA.LogLines, cfg.RCA.MetricSamples)
 			ctxBuilder.SetPrometheus(cfg.RCA.PrometheusURL, cfg.RCA.PrometheusEnabled)
 			ctxBuilder.SetLoki(cfg.RCA.LokiURL, cfg.RCA.LokiEnabled)
+			ctxBuilder.SetEventBuffer(eventBuffer)
 			executor := rca.NewExecutor(30 * time.Second)
 			processor := rca.NewProcessor(ctxBuilder, llmProvider, executor, rs, as, cfg.RCA.AgentTimeoutSeconds)
+			processor.SetAutoRemediate(cfg.RCA.AutoRemediate)
+			processor.SetDryRun(cfg.RCA.DryRun)
 
 			handler.SetRCAStore(rs)
 			if is, ok := store.(storage.IncidentStore); ok {

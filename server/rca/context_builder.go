@@ -17,6 +17,10 @@ type AlertContext struct {
 	PodLogs        []models.PodLog // current container log lines
 	PrevLogs       []models.PodLog // previous container logs (pre-crash evidence for crashloop)
 	SiblingAlerts  []models.Alert  // other firing alerts on the same resource
+	// K8s Warning events for the alert's namespace (recent, capped at 20).
+	K8sEvents []storage.K8sEvent
+	// Per-namespace pod-phase summary derived from related metrics.
+	NamespaceSummary map[string]namespaceStat
 	// Pre-classified log patterns — populated by ClassifyLogs before LLM stages.
 	LogClassification ClassifiedLogs
 	// Detected metric anomalies (Z-score ≥ 2.5σ over recent samples).
@@ -28,11 +32,18 @@ type AlertContext struct {
 	LokiEnabled       bool
 }
 
+// namespaceStat holds a lightweight pod count breakdown for one namespace.
+type namespaceStat struct {
+	ActivePods    int
+	CrashloopPods int // pods with restart_count > 5
+}
+
 // ContextBuilder assembles AlertContext from multiple stores.
 type ContextBuilder struct {
 	metricStore    storage.QueryableStore
 	logStore       storage.LogStore // may be nil
 	alertStore     storage.AlertStore
+	eventBuffer    *storage.EventBuffer // may be nil
 	logLines       int
 	metricSamples  int
 	prometheusURL     string
@@ -67,6 +78,12 @@ func (b *ContextBuilder) SetPrometheus(url string, enabled bool) {
 	if enabled && url != "" {
 		b.prometheusClient = NewPrometheusClient(url)
 	}
+}
+
+// SetEventBuffer injects the K8s event ring buffer so recent Warning events
+// can be included in RCA context.
+func (b *ContextBuilder) SetEventBuffer(eb *storage.EventBuffer) {
+	b.eventBuffer = eb
 }
 
 // SetLoki injects Loki connection info into context.
@@ -167,6 +184,14 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
+	// K8s Warning events — pull last 20 for the alert's namespace from event buffer.
+	if b.eventBuffer != nil {
+		ctx.K8sEvents = b.eventBuffer.GetRecent(alert.Namespace, 20)
+	}
+
+	// Namespace summary — count active and crashlooping pods per namespace from metrics.
+	ctx.NamespaceSummary = buildNamespaceSummary(ctx.RelatedMetrics)
+
 	// Cap related metrics to prevent oversized prompts on high-cardinality clusters.
 	const maxRelatedMetrics = 50
 	if len(ctx.RelatedMetrics) > maxRelatedMetrics {
@@ -174,6 +199,41 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 	}
 
 	return ctx
+}
+
+// buildNamespaceSummary groups related pod metrics by namespace and counts
+// active pods and those with high restart counts (crashloop indicators).
+func buildNamespaceSummary(metrics []models.Metric) map[string]namespaceStat {
+	seen := make(map[string]bool)     // "namespace/pod" dedup
+	restarts := make(map[string]float64) // pod → max restart_count
+	for _, m := range metrics {
+		if m.Name == "kubernetes.pod.restart_count" {
+			pod := m.Tags["pod"]
+			if pod != "" && m.Value > restarts[pod] {
+				restarts[pod] = m.Value
+			}
+		}
+	}
+	stats := make(map[string]namespaceStat)
+	for _, m := range metrics {
+		ns := m.Tags["namespace"]
+		pod := m.Tags["pod"]
+		if ns == "" || pod == "" {
+			continue
+		}
+		key := ns + "/" + pod
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		st := stats[ns]
+		st.ActivePods++
+		if restarts[pod] > 5 {
+			st.CrashloopPods++
+		}
+		stats[ns] = st
+	}
+	return stats
 }
 
 // Format serialises the context into a structured prompt section for Claude.
@@ -197,6 +257,27 @@ func (c AlertContext) Format() string {
 	// Statistical anomalies detected on primary metric.
 	if anomSummary := AnomalySummary(c.Anomalies); anomSummary != "" {
 		b.WriteString(anomSummary)
+	}
+
+	// K8s Warning events — high-value diagnostic signal from the API server.
+	if len(c.K8sEvents) > 0 {
+		b.WriteString("=== K8S WARNING EVENTS (recent) ===\n")
+		for _, ev := range c.K8sEvents {
+			b.WriteString(fmt.Sprintf("  [%s] %s/%s  reason=%s  count=%d  msg=%s\n",
+				ev.LastSeen.Format("15:04:05"), ev.Kind, ev.Object,
+				ev.Reason, ev.Count, ev.Message))
+		}
+		b.WriteString("\n")
+	}
+
+	// Namespace summary — per-namespace pod health at a glance.
+	if len(c.NamespaceSummary) > 0 {
+		b.WriteString("=== NAMESPACE SUMMARY ===\n")
+		for ns, st := range c.NamespaceSummary {
+			b.WriteString(fmt.Sprintf("  %s: active_pods=%d  crashloop_pods=%d\n",
+				ns, st.ActivePods, st.CrashloopPods))
+		}
+		b.WriteString("\n")
 	}
 
 	b.WriteString("=== ALERT ===\n")

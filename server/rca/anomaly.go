@@ -78,9 +78,14 @@ func AnomalySummary(anomalies []AnomalyResult) string {
 	return sb.String()
 }
 
+// maxProblemPods caps the number of distinct problem pods fed to the LLM
+// to prevent 413 / token-overflow on large clusters.
+const maxProblemPods = 50
+
 // FilterProblemPods returns only pod-level metrics where the pod shows signs of trouble:
 // restart_count > 2, or cpu/memory usage is non-zero (active workload with potential issue).
 // Healthy idle pods are excluded to reduce LLM token usage on large clusters.
+// The result is further capped at maxProblemPods distinct pods.
 func FilterProblemPods(metrics []models.Metric) []models.Metric {
 	// Build per-pod restart map.
 	restarts := make(map[string]float64)
@@ -95,6 +100,7 @@ func FilterProblemPods(metrics []models.Metric) []models.Metric {
 
 	var out []models.Metric
 	seen := make(map[string]bool)
+	podCount := 0
 	for _, m := range metrics {
 		pod := m.Tags["pod"]
 		if pod == "" {
@@ -108,7 +114,11 @@ func FilterProblemPods(metrics []models.Metric) []models.Metric {
 		}
 		// Include pod if restarts > 2, or if metric value is non-trivially non-zero.
 		if restarts[pod] > 2 || m.Value > 0.001 {
+			if podCount >= maxProblemPods {
+				continue // hard cap reached — skip remaining problem pods
+			}
 			seen[key] = true
+			podCount++
 			out = append(out, m)
 		}
 	}

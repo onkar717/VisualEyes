@@ -24,6 +24,9 @@ type NotificationsConfig struct {
 	Slack      SlackConfig      `mapstructure:"slack"`
 	PagerDuty  PagerDutyConfig  `mapstructure:"pagerduty"`
 	Webhook    WebhookConfig    `mapstructure:"webhook"`
+	// AlertSeverities lists which severity levels trigger external notifications.
+	// Valid values: "critical", "warning", "info". Empty slice = notify all.
+	AlertSeverities []string `mapstructure:"alert_severities"`
 }
 
 // SlackConfig configures the Slack incoming webhook notifier.
@@ -126,6 +129,12 @@ type RCAConfig struct {
 	// Loki integration — when set, log stage queries Loki instead of stored push logs.
 	LokiURL     string `mapstructure:"loki_url"`
 	LokiEnabled bool   `mapstructure:"loki_enabled"`
+	// AutoRemediate enables unattended execution of auto-safe remediation commands.
+	// When false, safe commands are identified but not executed (dry-run behaviour).
+	AutoRemediate bool `mapstructure:"auto_remediate"`
+	// DryRun causes all remediation commands to be logged but never executed.
+	// Overrides AutoRemediate when true.
+	DryRun bool `mapstructure:"dry_run"`
 }
 
 type LoggingConfig struct {
@@ -292,6 +301,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("notifications.webhook.enabled", false)
 	v.SetDefault("notifications.webhook.url", "")
 	v.SetDefault("notifications.webhook.secret", "")
+	// By default notify on critical and warning; omit info-level noise.
+	v.SetDefault("notifications.alert_severities", []string{"critical", "warning"})
 
 	// RCA
 	v.SetDefault("rca.enabled", false)
@@ -306,6 +317,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("rca.prometheus_enabled", false)
 	v.SetDefault("rca.loki_url", "")
 	v.SetDefault("rca.loki_enabled", false)
+	v.SetDefault("rca.auto_remediate", true)
+	v.SetDefault("rca.dry_run", false)
 
 	// Logging
 	v.SetDefault("logging.level", "info")
@@ -330,5 +343,11 @@ func defaultAlertRules() []map[string]interface{} {
 		{"name": "disk_full_warning", "metric_name": "disk.usage_percent", "threshold": 90.0, "operator": "gt", "severity": "warning"},
 		{"name": "k8s_node_cpu_high", "metric_name": "kubernetes.node.cpu.usage", "threshold": 0.85, "operator": "gt", "severity": "warning"},
 		{"name": "k8s_pod_crash_loop", "metric_name": "kubernetes.pod.restart_count", "threshold": 5.0, "operator": "gt", "severity": "critical"},
+		// HTTP error rate rules — triggers when 5xx rate exceeds threshold percentage.
+		{"name": "http_error_rate_critical", "metric_name": "http.error_rate_pct", "threshold": 5.0, "operator": "gt", "severity": "critical"},
+		{"name": "http_error_rate_warning", "metric_name": "http.error_rate_pct", "threshold": 1.0, "operator": "gt", "severity": "warning"},
+		// P99 latency rules — threshold in milliseconds.
+		{"name": "http_latency_p99_critical", "metric_name": "http.p99_latency_ms", "threshold": 2000.0, "operator": "gt", "severity": "critical"},
+		{"name": "http_latency_p99_warning", "metric_name": "http.p99_latency_ms", "threshold": 500.0, "operator": "gt", "severity": "warning"},
 	}
 }
