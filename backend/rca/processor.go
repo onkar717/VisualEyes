@@ -115,7 +115,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 		if !cmd.IsAutoSafe {
 			continue
 		}
-		output, err := p.executor.Execute(cmd.Command)
+		output, err := p.executor.Execute(ctx, cmd.Command)
 		if err != nil {
 			fixCmds[i].Status = models.RemediationFailed
 			fixCmds[i].ExecError = err.Error()
@@ -128,7 +128,11 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	}
 
 	// 6. Serialise commands and save final RCAResult.
-	cmdsJSON, _ := json.Marshal(fixCmds)
+	cmdsJSON, err := json.Marshal(fixCmds)
+	if err != nil {
+		log.Error("failed to marshal remediation commands", "error", err)
+		cmdsJSON = []byte("[]")
+	}
 	result.Explanation = resp.Explanation
 	result.RootCause = resp.RootCause
 	result.Commands = string(cmdsJSON)
@@ -147,17 +151,23 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 func (p *Processor) updateAlertRCAStatus(alertID uint, status string) {
 	a, err := p.alertStore.GetAlertByID(alertID)
 	if err != nil {
+		slog.Warn("updateAlertRCAStatus: alert not found", "alert_id", alertID, "error", err)
 		return
 	}
 	a.RCAStatus = status
-	p.alertStore.UpdateAlert(a)
+	if err := p.alertStore.UpdateAlert(a); err != nil {
+		slog.Error("updateAlertRCAStatus: failed to update", "alert_id", alertID, "status", status, "error", err)
+	}
 }
 
 func (p *Processor) linkRCAToAlert(alertID, rcaID uint) {
 	a, err := p.alertStore.GetAlertByID(alertID)
 	if err != nil {
+		slog.Warn("linkRCAToAlert: alert not found", "alert_id", alertID, "error", err)
 		return
 	}
 	a.RCAID = &rcaID
-	p.alertStore.UpdateAlert(a)
+	if err := p.alertStore.UpdateAlert(a); err != nil {
+		slog.Error("linkRCAToAlert: failed to update", "alert_id", alertID, "rca_id", rcaID, "error", err)
+	}
 }
