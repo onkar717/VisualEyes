@@ -13,12 +13,14 @@ import (
 type AlertContext struct {
 	Alert          models.Alert
 	RecentMetrics  []models.Metric // last N samples of the triggering metric
-	RelatedMetrics []models.Metric // samples of related metrics on same resource
+	RelatedMetrics []models.Metric // samples of related metrics on same resource (problem pods only)
 	PodLogs        []models.PodLog // current container log lines
 	PrevLogs       []models.PodLog // previous container logs (pre-crash evidence for crashloop)
 	SiblingAlerts  []models.Alert  // other firing alerts on the same resource
 	// Pre-classified log patterns — populated by ClassifyLogs before LLM stages.
 	LogClassification ClassifiedLogs
+	// Detected metric anomalies (Z-score ≥ 2.5σ over recent samples).
+	Anomalies []AnomalyResult
 	// Observability stack availability — hints for the LLM agents.
 	PrometheusURL     string
 	PrometheusEnabled bool
@@ -95,15 +97,19 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 	}
 	if samples, err := b.metricStore.QueryByName(metricName, since, b.metricSamples); err == nil {
 		ctx.RecentMetrics = samples
+		// Run Z-score anomaly detection on the primary metric time series.
+		ctx.Anomalies = DetectAnomalies(samples)
 	}
 
-	// Related system metrics for same resource.
+	// Related system metrics for same resource — filter to problem pods only.
 	relatedNames := relatedMetrics(alert.RuleName)
 	for _, name := range relatedNames {
 		if samples, err := b.metricStore.QueryByName(name, since, 10); err == nil {
 			ctx.RelatedMetrics = append(ctx.RelatedMetrics, samples...)
 		}
 	}
+	// Remove healthy idle pods from related metrics to reduce LLM token usage.
+	ctx.RelatedMetrics = FilterProblemPods(ctx.RelatedMetrics)
 
 	// Supplement with Prometheus PromQL metrics when available.
 	// For pod-related alerts, fetch CPU and memory via standard cAdvisor queries.
@@ -187,6 +193,11 @@ func (c AlertContext) Format() string {
 		b.WriteString("Loki: NOT configured — logs provided inline below\n")
 	}
 	b.WriteString("\n")
+
+	// Statistical anomalies detected on primary metric.
+	if anomSummary := AnomalySummary(c.Anomalies); anomSummary != "" {
+		b.WriteString(anomSummary)
+	}
 
 	b.WriteString("=== ALERT ===\n")
 	b.WriteString(fmt.Sprintf("Rule: %s | Severity: %s | Status: %s\n", c.Alert.RuleName, c.Alert.Severity, c.Alert.Status))
