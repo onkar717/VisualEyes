@@ -120,6 +120,37 @@ func main() {
 		}
 	}()
 
+	// Previous-container log collection (for CrashLoopBackOff diagnosis).
+	// Fetches terminated container logs via k8s API with Previous=true.
+	prevClient := collector.Client()
+	if prevClient != nil {
+		prevCollector := logs.NewPreviousCollector(prevClient, nodeName, allowedNamespaces)
+		go func() {
+			ticker := time.NewTicker(60 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					prevLines, err := prevCollector.Collect(ctx)
+					if err != nil {
+						slog.Warn("prev log collect failed", "error", err)
+						continue
+					}
+					if len(prevLines) == 0 {
+						continue
+					}
+					if err := logShipper.Ship(prevLines); err != nil {
+						slog.Warn("prev log ship failed", "error", err)
+					} else {
+						slog.Debug("shipped prev container logs", "count", len(prevLines))
+					}
+				}
+			}
+		}()
+	}
+
 	// K8s Events goroutine
 	// Events collector uses the same in-cluster client as the metrics collector.
 	k8sClient := collector.Client()
