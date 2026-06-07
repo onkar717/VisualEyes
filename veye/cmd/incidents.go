@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +16,7 @@ var (
 	incidentSeverity string
 	incidentStatus   string
 	incidentAlertID  uint
+	incidentHours    int
 )
 
 var incidentsCmd = &cobra.Command{
@@ -23,7 +24,7 @@ var incidentsCmd = &cobra.Command{
 	Short: "Show incident history — SEV1-4 lifecycle, MTTR, root cause",
 	Long:  "Displays structured incidents with severity classification, status lifecycle, MTTR, and AI-generated root cause. Use --severity/--status to filter.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		resp, err := api.FullIncidents(incidentLimit, incidentSeverity, incidentStatus)
+		resp, err := api.FullIncidents(incidentLimit, incidentSeverity, incidentStatus, incidentHours)
 		if err != nil {
 			return fmt.Errorf("fetch incidents: %w", err)
 		}
@@ -37,6 +38,7 @@ func init() {
 	incidentsCmd.Flags().StringVar(&incidentSeverity, "severity", "", "Filter by severity (SEV1, SEV2, SEV3, SEV4)")
 	incidentsCmd.Flags().StringVar(&incidentStatus, "status", "", "Filter by status (OPEN, INVESTIGATING, MITIGATED, RESOLVED)")
 	incidentsCmd.Flags().UintVar(&incidentAlertID, "alert-id", 0, "Show notification events for a specific alert ID")
+	incidentsCmd.Flags().IntVar(&incidentHours, "hours", 0, "Only show incidents from the last N hours (0 = all time)")
 }
 
 func printIncidentsFull(resp *client.IncidentListResponse) {

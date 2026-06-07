@@ -85,6 +85,7 @@ rca:
   temperature: 0.1
   log_lines: 100
   metric_samples: 20
+  agent_timeout_seconds: 120   # per-stage LLM timeout; total pipeline cap = 6× this
 
 agent:
   collection_interval: 10

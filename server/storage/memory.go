@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // MemoryStore is a fully in-memory implementation of MetricStore, QueryableStore,
@@ -355,12 +355,19 @@ func (s *MemoryStore) GetIncidentByAlertID(alertID uint) (*models.Incident, erro
 	return nil, fmt.Errorf("no incident for alert %d", alertID)
 }
 
-func (s *MemoryStore) GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error) {
+func (s *MemoryStore) GetRecentIncidents(severityFilter, statusFilter string, limit, hours int) ([]models.Incident, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	var cutoff time.Time
+	if hours > 0 {
+		cutoff = time.Now().Add(-time.Duration(hours) * time.Hour)
+	}
 	var out []models.Incident
 	for i := len(s.incidents) - 1; i >= 0; i-- {
 		inc := s.incidents[i]
+		if hours > 0 && inc.DetectedAt.Before(cutoff) {
+			continue
+		}
 		if severityFilter != "" && string(inc.Severity) != severityFilter {
 			continue
 		}
@@ -390,4 +397,30 @@ func (s *MemoryStore) MTTRStats() (float64, int, error) {
 		return 0, 0, nil
 	}
 	return float64(total) / float64(count), count, nil
+}
+
+func (s *MemoryStore) GetStats() (IncidentStats, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	st := IncidentStats{
+		BySeverity: make(map[string]int),
+		ByStatus:   make(map[string]int),
+	}
+	var mttrTotal int
+	for _, inc := range s.incidents {
+		st.TotalIncidents++
+		st.BySeverity[string(inc.Severity)]++
+		st.ByStatus[string(inc.Status)]++
+		if inc.Status == models.IncidentOpen || inc.Status == models.IncidentInvestigating {
+			st.OpenIncidents++
+		}
+		if inc.MTTRSeconds != nil {
+			mttrTotal += *inc.MTTRSeconds
+			st.MTTRCount++
+		}
+	}
+	if st.MTTRCount > 0 {
+		st.AvgMTTRSeconds = float64(mttrTotal) / float64(st.MTTRCount)
+	}
+	return st, nil
 }

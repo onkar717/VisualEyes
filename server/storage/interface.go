@@ -3,7 +3,7 @@ package storage
 import (
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // MetricStore is the minimal interface all storage backends must satisfy.
@@ -50,12 +50,24 @@ type NotificationStore interface {
 	GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error)
 }
 
+// IncidentStats is the aggregated summary returned by /api/stats.
+type IncidentStats struct {
+	TotalIncidents int            `json:"total_incidents"`
+	OpenIncidents  int            `json:"open_incidents"`
+	AvgMTTRSeconds float64        `json:"avg_mttr_seconds"`
+	MTTRCount      int            `json:"mttr_count"`
+	BySeverity     map[string]int `json:"by_severity"`
+	ByStatus       map[string]int `json:"by_status"`
+}
+
 // IncidentStore persists and queries the full incident lifecycle.
 type IncidentStore interface {
 	SaveIncident(inc *models.Incident) error
 	UpdateIncident(inc *models.Incident) error
 	GetIncidentByID(id uint) (*models.Incident, error)
 	GetIncidentByAlertID(alertID uint) (*models.Incident, error)
-	GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error)
+	// GetRecentIncidents returns incidents filtered by severity/status, optionally within the last `hours` hours (0 = no time filter).
+	GetRecentIncidents(severityFilter, statusFilter string, limit, hours int) ([]models.Incident, error)
 	MTTRStats() (avgSeconds float64, count int, err error)
+	GetStats() (IncidentStats, error)
 }

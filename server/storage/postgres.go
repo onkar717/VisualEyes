@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // PostgresStore is a GORM-backed PostgreSQL implementation of all storage interfaces:
@@ -307,13 +307,17 @@ func (s *PostgresStore) GetIncidentByAlertID(alertID uint) (*models.Incident, er
 	return &inc, nil
 }
 
-func (s *PostgresStore) GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error) {
+func (s *PostgresStore) GetRecentIncidents(severityFilter, statusFilter string, limit, hours int) ([]models.Incident, error) {
 	q := s.db.Order("detected_at DESC")
 	if severityFilter != "" {
 		q = q.Where("severity = ?", severityFilter)
 	}
 	if statusFilter != "" {
 		q = q.Where("status = ?", statusFilter)
+	}
+	if hours > 0 {
+		cutoff := time.Now().Add(-time.Duration(hours) * time.Hour)
+		q = q.Where("detected_at >= ?", cutoff)
 	}
 	if limit > 0 {
 		q = q.Limit(limit)
@@ -323,6 +327,45 @@ func (s *PostgresStore) GetRecentIncidents(severityFilter, statusFilter string, 
 		return nil, fmt.Errorf("get recent incidents: %w", err)
 	}
 	return incidents, nil
+}
+
+func (s *PostgresStore) GetStats() (IncidentStats, error) {
+	st := IncidentStats{
+		BySeverity: make(map[string]int),
+		ByStatus:   make(map[string]int),
+	}
+	var total int64
+	s.db.Model(&models.Incident{}).Count(&total)
+	st.TotalIncidents = int(total)
+
+	var open int64
+	s.db.Model(&models.Incident{}).Where("status IN ?", []string{"OPEN", "INVESTIGATING"}).Count(&open)
+	st.OpenIncidents = int(open)
+
+	type sevRow struct {
+		Severity string
+		Count    int
+	}
+	var sevRows []sevRow
+	s.db.Model(&models.Incident{}).Select("severity, count(*) as count").Group("severity").Scan(&sevRows)
+	for _, r := range sevRows {
+		st.BySeverity[r.Severity] = r.Count
+	}
+
+	type statusRow struct {
+		Status string
+		Count  int
+	}
+	var statusRows []statusRow
+	s.db.Model(&models.Incident{}).Select("status, count(*) as count").Group("status").Scan(&statusRows)
+	for _, r := range statusRows {
+		st.ByStatus[r.Status] = r.Count
+	}
+
+	avg, count, err := s.MTTRStats()
+	st.AvgMTTRSeconds = avg
+	st.MTTRCount = count
+	return st, err
 }
 
 func (s *PostgresStore) MTTRStats() (float64, int, error) {

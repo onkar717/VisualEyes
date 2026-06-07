@@ -116,9 +116,10 @@ type RCAConfig struct {
 	BaseURL       string `mapstructure:"base_url"`
 	Model         string  `mapstructure:"model"`
 	MaxTokens     int     `mapstructure:"max_tokens"`
-	Temperature   float64 `mapstructure:"temperature"` // LLM sampling temperature 0.0-1.0
-	LogLines      int     `mapstructure:"log_lines"`
-	MetricSamples int     `mapstructure:"metric_samples"`
+	Temperature          float64 `mapstructure:"temperature"`           // LLM sampling temperature 0.0-1.0
+	LogLines             int     `mapstructure:"log_lines"`
+	MetricSamples        int     `mapstructure:"metric_samples"`
+	AgentTimeoutSeconds  int     `mapstructure:"agent_timeout_seconds"` // per-stage timeout; total = 6× this
 }
 
 type LoggingConfig struct {
@@ -291,6 +292,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("rca.log_lines", 100)
 	v.SetDefault("rca.metric_samples", 20)
 	v.SetDefault("rca.base_url", "")
+	v.SetDefault("rca.agent_timeout_seconds", 120)
 
 	// Logging
 	v.SetDefault("logging.level", "info")
