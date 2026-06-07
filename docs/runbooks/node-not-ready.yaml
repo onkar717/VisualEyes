@@ -1,5 +1,5 @@
 name: NodeNotReady
-description: Kubernetes node is not in Ready state — all pods on that node stop receiving traffic and may be rescheduled
+description: Kubernetes node is not in Ready state   all pods on that node stop receiving traffic and may be rescheduled
 severity: SEV1
 tags: [node, infrastructure, unavailable]
 
@@ -15,7 +15,7 @@ triage_steps:
     safe: true
 
   - step: 2
-    description: Describe the affected node — check Conditions and Events
+    description: Describe the affected node   check Conditions and Events
     command: "kubectl describe node {node}"
     safe: true
 
@@ -39,11 +39,11 @@ common_causes:
     signal: "Last heartbeat time is old; node condition LastTransitionTime is recent"
     fix: "SSH to node and restart kubelet: systemctl restart kubelet"
 
-  - cause: Node ran out of memory — OOM at OS level
+  - cause: Node ran out of memory   OOM at OS level
     signal: "MemoryPressure condition on node; kernel OOM kill events in dmesg"
     fix: "Add node memory; reduce pod memory requests; check for memory leaks"
 
-  - cause: Network partition — node cannot reach API server
+  - cause: Network partition   node cannot reach API server
     signal: "Node was healthy before; no recent Events; other nodes are fine"
     fix: "Check network/firewall between node and control plane; check CNI plugin"
 

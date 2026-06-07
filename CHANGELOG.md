@@ -24,11 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - 2026-06-07
 
 ### Added
-- `veye watch` — full Bubbletea interactive TUI dashboard
-- `veye logs --follow` — live pod log tail
-- `veye alerts` — active alerts table view
-- `veye rca` — RCA detail view per incident
-- `veye status` — live cluster and system health snapshot
+- `veye watch`   full Bubbletea interactive TUI dashboard
+- `veye logs --follow`   live pod log tail
+- `veye alerts`   active alerts table view
+- `veye rca`   RCA detail view per incident
+- `veye status`   live cluster and system health snapshot
 - veye CLI scaffold with Cobra root and HTTP client
 
 ### Fixed
@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-05-16
 
 ### Added
-- React UI overhaul — Alerts panel, RCA drawer, Log viewer, WebSocket live updates
+- React UI overhaul   Alerts panel, RCA drawer, Log viewer, WebSocket live updates
 - Prometheus `/metrics` registry and WebSocket real-time metric streaming
 - Claude AI-powered RCA engine with autonomous safe-command execution
 - Pod log collection pipeline and Kubernetes Events collection

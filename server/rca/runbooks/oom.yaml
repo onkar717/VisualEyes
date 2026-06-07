@@ -1,5 +1,5 @@
 name: oom
-description: Container OOMKilled — killed by kernel due to memory exhaustion
+description: Container OOMKilled   killed by kernel due to memory exhaustion
 triggers:
   - memory.usage_percent > 90
   - pod.reason = OOMKilled

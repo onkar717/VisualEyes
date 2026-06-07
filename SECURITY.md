@@ -18,12 +18,12 @@ Open a [GitHub Security Advisory](https://github.com/onkar717/VisualEyes/securit
 
 Include:
 
-- **Type** — e.g. command injection, SSRF, auth bypass, path traversal
-- **Component** — backend / system agent / k8s agent / veye CLI / UI
-- **Affected version(s)** — tag, branch, or commit SHA
-- **Reproduction steps** — minimal steps to trigger the issue
-- **Impact** — what an attacker can achieve
-- **Proof-of-concept** — code or curl command if available (will be kept confidential)
+- **Type**   e.g. command injection, SSRF, auth bypass, path traversal
+- **Component**   backend / system agent / k8s agent / veye CLI / UI
+- **Affected version(s)**   tag, branch, or commit SHA
+- **Reproduction steps**   minimal steps to trigger the issue
+- **Impact**   what an attacker can achieve
+- **Proof-of-concept**   code or curl command if available (will be kept confidential)
 
 You will receive an acknowledgement within **48 hours** and a resolution timeline within **7 days** of confirmation.
 
@@ -47,8 +47,8 @@ You will receive an acknowledgement within **48 hours** and a resolution timelin
 
 The RCA engine executes `kubectl` commands suggested by Claude AI. Two safeguards prevent misuse:
 
-1. **Allowlist enforcement** — only `kubectl get`, `describe`, `logs`, `top`, `rollout status`, `get events` are permitted without explicit confirmation
-2. **Destructive flag** — commands touching state (`delete`, `patch`, `scale`, `set`) are marked `is_destructive: true` and require explicit user confirmation (`y` in CLI) before execution
+1. **Allowlist enforcement**   only `kubectl get`, `describe`, `logs`, `top`, `rollout status`, `get events` are permitted without explicit confirmation
+2. **Destructive flag**   commands touching state (`delete`, `patch`, `scale`, `set`) are marked `is_destructive: true` and require explicit user confirmation (`y` in CLI) before execution
 
 The Claude API prompt explicitly instructs the model to only suggest safe, read-first diagnostic commands.
 
@@ -70,8 +70,8 @@ No `create`, `update`, `delete`, or `patch` verbs are requested.
 
 ### Secrets Handling
 
-- `ANTHROPIC_API_KEY` and `DATABASE_URL` must be set via environment variables or `.env` file — never hardcoded
-- The `.env` file is in `.gitignore` — `.env.example` contains only placeholders
+- `ANTHROPIC_API_KEY` and `DATABASE_URL` must be set via environment variables or `.env` file   never hardcoded
+- The `.env` file is in `.gitignore`   `.env.example` contains only placeholders
 - In Kubernetes, use a `Secret` object and reference it as environment variables; do not embed secrets in ConfigMaps
 
 ---
@@ -89,7 +89,7 @@ No `create`, `update`, `delete`, or `patch` verbs are requested.
 ### Docker
 
 - [ ] Use tagged (not `latest`) image versions in production
-- [ ] Run containers as non-root (`USER 1000` — already set in provided Dockerfiles)
+- [ ] Run containers as non-root (`USER 1000`   already set in provided Dockerfiles)
 - [ ] Scan images with `docker scout` or Trivy before deployment
 - [ ] Use read-only root filesystem where possible
 

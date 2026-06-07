@@ -51,7 +51,7 @@ type ClusterSnapshot struct {
 
 // ComputeHealthScore calculates a 0–100 health score heuristically and stores
 // it in HealthScore. Incorporates node readiness, pod health, resource pressure,
-// and open incident count — matching reference project scoring formula.
+// and open incident count   matching reference project scoring formula.
 func (s *ClusterSnapshot) ComputeHealthScore() {
 	score := 100.0
 	if s.TotalNodes > 0 {
@@ -62,7 +62,7 @@ func (s *ClusterSnapshot) ComputeHealthScore() {
 		podHealth := float64(s.RunningPods) / float64(s.TotalPods) * 100
 		score -= (100 - podHealth) * 0.3
 	}
-	// CPU/Mem pressure — each caps at 15 points deduction.
+	// CPU/Mem pressure   each caps at 15 points deduction.
 	if s.CPUUsagePct > 0 {
 		score -= min64(s.CPUUsagePct*0.1, 15)
 	}

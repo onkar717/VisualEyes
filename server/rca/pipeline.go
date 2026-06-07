@@ -56,7 +56,7 @@ Based on triage, metrics, and log evidence, diagnose infrastructure constraints.
 Output a concise prose summary (max 200 words) covering:
 1. Resource quota hits in any namespace
 2. Scheduling constraints (taints, affinity, PVC binding)
-3. Node health — any nodes NotReady or cordoned?
+3. Node health   any nodes NotReady or cordoned?
 4. Whether root cause is infra-driven or application-driven`
 
 // --- Stage 5: Remediation ---
@@ -77,7 +77,7 @@ Output ONLY valid JSON:
   "runbook_used": "runbook name or none"
 }
 
-AUTO-SAFE RULES — is_auto_safe=true ONLY for:
+AUTO-SAFE RULES   is_auto_safe=true ONLY for:
   kubectl delete pod ...
   kubectl rollout restart ...
 Everything else: is_auto_safe=false.`
@@ -87,7 +87,7 @@ const commanderSystemPrompt = `You are the Incident Commander.
 Synthesise all six stage outputs into the definitive incident report.
 
 CRITICAL RULES FOR COMMANDS:
-- Use ACTUAL pod/deployment/namespace names from the alert and triage data — NEVER use placeholders like {pod} or {namespace}.
+- Use ACTUAL pod/deployment/namespace names from the alert and triage data   NEVER use placeholders like {pod} or {namespace}.
 - If you do not know the exact name, omit that command rather than using a placeholder.
 - Every command must be immediately executable by an operator with kubectl access.
 
@@ -188,13 +188,13 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var triage triageStage
 	if err := json.Unmarshal([]byte(stripFences(triageRaw)), &triage); err != nil {
-		slog.Warn("triage parse failed — defaults", "err", err)
+		slog.Warn("triage parse failed   defaults", "err", err)
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
 
-	// Healthy-cluster fast exit — skip 5 LLM calls when triage says no issue.
+	// Healthy-cluster fast exit   skip 5 LLM calls when triage says no issue.
 	if !triage.HasIssue {
-		slog.Info("rca triage: no issue detected — healthy cluster short-circuit", "alert_id", ac.Alert.ID)
+		slog.Info("rca triage: no issue detected   healthy cluster short-circuit", "alert_id", ac.Alert.ID)
 		return &RCAResponse{
 			HasIssue:    false,
 			Severity:    "SEV4",
@@ -216,7 +216,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	}
 	total += tok
 
-	// Stage 3: Log Analysis — prepend pre-classified log patterns for signal clarity.
+	// Stage 3: Log Analysis   prepend pre-classified log patterns for signal clarity.
 	slog.Info("rca stage 3/6: log analysis", "alert_id", ac.Alert.ID)
 	logUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nPRE-CLASSIFIED LOG PATTERNS:\n%s\n\nALERT+LOGS:\n%s",
 		truncStage(triageRaw), truncStage(metricsRaw),
@@ -257,7 +257,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		slog.Warn("remediation parse failed", "err", err)
 	}
 
-	// Stage 6: Commander — synthesise all stages
+	// Stage 6: Commander   synthesise all stages
 	slog.Info("rca stage 6/6: commander", "alert_id", ac.Alert.ID)
 	cmdUser := fmt.Sprintf(
 		"ACTUAL RESOURCE NAMES (use these verbatim in commands):\n  pod/resource: %s\n  namespace: %s\n\nTRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
@@ -273,7 +273,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var resp RCAResponse
 	if err := json.Unmarshal([]byte(stripFences(finalRaw)), &resp); err != nil {
-		slog.Warn("commander parse failed — building from sub-stages", "err", err)
+		slog.Warn("commander parse failed   building from sub-stages", "err", err)
 		resp = RCAResponse{
 			HasIssue:            true,
 			Explanation:         triage.Summary,

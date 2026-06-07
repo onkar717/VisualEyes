@@ -33,7 +33,7 @@ export function useWebSocket<T = unknown>(
       try {
         setLastMessage(JSON.parse(e.data) as T);
       } catch {
-        // non-JSON frame (server ping text etc.) — ignore
+        // non-JSON frame (server ping text etc.)   ignore
       }
     };
 

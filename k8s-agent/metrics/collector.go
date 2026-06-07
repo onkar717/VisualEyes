@@ -89,7 +89,7 @@ func (c *Collector) Client() kubernetes.Interface { return c.k8sClient }
 // Returns empty slice (not error) when running out-of-cluster where kubelet is unavailable.
 func (c *Collector) Collect(ctx context.Context) ([]models.Metric, error) {
 	if c.client == nil {
-		return nil, nil // out-of-cluster dev mode — no kubelet access
+		return nil, nil // out-of-cluster dev mode   no kubelet access
 	}
 	stats, err := c.client.GetSummary()
 	if err != nil {

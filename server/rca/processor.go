@@ -154,7 +154,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 		}
 		if isRateLimitError(rcaErr) && attempt < 2 {
 			wait := retryWaits[attempt]
-			log.Warn("rca rate-limit — retrying", "attempt", attempt+1, "wait", wait)
+			log.Warn("rca rate-limit   retrying", "attempt", attempt+1, "wait", wait)
 			select {
 			case <-time.After(wait):
 				continue
@@ -172,9 +172,9 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	}
 	scanDuration := time.Since(scanStart).Seconds()
 
-	// 4. Healthy-cluster short-circuit — record a resolved no-op incident.
+	// 4. Healthy-cluster short-circuit   record a resolved no-op incident.
 	if !resp.HasIssue {
-		log.Info("rca: no issue — healthy cluster", "alert_id", alert.ID)
+		log.Info("rca: no issue   healthy cluster", "alert_id", alert.ID)
 		result.Explanation = resp.Explanation
 		result.RootCause   = resp.RootCause
 		result.Commands    = "[]"
@@ -388,7 +388,7 @@ func (p *Processor) upsertIncident(
 		if err := p.incidentStore.UpdateIncident(dup); err != nil {
 			slog.Error("upsertIncident: dedup update failed", "incident_code", dup.IncidentCode, "error", err)
 		} else {
-			slog.Info("incident deduped — merged into existing", "code", dup.IncidentCode, "alert_id", alert.ID)
+			slog.Info("incident deduped   merged into existing", "code", dup.IncidentCode, "alert_id", alert.ID)
 		}
 		return
 	}
@@ -451,7 +451,7 @@ func (p *Processor) createHealthyIncident(
 		IncidentCode:     models.NewIncidentCode(),
 		AlertID:          alert.ID,
 		RCAID:            &result.ID,
-		Title:            "Cluster Healthy — No Issues Detected",
+		Title:            "Cluster Healthy   No Issues Detected",
 		Severity:         models.IncidentSEV4,
 		Category:         "healthy",
 		Status:           models.IncidentIgnored,

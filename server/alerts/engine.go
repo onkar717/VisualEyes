@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/notifications"
-	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/notifications"
+	"github.com/onkar717/visual-eyes/server/storage"
 )
 
 // Engine polls recent metrics against configured rules at a fixed interval.
@@ -185,7 +185,7 @@ func (e *Engine) fire(rule Rule, resourceID, namespace string, value float64, de
 		select {
 		case e.trigger <- *alert:
 		default:
-			slog.Warn("rca trigger channel full — alert dropped from RCA queue", "alert_id", alert.ID)
+			slog.Warn("rca trigger channel full   alert dropped from RCA queue", "alert_id", alert.ID)
 		}
 	}
 }

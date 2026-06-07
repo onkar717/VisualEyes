@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // helpers

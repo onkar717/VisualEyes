@@ -52,7 +52,7 @@ common_causes:
     fix: "Add streaming for large payloads; paginate DB queries"
 
 remediation:
-  - scenario: Immediate relief — increase memory limit
+  - scenario: Immediate relief   increase memory limit
     command: "kubectl set resources deployment {deployment} -n {namespace} --limits=memory=1Gi --requests=memory=512Mi"
     destructive: false
     confirm_required: true

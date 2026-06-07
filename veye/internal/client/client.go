@@ -124,7 +124,7 @@ type NotificationEvent struct {
 	CreatedAt string `json:"createdAt"`
 }
 
-// Incident mirrors models.Incident — full lifecycle record.
+// Incident mirrors models.Incident   full lifecycle record.
 type Incident struct {
 	ID                  uint   `json:"id"`
 	IncidentCode        string `json:"incidentCode"`
@@ -292,7 +292,7 @@ func (c *Client) HealthScore() (float64, error) {
 	return r.HealthScore, c.get("/healthz", &r)
 }
 
-// GetIncident calls GET /api/incidents/full/{id} — single incident detail.
+// GetIncident calls GET /api/incidents/full/{id}   single incident detail.
 func (c *Client) GetIncident(id uint) (*Incident, error) {
 	var inc Incident
 	return &inc, c.get(fmt.Sprintf("/api/incidents/full/%d", id), &inc)

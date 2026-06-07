@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // WebhookNotifier sends alert events as JSON POST to a configurable HTTP endpoint.
 // Optionally signs each request with HMAC-SHA256 (X-VisualEyes-Signature header)
-// for receiver verification — compatible with the standard-webhooks spec.
+// for receiver verification   compatible with the standard-webhooks spec.
 type WebhookNotifier struct {
 	url    string
 	secret string

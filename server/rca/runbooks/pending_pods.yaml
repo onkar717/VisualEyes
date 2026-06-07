@@ -1,5 +1,5 @@
 name: pending_pods
-description: Pods stuck in Pending — scheduler cannot place them due to resource or taint constraints
+description: Pods stuck in Pending   scheduler cannot place them due to resource or taint constraints
 triggers:
   - pod.phase = Pending
   - kubernetes.pod.status = Pending
@@ -7,10 +7,10 @@ categories:
   - pending
 diagnosis:
   - Check pod events for scheduler messages: Insufficient cpu, Insufficient memory, or No nodes available
-  - Look for taint/toleration mismatch — node has taint that pod doesn't tolerate
-  - Verify PVC is bound — PVC in Pending blocks pod scheduling
+  - Look for taint/toleration mismatch   node has taint that pod doesn't tolerate
+  - Verify PVC is bound   PVC in Pending blocks pod scheduling
   - Check if node affinity/nodeSelector is too restrictive (no matching nodes)
-  - Inspect resource quotas in the namespace — quota exhaustion blocks new pods
+  - Inspect resource quotas in the namespace   quota exhaustion blocks new pods
   - Look for pod disruption budgets blocking eviction of lower-priority pods
 remediation:
   - step: 1

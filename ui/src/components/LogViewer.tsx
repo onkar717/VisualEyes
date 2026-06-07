@@ -225,7 +225,7 @@ export const LogViewer: React.FC = () => {
       </Paper>
 
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-        Auto-refreshes every 10 s. {autoScroll ? 'Auto-scroll on.' : 'Scrolled up — auto-scroll paused.'}
+        Auto-refreshes every 10 s. {autoScroll ? 'Auto-scroll on.' : 'Scrolled up   auto-scroll paused.'}
       </Typography>
     </ModernLayout>
   );

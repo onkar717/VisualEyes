@@ -15,13 +15,13 @@ import (
 // State-changing commands (delete/restart) also run automatically for
 // common self-healing operations. Anything else is rejected.
 var safeCommandPrefixes = []string{
-	// Read-only diagnostics — always safe
+	// Read-only diagnostics   always safe
 	"kubectl get ",
 	"kubectl describe ",
 	"kubectl logs ",
 	"kubectl top ",
 	"kubectl rollout status ",
-	// Self-healing — auto-execute for common recoverable failures
+	// Self-healing   auto-execute for common recoverable failures
 	"kubectl delete pod ",
 	"kubectl rollout restart ",
 	// Scaling and scheduling
@@ -80,7 +80,7 @@ func (e *Executor) Execute(ctx context.Context, cmd string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-	// Split command into binary + args — avoid shell injection by not using sh -c.
+	// Split command into binary + args   avoid shell injection by not using sh -c.
 	parts := strings.Fields(cmd)
 	if len(parts) == 0 {
 		return "", fmt.Errorf("empty command")

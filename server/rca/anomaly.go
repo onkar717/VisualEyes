@@ -42,7 +42,7 @@ func DetectAnomalies(samples []models.Metric) []AnomalyResult {
 	}
 	stddev := math.Sqrt(variance / float64(len(samples)))
 	if stddev < 1e-9 {
-		return nil // constant series — no anomaly possible
+		return nil // constant series   no anomaly possible
 	}
 
 	var out []AnomalyResult
@@ -104,7 +104,7 @@ func FilterProblemPods(metrics []models.Metric) []models.Metric {
 	for _, m := range metrics {
 		pod := m.Tags["pod"]
 		if pod == "" {
-			out = append(out, m) // node-level or untagged — always include
+			out = append(out, m) // node-level or untagged   always include
 			continue
 		}
 		key := pod + "/" + m.Tags["namespace"]
@@ -115,7 +115,7 @@ func FilterProblemPods(metrics []models.Metric) []models.Metric {
 		// Include pod if restarts > 2, or if metric value is non-trivially non-zero.
 		if restarts[pod] > 2 || m.Value > 0.001 {
 			if podCount >= maxProblemPods {
-				continue // hard cap reached — skip remaining problem pods
+				continue // hard cap reached   skip remaining problem pods
 			}
 			seen[key] = true
 			podCount++

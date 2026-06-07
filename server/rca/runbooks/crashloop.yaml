@@ -1,16 +1,16 @@
 name: crashloop
-description: Pod is in CrashLoopBackOff — container repeatedly crashes and restarts
+description: Pod is in CrashLoopBackOff   container repeatedly crashes and restarts
 triggers:
   - kubernetes.pod.restart_count > 3
   - pod.reason = CrashLoopBackOff
 categories:
   - crashloop
 diagnosis:
-  - Look for OOMKilled exit code (137) in pod events — indicates memory exhaustion
+  - Look for OOMKilled exit code (137) in pod events   indicates memory exhaustion
   - Check previous container logs for panic, fatal, or segfault messages
   - Inspect container exit code: 1=app error, 2=misuse, 126/127=missing binary, 137=OOM/SIGKILL
   - Verify required environment variables and ConfigMap/Secret mounts exist
-  - Check liveness probe configuration — overly aggressive probes cause false restarts
+  - Check liveness probe configuration   overly aggressive probes cause false restarts
   - Compare restart count trend: rising monotonically vs. periodic spikes
 remediation:
   - step: 1

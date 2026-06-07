@@ -21,7 +21,7 @@ var (
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Proactive cluster health check — surfaces issues before they page you",
+	Short: "Proactive cluster health check   surfaces issues before they page you",
 	Long: `Queries the VisualEyes backend for active alerts and metric thresholds,
 then prints a prioritised list of findings.
 
@@ -103,7 +103,7 @@ func interactiveRemediate(issues []client.ScanIssue) error {
 		applied, skipped, failed := 0, 0, 0
 		for i, c := range cmds {
 			if !c.IsAutoSafe && !scanForce {
-				fmt.Printf("   Step %d: %s\n", i+1, styles.Mute.Render("skipped — not auto-safe. Use --force to execute."))
+				fmt.Printf("   Step %d: %s\n", i+1, styles.Mute.Render("skipped   not auto-safe. Use --force to execute."))
 				skipped++
 				continue
 			}

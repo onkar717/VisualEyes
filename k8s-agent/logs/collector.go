@@ -121,7 +121,7 @@ func (c *Collector) tailFile(path string) ([]LogLine, error) {
 
 	pod, namespace, container, ok := parseLogFilename(filepath.Base(path))
 	if !ok {
-		// Not a standard k8s log filename — skip silently.
+		// Not a standard k8s log filename   skip silently.
 		return nil, nil
 	}
 

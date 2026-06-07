@@ -10,7 +10,7 @@ on:
 
 jobs:
   trivy-fs:
-    name: Trivy — Filesystem & Dependency Scan
+    name: Trivy   Filesystem & Dependency Scan
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -37,7 +37,7 @@ jobs:
           category: trivy-filesystem
 
   trivy-config:
-    name: Trivy — Dockerfile & IaC Misconfiguration
+    name: Trivy   Dockerfile & IaC Misconfiguration
     runs-on: ubuntu-latest
     permissions:
       security-events: write

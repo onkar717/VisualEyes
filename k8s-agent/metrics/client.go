@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	sharedhttp "github.com/onkar717/visual-eyes/backend/http"
+	sharedhttp "github.com/onkar717/visual-eyes/server/http"
 )
 
 const (

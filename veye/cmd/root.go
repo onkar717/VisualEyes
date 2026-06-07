@@ -25,11 +25,11 @@ var banner = styles.Banner.Render(`
 
 var rootCmd = &cobra.Command{
 	Use:   "veye",
-	Short: "VisualEyes CLI — terminal client for your monitoring backend",
+	Short: "VisualEyes CLI   terminal client for your monitoring backend",
 	Long:  banner + styles.Mute.Render("  Connect to a running VisualEyes backend and inspect metrics, alerts, logs and RCA results."),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		api = client.New(apiURL)
-		// Quick reachability check — skip for help/version.
+		// Quick reachability check   skip for help/version.
 		if cmd.Name() != "help" {
 			if _, err := api.Health(); err != nil {
 				return fmt.Errorf("cannot reach VisualEyes backend at %s: %w\nHint: is the server running? (./bin/server)", apiURL, err)

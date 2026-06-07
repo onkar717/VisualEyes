@@ -40,7 +40,7 @@ type lokiQueryResponse struct {
 
 // QueryLogs fetches log lines for a given pod from Loki, looking back `lookback`
 // from now and returning at most `limit` lines. Returns nil (no error) if Loki
-// returns no results or is unreachable — callers fall back to stored logs.
+// returns no results or is unreachable   callers fall back to stored logs.
 func (c *LokiClient) QueryLogs(pod, namespace string, lookback time.Duration, limit int) ([]models.PodLog, error) {
 	if limit <= 0 {
 		limit = 100

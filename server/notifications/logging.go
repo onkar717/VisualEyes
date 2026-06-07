@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
-	"github.com/onkar717/visual-eyes/backend/storage"
+	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/storage"
 )
 
 // LoggingNotifier wraps any Notifier and persists a NotificationEvent record

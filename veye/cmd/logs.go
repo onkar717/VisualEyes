@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -54,13 +54,13 @@ func fetchAndPrintLogs(lastID uint) error {
 	}
 
 	if printed == 0 && lastID == 0 {
-		fmt.Println(styles.Mute.Render("  no logs found — ship some with the K8s agent or POST /api/pod-logs"))
+		fmt.Println(styles.Mute.Render("  no logs found   ship some with the K8s agent or POST /api/pod-logs"))
 	}
 	return nil
 }
 
 func followLogs() error {
-	fmt.Println(styles.Mute.Render("  following logs — Ctrl+C to quit"))
+	fmt.Println(styles.Mute.Render("  following logs   Ctrl+C to quit"))
 	fmt.Println()
 
 	var lastID uint

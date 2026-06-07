@@ -52,7 +52,7 @@ type AlertContext struct {
 	K8sEvents []storage.K8sEvent
 	// Per-namespace pod-phase summary derived from related metrics.
 	NamespaceSummary map[string]namespaceStat
-	// Pre-classified log patterns — populated by ClassifyLogs before LLM stages.
+	// Pre-classified log patterns   populated by ClassifyLogs before LLM stages.
 	LogClassification ClassifiedLogs
 	// Detected metric anomalies (Z-score ≥ 2.5σ over recent samples).
 	Anomalies []AnomalyResult
@@ -68,7 +68,7 @@ type AlertContext struct {
 	NodePressures []NodePressureInfo
 	// NamespaceLogSummary is per-pod error category counts from parallel log scan.
 	NamespaceLogSummary map[string]map[string]int
-	// Observability stack availability — hints for the LLM agents.
+	// Observability stack availability   hints for the LLM agents.
 	PrometheusURL     string
 	PrometheusEnabled bool
 	LokiURL           string
@@ -150,7 +150,7 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		LokiEnabled:       b.lokiEnabled,
 	}
 
-	// Primary metric samples — use MetricName (e.g. "cpu.usage"), not RuleName.
+	// Primary metric samples   use MetricName (e.g. "cpu.usage"), not RuleName.
 	metricName := alert.MetricName
 	if metricName == "" {
 		metricName = alert.RuleName // fallback for alerts stored before MetricName was added
@@ -161,7 +161,7 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		ctx.Anomalies = DetectAnomalies(samples)
 	}
 
-	// Related system metrics for same resource — filter to problem pods only.
+	// Related system metrics for same resource   filter to problem pods only.
 	relatedNames := relatedMetrics(alert.RuleName)
 	for _, name := range relatedNames {
 		if samples, err := b.metricStore.QueryByName(name, since, 10); err == nil {
@@ -188,7 +188,7 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Prometheus instant queries — OOM kills, deployment mismatches, HPA, PVC, node pressure.
+	// Prometheus instant queries   OOM kills, deployment mismatches, HPA, PVC, node pressure.
 	if b.prometheusClient != nil {
 		// OOM kills
 		if oomRes, err := b.prometheusClient.QueryInstant(oomKillQuery()); err == nil {
@@ -297,7 +297,7 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Parallel namespace log analysis — fetch top pods concurrently (G11).
+	// Parallel namespace log analysis   fetch top pods concurrently (G11).
 	if b.logStore != nil && ctx.Alert.Namespace != "" {
 		pods := uniquePodsInNamespace(ctx.RelatedMetrics, ctx.Alert.Namespace, 5)
 		if len(pods) > 0 {
@@ -333,7 +333,7 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Pod logs — prefer Loki when enabled; fall back to stored push logs.
+	// Pod logs   prefer Loki when enabled; fall back to stored push logs.
 	if looksLikePod(alert.ResourceID) {
 		if b.lokiClient != nil {
 			// Query Loki for live logs (last 30 min, up to logLines).
@@ -372,12 +372,12 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// K8s Warning events — pull last 20 for the alert's namespace from event buffer.
+	// K8s Warning events   pull last 20 for the alert's namespace from event buffer.
 	if b.eventBuffer != nil {
 		ctx.K8sEvents = b.eventBuffer.GetRecent(alert.Namespace, 20)
 	}
 
-	// Namespace summary — count active and crashlooping pods per namespace from metrics.
+	// Namespace summary   count active and crashlooping pods per namespace from metrics.
 	ctx.NamespaceSummary = buildNamespaceSummary(ctx.RelatedMetrics)
 
 	// Cap related metrics to prevent oversized prompts on high-cardinality clusters.
@@ -428,17 +428,17 @@ func buildNamespaceSummary(metrics []models.Metric) map[string]namespaceStat {
 func (c AlertContext) Format() string {
 	var b strings.Builder
 
-	// Observability stack availability — let agents know what they can reference.
+	// Observability stack availability   let agents know what they can reference.
 	b.WriteString("=== OBSERVABILITY STACK ===\n")
 	if c.PrometheusEnabled && c.PrometheusURL != "" {
 		b.WriteString(fmt.Sprintf("Prometheus: AVAILABLE at %s (use PromQL for CPU/memory/error-rate queries)\n", c.PrometheusURL))
 	} else {
-		b.WriteString("Prometheus: NOT configured — use kubelet/agent metrics only\n")
+		b.WriteString("Prometheus: NOT configured   use kubelet/agent metrics only\n")
 	}
 	if c.LokiEnabled && c.LokiURL != "" {
 		b.WriteString(fmt.Sprintf("Loki: AVAILABLE at %s (use LogQL for log queries)\n", c.LokiURL))
 	} else {
-		b.WriteString("Loki: NOT configured — logs provided inline below\n")
+		b.WriteString("Loki: NOT configured   logs provided inline below\n")
 	}
 	b.WriteString("\n")
 
@@ -447,7 +447,7 @@ func (c AlertContext) Format() string {
 		b.WriteString(anomSummary)
 	}
 
-	// K8s Warning events — high-value diagnostic signal from the API server.
+	// K8s Warning events   high-value diagnostic signal from the API server.
 	if len(c.K8sEvents) > 0 {
 		b.WriteString("=== K8S WARNING EVENTS (recent) ===\n")
 		for _, ev := range c.K8sEvents {
@@ -458,7 +458,7 @@ func (c AlertContext) Format() string {
 		b.WriteString("\n")
 	}
 
-	// Namespace summary — per-namespace pod health at a glance.
+	// Namespace summary   per-namespace pod health at a glance.
 	if len(c.NamespaceSummary) > 0 {
 		b.WriteString("=== NAMESPACE SUMMARY ===\n")
 		for ns, st := range c.NamespaceSummary {
@@ -468,7 +468,7 @@ func (c AlertContext) Format() string {
 		b.WriteString("\n")
 	}
 
-	// Init container failures — filter K8s events with Init: reasons (G16).
+	// Init container failures   filter K8s events with Init: reasons (G16).
 	var initEvents []storage.K8sEvent
 	for _, ev := range c.K8sEvents {
 		if strings.HasPrefix(ev.Reason, "Init:") || strings.Contains(ev.Message, "init container") {
@@ -599,14 +599,14 @@ func (c AlertContext) Format() string {
 	}
 
 	if len(c.PrevLogs) > 0 {
-		b.WriteString(fmt.Sprintf("=== PREVIOUS CONTAINER LOGS (pre-crash — %d lines) ===\n", len(c.PrevLogs)))
+		b.WriteString(fmt.Sprintf("=== PREVIOUS CONTAINER LOGS (pre-crash   %d lines) ===\n", len(c.PrevLogs)))
 		for _, l := range c.PrevLogs {
 			b.WriteString(fmt.Sprintf("  [PREV][%s] %s\n", l.Timestamp.Format("15:04:05"), l.Line))
 		}
 		b.WriteString("\n")
 	}
 
-	// Pre-classified log patterns — deterministic signal, placed after raw logs.
+	// Pre-classified log patterns   deterministic signal, placed after raw logs.
 	if c.LogClassification.Summary != "" {
 		b.WriteString(c.LogClassification.Summary)
 	}

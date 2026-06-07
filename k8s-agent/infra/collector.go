@@ -40,7 +40,7 @@ type HPAInfo struct {
 	MaxReplicas     int32  `json:"maxReplicas"`
 	CurrentReplicas int32  `json:"currentReplicas"`
 	DesiredReplicas int32  `json:"desiredReplicas"`
-	// AtMaxReplicas is true when currentReplicas == maxReplicas — saturation signal.
+	// AtMaxReplicas is true when currentReplicas == maxReplicas   saturation signal.
 	AtMaxReplicas bool   `json:"atMaxReplicas"`
 }
 
@@ -71,7 +71,7 @@ func Collect(ctx context.Context, client kubernetes.Interface) (*InfraSnapshot, 
 		}
 	}
 
-	// PVCs — only include non-Bound ones (Pending/Lost are actionable).
+	// PVCs   only include non-Bound ones (Pending/Lost are actionable).
 	pvcList, err := client.CoreV1().PersistentVolumeClaims(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		slog.Warn("infra: list pvcs failed", "error", err)

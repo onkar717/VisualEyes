@@ -1,4 +1,4 @@
-// veye is the VisualEyes CLI — a terminal client for the VisualEyes monitoring backend.
+// veye is the VisualEyes CLI   a terminal client for the VisualEyes monitoring backend.
 // It connects to a running veye-server and surfaces metrics, alerts, pod logs,
 // and AI-powered root cause analysis directly in your terminal.
 //
@@ -11,7 +11,7 @@
 //	veye watch                       # live Bubbletea dashboard
 package main
 
-import "github.com/onkar717/visual-eyes/cli/cmd"
+import "github.com/onkar717/visual-eyes/veye/cmd"
 
 func main() {
 	cmd.Execute()

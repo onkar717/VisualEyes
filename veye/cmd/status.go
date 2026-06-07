@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +78,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	fmt.Println()
 	fmt.Println(styles.SectionHeader.Render("  ALERTS"))
 	if len(alerts) == 0 {
-		fmt.Println(styles.Good.Render("  ✓ No firing alerts — system is healthy"))
+		fmt.Println(styles.Good.Render("  ✓ No firing alerts   system is healthy"))
 	} else {
 		for _, a := range alerts {
 			fmt.Printf("  %s  %s\n", styles.SeverityBadge(a.Severity), styles.ValStyle.Render(a.Message))

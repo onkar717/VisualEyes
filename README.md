@@ -24,7 +24,7 @@
 
 ---
 
-**VisualEyes** combines real-time metrics collection, a Bubbletea TUI dashboard, AI Root Cause Analysis, and a full React web UI — giving on-call engineers complete visibility from a single tool.
+**VisualEyes** combines real-time metrics collection, a Bubbletea TUI dashboard, AI Root Cause Analysis, and a full React web UI   giving on-call engineers complete visibility from a single tool.
 
 ---
 
@@ -40,16 +40,19 @@ Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a 
 
 ## ✨ Features
 
-- 📊 **System metrics** — CPU, memory, disk, network, load average via `gopsutil`
-- ☸️ **Kubernetes metrics** — pod-level and node-level stats via kubelet summary API
-- 🧠 **AI-powered RCA** — Claude AI diagnoses incidents and proposes safe remediation commands
-- 🚨 **Alert engine** — configurable rules with dedup, noise filtering, auto-RCA trigger
-- ⚡ **WebSocket streaming** — live metric push to React dashboard, no polling
-- 📈 **Prometheus `/metrics`** — plug into any Grafana/Prometheus stack
-- 🖥️ **veye CLI** — Bubbletea TUI: `status`, `alerts`, `logs`, `rca`, `watch`
-- 🗄️ **PostgreSQL storage** — persistent incident history with MTTR tracking
-- 🔒 **Safety-first RCA** — remediation commands validated before execution
-- 🐳 **Docker & Kubernetes** — full containerized deployment, Compose + manifests
+- 📊 **System metrics** CPU, memory, disk, network, load average via `gopsutil`
+- ☸️ **Kubernetes metrics** pod-level and node-level stats via kubelet summary API
+- 🧠 **AI-powered RCA** 6-stage pipeline (triage, metrics, logs, infra, remediation, commander)
+- 🚨 **Alert engine** configurable rules, Z-score anomaly detection, dedup, auto-RCA trigger
+- ⚡ **WebSocket streaming** live metric push to React dashboard, no polling
+- 📈 **Prometheus `/metrics`** plug into any Grafana/Prometheus stack
+- 🖥️ **veye CLI** Bubbletea TUI: `status`, `alerts`, `logs`, `rca`, `watch`, `incidents`
+- 🗄️ **PostgreSQL storage** persistent incident history, MTTR by severity, evidence trail
+- 🔒 **Safety-first RCA** typed RemediationStep with dry-run mode, safe prefix allowlist
+- 📣 **Rich notifications** Slack Block Kit, PagerDuty, Webhook with 30-min dedup window
+- 📚 **Runbook library** YAML-based runbooks, env-configurable external dir
+- 🔍 **Deep K8s checks** HPA at-max, PVC unbound, OOM kill, replica mismatch via PromQL
+- 🐳 **Docker & Kubernetes** full containerized deployment, Compose + manifests
 
 ---
 
@@ -108,7 +111,7 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 
 ## 💻 Sample Output
 
-### veye watch — Interactive TUI Dashboard
+### veye watch   Interactive TUI Dashboard
 
 ```
 ┌------------------------ VisualEyes -------------------------┐
@@ -120,7 +123,7 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 ├------------------------ RCA Result -------------------------┤
 │  ROOT CAUSE (94% confidence):                               │
 │  payment-service cannot connect to Redis at                 │
-│  redis.prod.svc:6379 — connection refused.                  │
+│  redis.prod.svc:6379   connection refused.                  │
 │                                                              │
 │  PROPOSED FIX:                                              │
 │  kubectl get svc redis -n prod                              │
@@ -147,17 +150,17 @@ g7h8i9    SEV3      frontend-deploy    HighCPUThrottle     14m
 ```
 $ veye rca a1b2c3
 
-[VisualEyes RCA] Incident a1b2c3 — payment-service (SEV1)
+[VisualEyes RCA] Incident a1b2c3   payment-service (SEV1)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ROOT CAUSE:
   Container 'payment-service' is CrashLoopBackOff.
-  Exit code 1 — unable to connect to Redis cache at
+  Exit code 1   unable to connect to Redis cache at
   redis.prod.svc.cluster.local:6379. TCP connection refused.
 
 CONTRIBUTING FACTORS:
   • Redis service has 0 ready endpoints (selector mismatch)
-  • Pod redis-0 is Pending — PVC not bound
+  • Pod redis-0 is Pending   PVC not bound
 
 REMEDIATION PLAN:
   Step 1: Check Redis pod status
@@ -179,7 +182,7 @@ REMEDIATION PLAN:
 - Go 1.24+
 - Node.js 18+
 - Docker & Docker Compose
-- PostgreSQL 14+ (or use Docker Compose — no local install needed)
+- PostgreSQL 14+ (or use Docker Compose   no local install needed)
 - `kubectl` + cluster (for Kubernetes mode)
 
 ### 1. Clone & Build
@@ -197,8 +200,8 @@ make install-ui  # Install frontend dependencies
 
 ```bash
 cp .env.example .env
-# Set ANTHROPIC_API_KEY for AI RCA (optional — RCA disabled if not set)
-# Set DATABASE_URL for PostgreSQL (optional — falls back to in-memory)
+# Set ANTHROPIC_API_KEY for AI RCA (optional   RCA disabled if not set)
+# Set DATABASE_URL for PostgreSQL (optional   falls back to in-memory)
 ```
 
 ### 3. Run Locally
@@ -210,7 +213,7 @@ make run-ui                # React UI on :5173
 open http://localhost:5173
 ```
 
-### 4. Or — Full Stack with Docker Compose
+### 4. Or   Full Stack with Docker Compose
 
 ```bash
 docker-compose up --build -d
@@ -238,12 +241,12 @@ For minikube, kind, and production setup see [INSTALLATION.md](INSTALLATION.md).
 
 VisualEyes detects and automatically triggers RCA for:
 
-- **Pod Lifecycle** — `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Pending`, `CreateContainerConfigError`
-- **Resource Pressure** — CPU throttling, memory saturation, disk pressure, node not-ready
-- **Kubernetes Health** — pod restarts exceeding threshold, deployment replica mismatch
-- **Network** — service endpoint unavailability, DNS resolution failures
-- **Storage** — unbound PVCs, volume mount failures
-- **Custom Rules** — define your own threshold-based alert rules in `configs/config.yaml`
+- **Pod Lifecycle**   `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Pending`, `CreateContainerConfigError`
+- **Resource Pressure**   CPU throttling, memory saturation, disk pressure, node not-ready
+- **Kubernetes Health**   pod restarts exceeding threshold, deployment replica mismatch
+- **Network**   service endpoint unavailability, DNS resolution failures
+- **Storage**   unbound PVCs, volume mount failures
+- **Custom Rules**   define your own threshold-based alert rules in `configs/config.yaml`
 
 ---
 
@@ -266,10 +269,10 @@ VisualEyes detects and automatically triggers RCA for:
 
 | Source | Description |
 |--------|-------------|
-| `configs/config.yaml` | Default config — collection interval, endpoints, alert rules |
-| `.env` | Secrets — `ANTHROPIC_API_KEY`, `DATABASE_URL` |
+| `configs/config.yaml` | Default config   collection interval, endpoints, alert rules |
+| `.env` | Secrets   `ANTHROPIC_API_KEY`, `DATABASE_URL` |
 | `deployments/kubernetes/config.yaml` | In-cluster ConfigMap overrides |
-| Environment variables | Override any key — e.g., `VISUAL_EYES_AGENT_COLLECTION_INTERVAL=5s` |
+| Environment variables | Override any key   e.g., `VISUAL_EYES_AGENT_COLLECTION_INTERVAL=5s` |
 
 ---
 
@@ -290,21 +293,23 @@ make cross      # Cross-compile all binaries → dist/ (5 platforms)
 
 ```
 VisualEyes/
-├-- agents/
-│   ├-- system/          # Host metrics agent — CPU, mem, disk, net, load
-│   └-- kubernetes/      # K8s agent — kubelet API, pod/node metrics, events
-├-- backend/
-│   ├-- alerts/          # Alert engine: rule eval, dedup, noise filter
+├-- system-agent/        # Host metrics agent: CPU, mem, disk, net, load
+├-- k8s-agent/           # Kubernetes agent: kubelet API, pod/node metrics, events
+├-- server/
+│   ├-- alerts/          # Alert engine: rule eval, dedup, noise filter, Z-score anomaly
 │   ├-- api/             # HTTP handlers, routes, middleware
-│   ├-- rca/             # AI RCA: Claude client, context builder, executor
-│   ├-- storage/         # Interface, PostgreSQL (GORM), in-memory
+│   ├-- models/          # Incident, Evidence, RemediationStep, Alert models
+│   ├-- notifications/   # Slack Block Kit, PagerDuty, Webhook, dedup notifier
+│   ├-- rca/             # AI RCA: 6-stage pipeline, context builder, executor, runbooks
+│   ├-- storage/         # Interface, PostgreSQL (GORM), in-memory, event buffer
 │   └-- ws/              # WebSocket broadcaster
-├-- cli/
-│   └-- cmd/             # veye commands: status, alerts, logs, rca, watch
+├-- veye/
+│   ├-- cmd/             # veye commands: status, alerts, logs, rca, watch, incidents, apply
+│   └-- internal/        # TUI model, API client, styles
 ├-- configs/             # Default YAML config
 ├-- deployments/
 │   └-- kubernetes/      # RBAC, ConfigMap, DaemonSet
-├-- docs/images/         # Screenshots, architecture diagrams
+├-- docs/                # API reference, architecture, runbooks
 ├-- ui/                  # React 19 + MUI 7 + Vite dashboard
 └-- docker-compose.yml
 ```
@@ -318,13 +323,20 @@ VisualEyes/
 - [x] Backend with alert engine, RCA processor, WebSocket, Prometheus
 - [x] PostgreSQL persistent storage
 - [x] React dashboard with dark/light theme, live updates
-- [x] AI-powered RCA with Claude — safe remediation command execution
-- [x] veye CLI — interactive Bubbletea TUI (status, alerts, logs, rca, watch)
+- [x] AI-powered RCA with Claude: 6-stage pipeline, safe remediation execution
+- [x] veye CLI: interactive Bubbletea TUI (status, alerts, logs, rca, watch, incidents)
 - [x] GitHub Actions CI/CD + cross-platform release pipeline
+- [x] Slack Block Kit rich notifications + PagerDuty + Webhook alerting
+- [x] Custom runbook library (YAML-based, embeddable, env-configurable dir)
+- [x] Evidence model + typed RemediationStep per-step tracking
+- [x] Dedup notifier: 30-min per-alert suppression window
+- [x] MTTR tracking by severity with incident count
+- [x] HPA at-max, PVC unbound, OOM kill detection via PromQL
+- [x] Z-score anomaly detection for metric spikes
+- [x] Per-node CPU/mem pressure, deployment replica mismatch checks
+- [x] Multi-namespace incident tracking with affected pod counts
 - [ ] Distributed tracing integration (OpenTelemetry)
-- [ ] Slack / PagerDuty alert routing
 - [ ] Multi-cluster support in the web dashboard
-- [ ] Custom runbook library (YAML-based, embeddable)
 - [ ] eBPF network flow visibility
 
 ---
@@ -338,11 +350,11 @@ git checkout -b feature/your-feature
 make test && make lint
 git commit -m "feat: describe your change"
 git push origin feature/your-feature
-# open a pull request — template will guide you
+# open a pull request   template will guide you
 ```
 
 ---
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE).
+MIT   see [LICENSE](LICENSE).

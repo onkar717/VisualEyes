@@ -56,7 +56,7 @@ func (b *Broadcaster) unregister(ch chan []byte) {
 }
 
 // Send fans out payload to every registered client. Clients whose buffers are
-// full are skipped — they will receive the next broadcast instead.
+// full are skipped   they will receive the next broadcast instead.
 func (b *Broadcaster) Send(payload []byte) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

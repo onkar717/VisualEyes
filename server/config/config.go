@@ -123,10 +123,10 @@ type RCAConfig struct {
 	LogLines             int     `mapstructure:"log_lines"`
 	MetricSamples        int     `mapstructure:"metric_samples"`
 	AgentTimeoutSeconds  int     `mapstructure:"agent_timeout_seconds"` // per-stage timeout; total = 6× this
-	// Prometheus integration — when set, the metrics agent stage knows Prometheus is available.
+	// Prometheus integration   when set, the metrics agent stage knows Prometheus is available.
 	PrometheusURL     string `mapstructure:"prometheus_url"`
 	PrometheusEnabled bool   `mapstructure:"prometheus_enabled"`
-	// Loki integration — when set, log stage queries Loki instead of stored push logs.
+	// Loki integration   when set, log stage queries Loki instead of stored push logs.
 	LokiURL     string `mapstructure:"loki_url"`
 	LokiEnabled bool   `mapstructure:"loki_enabled"`
 	// AutoRemediate enables unattended execution of auto-safe remediation commands.
@@ -343,10 +343,10 @@ func defaultAlertRules() []map[string]interface{} {
 		{"name": "disk_full_warning", "metric_name": "disk.usage_percent", "threshold": 90.0, "operator": "gt", "severity": "warning"},
 		{"name": "k8s_node_cpu_high", "metric_name": "kubernetes.node.cpu.usage", "threshold": 0.85, "operator": "gt", "severity": "warning"},
 		{"name": "k8s_pod_crash_loop", "metric_name": "kubernetes.pod.restart_count", "threshold": 5.0, "operator": "gt", "severity": "critical"},
-		// HTTP error rate rules — triggers when 5xx rate exceeds threshold percentage.
+		// HTTP error rate rules   triggers when 5xx rate exceeds threshold percentage.
 		{"name": "http_error_rate_critical", "metric_name": "http.error_rate_pct", "threshold": 5.0, "operator": "gt", "severity": "critical"},
 		{"name": "http_error_rate_warning", "metric_name": "http.error_rate_pct", "threshold": 1.0, "operator": "gt", "severity": "warning"},
-		// P99 latency rules — threshold in milliseconds.
+		// P99 latency rules   threshold in milliseconds.
 		{"name": "http_latency_p99_critical", "metric_name": "http.p99_latency_ms", "threshold": 2000.0, "operator": "gt", "severity": "critical"},
 		{"name": "http_latency_p99_warning", "metric_name": "http.p99_latency_ms", "threshold": 500.0, "operator": "gt", "severity": "warning"},
 	}

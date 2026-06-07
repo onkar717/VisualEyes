@@ -32,7 +32,7 @@ type PostgresStore struct {
 func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
-		PreferSimpleProtocol: true, // disable implicit prepared statements — safer for PgBouncer
+		PreferSimpleProtocol: true, // disable implicit prepared statements   safer for PgBouncer
 	}), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})

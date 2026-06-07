@@ -122,7 +122,7 @@ func RunbookSummary(rb *Runbook) string {
 		return "(no matching runbook)"
 	}
 	var sb strings.Builder
-	sb.WriteString("Runbook: " + rb.Name + " — " + rb.Description + "\n")
+	sb.WriteString("Runbook: " + rb.Name + "   " + rb.Description + "\n")
 	if len(rb.Diagnosis) > 0 {
 		sb.WriteString("Diagnosis hints:\n")
 		for _, hint := range rb.Diagnosis {
