@@ -28,14 +28,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
 
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Verify module checksums
-        run: go mod verify
+      - name: Sync workspace
+        run: go work sync
 
       - name: Run tests
-        run: go test -race -count=1 ./...
+        run: go test -race -count=1 ./server/... ./veye/... ./system-agent/... ./k8s-agent/...
 
       - name: Cross-compile binaries
         run: make cross
@@ -74,13 +71,17 @@ jobs:
       matrix:
         include:
           - name: server
-            file: backend/Dockerfile
+            file: server/Dockerfile
             context: .
             image: visual-eyes-server
           - name: system-agent
-            file: agents/system/Dockerfile
+            file: system-agent/Dockerfile
             context: .
             image: visual-eyes-agent
+          - name: k8s-agent
+            file: Dockerfile
+            context: .
+            image: visual-eyes-kube-agent
           - name: ui
             file: ui/Dockerfile
             context: ./ui
