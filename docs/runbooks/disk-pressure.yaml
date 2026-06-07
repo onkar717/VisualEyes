@@ -1,0 +1,68 @@
+name: DiskPressure
+description: Node disk usage is critically high — kubelet may evict pods to reclaim space
+severity: SEV1
+tags: [resource-pressure, disk, node, eviction]
+
+symptoms:
+  - Node condition DiskPressure=True
+  - Pods being evicted with reason DiskPressure
+  - Alert fired: reason=DiskPressure or HighDiskUsage
+
+triage_steps:
+  - step: 1
+    description: Check node conditions for DiskPressure
+    command: "kubectl describe nodes | grep -A5 'Conditions'"
+    safe: true
+
+  - step: 2
+    description: Check disk usage on affected node (via pod on that node)
+    command: "kubectl get nodes -o wide"
+    safe: true
+
+  - step: 3
+    description: Check for large or dangling Docker/containerd images
+    command: "kubectl get pods -n kube-system | grep -i image"
+    safe: true
+
+  - step: 4
+    description: Check for pods with excessive ephemeral storage usage
+    command: "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,NODE:.spec.nodeName' | grep {node}"
+    safe: true
+
+  - step: 5
+    description: Check persistent volume usage
+    command: "kubectl get pvc -A"
+    safe: true
+
+common_causes:
+  - cause: Accumulated container logs filling /var/log
+    signal: "Disk usage high in /var/log; containerd log directories large"
+    fix: "Configure logrotate; set container log max-size in kubelet config"
+
+  - cause: Dangling images and stopped containers not being GC'd
+    signal: "Many old images on node; kubelet image GC threshold not configured"
+    fix: "Set imageGCHighThresholdPercent in kubelet config (default 85%)"
+
+  - cause: PersistentVolume filled by application data
+    signal: "PVC at or near capacity"
+    fix: "Expand PVC if StorageClass supports it; archive/delete old data"
+
+  - cause: Ephemeral storage overuse by pod (no limit set)
+    signal: "Single pod writing large amounts of tmp/cache data"
+    fix: "Set ephemeral-storage limit in pod spec; clean up data"
+
+remediation:
+  - scenario: Force image garbage collection (if kubelet API accessible)
+    command: "kubectl get nodes -o name | xargs -I{} kubectl describe {} | grep 'Image'"
+    destructive: false
+    confirm_required: false
+
+  - scenario: Evict pods from pressured node to allow recovery
+    command: "kubectl drain {node} --ignore-daemonsets --delete-emptydir-data"
+    destructive: true
+    confirm_required: true
+
+monitoring:
+  - metric: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes
+    threshold: "> 85%"
+    action: "Fire SEV2 DiskPressureWarning before kubelet threshold hit"
