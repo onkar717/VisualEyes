@@ -128,9 +128,12 @@ type LoggingConfig struct {
 }
 
 type AgentConfig struct {
-	CollectionInterval int  `mapstructure:"collection_interval"`
-	DisableHostMetrics bool `mapstructure:"disable_host_metrics"`
-	DisableKubeMetrics bool `mapstructure:"disable_kube_metrics"`
+	CollectionInterval int      `mapstructure:"collection_interval"`
+	DisableHostMetrics bool     `mapstructure:"disable_host_metrics"`
+	DisableKubeMetrics bool     `mapstructure:"disable_kube_metrics"`
+	// Namespaces restricts pod metric collection to the listed namespaces.
+	// Empty slice means all namespaces are collected.
+	Namespaces         []string `mapstructure:"namespaces"`
 }
 
 type OutputConfig struct {
@@ -302,6 +305,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("agent.collection_interval", 10)
 	v.SetDefault("agent.disable_host_metrics", false)
 	v.SetDefault("agent.disable_kube_metrics", false)
+	v.SetDefault("agent.namespaces", []string{})
 	v.SetDefault("output.remote.enabled", false)
 	v.SetDefault("output.remote.endpoint", "http://localhost:8080/api/system-metrics")
 }

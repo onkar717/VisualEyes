@@ -91,6 +91,9 @@ agent:
   collection_interval: 10
   disable_host_metrics: false
   disable_kube_metrics: false
+  # namespaces: []  # restrict pod metric collection; empty = all namespaces
+  # Example: namespaces: [default, kube-system, monitoring]
+  namespaces: []
 
 output:
   remote:

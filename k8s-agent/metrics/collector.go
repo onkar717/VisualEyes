@@ -8,17 +8,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // Collector handles collecting Kubernetes metrics
 type Collector struct {
-	client    *KubeletClient
-	k8sClient kubernetes.Interface // may be nil if in-cluster config fails
+	client     *KubeletClient
+	k8sClient  kubernetes.Interface // may be nil if in-cluster config fails
+	namespaces map[string]struct{}  // empty = all namespaces
 }
 
-// New creates a new Kubernetes metrics collector
-func New() (*Collector, error) {
+// New creates a new Kubernetes metrics collector.
+// allowedNamespaces restricts pod collection; pass nil or empty slice for all namespaces.
+func New(allowedNamespaces []string) (*Collector, error) {
 	if !IsInCluster() {
 		return nil, fmt.Errorf("not running in a Kubernetes cluster")
 	}
@@ -36,10 +38,27 @@ func New() (*Collector, error) {
 		}
 	}
 
+	nsSet := make(map[string]struct{}, len(allowedNamespaces))
+	for _, ns := range allowedNamespaces {
+		if ns != "" {
+			nsSet[ns] = struct{}{}
+		}
+	}
+
 	return &Collector{
-		client:    kubeletClient,
-		k8sClient: k8sClient,
+		client:     kubeletClient,
+		k8sClient:  k8sClient,
+		namespaces: nsSet,
 	}, nil
+}
+
+// allowedNamespace reports whether the namespace passes the configured filter.
+func (c *Collector) allowedNamespace(ns string) bool {
+	if len(c.namespaces) == 0 {
+		return true
+	}
+	_, ok := c.namespaces[ns]
+	return ok
 }
 
 // Client returns the kubernetes.Interface client (may be nil outside a cluster).
@@ -82,6 +101,9 @@ func (c *Collector) Collect(ctx context.Context) ([]models.Metric, error) {
 
 	// Pod and container metrics
 	for _, pod := range stats.Pods {
+		if !c.allowedNamespace(pod.PodRef.Namespace) {
+			continue
+		}
 		podTags := map[string]string{
 			"node":      stats.Node.NodeName,
 			"pod":       pod.PodRef.Name,
