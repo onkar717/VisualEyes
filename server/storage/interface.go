@@ -66,12 +66,14 @@ type RemediationLogStore interface {
 
 // IncidentStats is the aggregated summary returned by /api/stats.
 type IncidentStats struct {
-	TotalIncidents int            `json:"total_incidents"`
-	OpenIncidents  int            `json:"open_incidents"`
-	AvgMTTRSeconds float64        `json:"avg_mttr_seconds"`
-	MTTRCount      int            `json:"mttr_count"`
-	BySeverity     map[string]int `json:"by_severity"`
-	ByStatus       map[string]int `json:"by_status"`
+	TotalIncidents int               `json:"total_incidents"`
+	OpenIncidents  int               `json:"open_incidents"`
+	AvgMTTRSeconds float64           `json:"avg_mttr_seconds"`
+	MTTRCount      int               `json:"mttr_count"`
+	// MTTRBySeverity maps severity level (SEV1..SEV4) to average MTTR in seconds.
+	MTTRBySeverity map[string]float64 `json:"mttr_by_severity,omitempty"`
+	BySeverity     map[string]int    `json:"by_severity"`
+	ByStatus       map[string]int    `json:"by_status"`
 }
 
 // ClusterSnapshotStore persists point-in-time cluster health samples for trending.

@@ -511,6 +511,22 @@ func (s *MemoryStore) GetStats() (IncidentStats, error) {
 	if st.MTTRCount > 0 {
 		st.AvgMTTRSeconds = float64(mttrTotal) / float64(st.MTTRCount)
 	}
+	// MTTRBySeverity — computed inline since we hold the read lock.
+	sevTotals := make(map[string]float64)
+	sevCounts := make(map[string]int)
+	for _, inc := range s.incidents {
+		if inc.MTTRSeconds != nil {
+			sev := string(inc.Severity)
+			sevTotals[sev] += float64(*inc.MTTRSeconds)
+			sevCounts[sev]++
+		}
+	}
+	if len(sevTotals) > 0 {
+		st.MTTRBySeverity = make(map[string]float64, len(sevTotals))
+		for sev, total := range sevTotals {
+			st.MTTRBySeverity[sev] = total / float64(sevCounts[sev])
+		}
+	}
 	return st, nil
 }
 

@@ -147,10 +147,11 @@ type Incident struct {
 
 // IncidentListResponse is the /api/incidents/full response envelope.
 type IncidentListResponse struct {
-	Incidents      []Incident `json:"incidents"`
-	Count          int        `json:"count"`
-	MTTRAvgSeconds float64    `json:"mttr_avg_seconds"`
-	MTTRCount      int        `json:"mttr_count"`
+	Incidents      []Incident         `json:"incidents"`
+	Count          int                `json:"count"`
+	MTTRAvgSeconds float64            `json:"mttr_avg_seconds"`
+	MTTRCount      int                `json:"mttr_count"`
+	MTTRBySeverity map[string]float64 `json:"mttr_by_severity,omitempty"`
 }
 
 // K8sMetrics is the /api/kubernetes/metrics response.

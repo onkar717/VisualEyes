@@ -58,7 +58,7 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 		mttrBox := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#303060")).
-			Padding(0, 2).Width(60)
+			Padding(0, 2).Width(70)
 
 		mttrLine := fmt.Sprintf("%s  %s   %s  %s",
 			styles.KeyStyle.Render("Avg MTTR"),
@@ -66,6 +66,15 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 			styles.KeyStyle.Render("Incidents mitigated"),
 			styles.ValStyle.Render(fmt.Sprintf("%d", resp.MTTRCount)),
 		)
+		if len(resp.MTTRBySeverity) > 0 {
+			bySev := "  by severity:"
+			for _, sev := range []string{"SEV1", "SEV2", "SEV3", "SEV4"} {
+				if v, ok := resp.MTTRBySeverity[sev]; ok {
+					bySev += fmt.Sprintf("  %s %s", styles.KeyStyle.Render(sev), styles.ValStyle.Render(formatMTTR(v)))
+				}
+			}
+			mttrLine += "\n" + bySev
+		}
 		fmt.Println(mttrBox.Render(mttrLine))
 		fmt.Println()
 	}

@@ -368,6 +368,9 @@ func (s *PostgresStore) GetStats() (IncidentStats, error) {
 	avg, count, err := s.MTTRStats()
 	st.AvgMTTRSeconds = avg
 	st.MTTRCount = count
+	if m, merr := s.MTTRStatsBySeverity(); merr == nil {
+		st.MTTRBySeverity = m
+	}
 	return st, err
 }
 

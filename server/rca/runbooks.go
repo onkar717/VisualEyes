@@ -2,6 +2,9 @@ package rca
 
 import (
 	"embed"
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -32,6 +35,7 @@ type Runbook struct {
 var loadedRunbooks []*Runbook
 
 func init() {
+	// Load embedded runbooks first.
 	entries, _ := runbookFS.ReadDir("runbooks")
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".yaml") {
@@ -47,6 +51,49 @@ func init() {
 		}
 		loadedRunbooks = append(loadedRunbooks, &rb)
 	}
+
+	// Load additional runbooks from external directory at runtime.
+	// Set VISUAL_EYES_RUNBOOK_DIR to a directory containing *.yaml runbook files.
+	if dir := os.Getenv("VISUAL_EYES_RUNBOOK_DIR"); dir != "" {
+		loadExternalRunbooks(dir)
+	}
+}
+
+// loadExternalRunbooks reads *.yaml runbook files from dir and appends them to
+// loadedRunbooks, overriding embedded runbooks with the same name if present.
+func loadExternalRunbooks(dir string) {
+	matches, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
+	if err != nil {
+		slog.Warn("runbooks: failed to glob external dir", "dir", dir, "err", err)
+		return
+	}
+	loaded := 0
+	for _, path := range matches {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			slog.Warn("runbooks: skip unreadable file", "path", path, "err", err)
+			continue
+		}
+		var rb Runbook
+		if err := yaml.Unmarshal(data, &rb); err != nil {
+			slog.Warn("runbooks: skip invalid yaml", "path", path, "err", err)
+			continue
+		}
+		// Override existing embedded runbook with same name if present.
+		replaced := false
+		for i, existing := range loadedRunbooks {
+			if strings.EqualFold(existing.Name, rb.Name) {
+				loadedRunbooks[i] = &rb
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			loadedRunbooks = append(loadedRunbooks, &rb)
+		}
+		loaded++
+	}
+	slog.Info("runbooks: loaded external runbooks", "dir", dir, "count", loaded)
 }
 
 // SelectRunbook returns the best matching runbook for the given category string.
