@@ -1,0 +1,74 @@
+run:
+  timeout: 5m
+  go: "1.24"
+
+linters:
+  enable:
+    - errcheck        # unchecked errors
+    - gosimple        # simplification suggestions
+    - govet           # correctness issues
+    - ineffassign     # ineffectual assignments
+    - staticcheck     # comprehensive static analysis
+    - unused          # unused code
+    - gofmt           # formatting
+    - goimports       # import ordering
+    - misspell        # spelling mistakes in comments/strings
+    - godot           # periods at end of comments
+    - gocritic        # style and performance suggestions
+    - noctx           # http requests without context
+    - bodyclose       # unclosed http response bodies
+    - rowserrcheck    # sql.Rows.Err() not checked
+    - exportloopref   # loop variable captured by reference
+    - prealloc        # slice preallocation
+    - unconvert       # unnecessary type conversions
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  govet:
+    enable:
+      - shadow
+
+  gofmt:
+    simplify: true
+
+  goimports:
+    local-prefixes: github.com/onkar717/visual-eyes
+
+  misspell:
+    locale: US
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam       # acceptable in this codebase
+      - rangeValCopy    # acceptable in this codebase
+
+  staticcheck:
+    checks: ["all"]
+
+issues:
+  exclude-rules:
+    # Test files — relax some rules
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+        - gocritic
+
+    # Main entry points — allow fmt.Print
+    - path: "main\\.go"
+      linters:
+        - forbidigo
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    - format: colored-line-number
+  sort-results: true
