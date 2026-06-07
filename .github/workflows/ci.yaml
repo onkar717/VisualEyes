@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint-go:
-    name: Go Build & Vet
+    name: Go Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,17 +26,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Sync workspace
+        run: go work sync
 
-      - name: Build all components
+      - name: Build all modules
         run: make build
 
-      - name: Run go vet
-        run: go vet ./...
+      - name: Run go vet (all modules)
+        run: go vet ./server/... ./veye/... ./system-agent/... ./k8s-agent/...
+
+      - name: Run tests with race detector
+        run: go test -race -count=1 ./server/... ./veye/... ./system-agent/... ./k8s-agent/...
+
+      - name: golangci-lint (server)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: server
+        continue-on-error: true
 
       - name: Check large files (>10MB)
         run: find . -not -path './.git/*' -type f -size +10M | tee /dev/stderr | wc -l | grep -q '^0$'
+
+  build-ui:
+    name: UI Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        run: cd ui && npm ci
+
+      - name: Build UI
+        run: cd ui && npm run build
 
   lint-markdown:
     name: Markdown Lint
