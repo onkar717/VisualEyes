@@ -48,8 +48,12 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 	since := time.Now().Add(-30 * time.Minute)
 	ctx := AlertContext{Alert: alert}
 
-	// Primary metric samples.
-	if samples, err := b.metricStore.QueryByName(alert.RuleName, since, b.metricSamples); err == nil {
+	// Primary metric samples — use MetricName (e.g. "cpu.usage"), not RuleName.
+	metricName := alert.MetricName
+	if metricName == "" {
+		metricName = alert.RuleName // fallback for alerts stored before MetricName was added
+	}
+	if samples, err := b.metricStore.QueryByName(metricName, since, b.metricSamples); err == nil {
 		ctx.RecentMetrics = samples
 	}
 

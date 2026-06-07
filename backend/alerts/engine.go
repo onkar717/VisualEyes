@@ -139,6 +139,7 @@ func (e *Engine) evaluate() {
 func (e *Engine) fire(rule Rule, resourceID, namespace string, value float64, dedupeKey string) {
 	alert := &models.Alert{
 		RuleName:   rule.Name,
+		MetricName: rule.MetricName,
 		Severity:   rule.Severity,
 		Status:     models.AlertFiring,
 		ResourceID: resourceID,
