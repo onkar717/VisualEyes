@@ -27,6 +27,7 @@ type Handler struct {
 	logStore          storage.LogStore
 	rcaStore          storage.RCAStore
 	notificationStore storage.NotificationStore
+	incidentStore     storage.IncidentStore
 	broadcaster       *ws.Broadcaster
 	hostname          string
 	corsOrigins       string
@@ -34,11 +35,12 @@ type Handler struct {
 	rateLimiter       interface{ Stop() }
 }
 
-func (h *Handler) SetAlertStore(s storage.AlertStore)             { h.alertStore = s }
-func (h *Handler) SetLogStore(s storage.LogStore)                 { h.logStore = s }
-func (h *Handler) SetRCAStore(s storage.RCAStore)                 { h.rcaStore = s }
+func (h *Handler) SetAlertStore(s storage.AlertStore)               { h.alertStore = s }
+func (h *Handler) SetLogStore(s storage.LogStore)                   { h.logStore = s }
+func (h *Handler) SetRCAStore(s storage.RCAStore)                   { h.rcaStore = s }
 func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notificationStore = s }
-func (h *Handler) SetBroadcaster(b *ws.Broadcaster)               { h.broadcaster = b }
+func (h *Handler) SetIncidentStore(s storage.IncidentStore)         { h.incidentStore = s }
+func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                 { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -667,7 +669,8 @@ func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "pong")
 }
 
-// Healthz returns component health as JSON. HTTP 503 if any component is unhealthy.
+// Healthz returns component health + cluster health score as JSON.
+// HTTP 503 if any core component is unhealthy.
 func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 	h.cors(w)
 	systemOK := h.systemStore != nil
@@ -682,13 +685,72 @@ func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, code, map[string]any{
-		"status": status,
-		"uptime": uptime,
+		"status":       status,
+		"uptime":       uptime,
+		"health_score": h.computeHealthScore(),
 		"components": map[string]bool{
-			"system_store": systemOK,
-			"k8s_store":    k8sOK,
+			"system_store":    systemOK,
+			"k8s_store":       k8sOK,
+			"alert_store":     h.alertStore != nil,
+			"incident_store":  h.incidentStore != nil,
 		},
 	})
+}
+
+// computeHealthScore returns a 0-100 score representing cluster health.
+// 100 = perfect, 0 = critical. Deductions based on active alerts and metrics.
+func (h *Handler) computeHealthScore() float64 {
+	score := 100.0
+
+	// Active alerts penalty.
+	if h.alertStore != nil {
+		if active, err := h.alertStore.GetActiveAlerts(); err == nil {
+			for _, a := range active {
+				switch a.Severity {
+				case "critical":
+					score -= 15
+				case "warning":
+					score -= 7
+				default:
+					score -= 2
+				}
+			}
+		}
+	}
+
+	// Metric thresholds penalty.
+	if h.systemStore != nil {
+		for _, m := range h.systemStore.GetAllMetrics() {
+			switch m.Name {
+			case "cpu.usage":
+				if m.Value >= 90 {
+					score -= 15
+				} else if m.Value >= 75 {
+					score -= 8
+				}
+			case "memory.usage_percent":
+				if m.Value >= 90 {
+					score -= 15
+				} else if m.Value >= 80 {
+					score -= 8
+				}
+			case "disk.usage_percent":
+				if m.Value >= 95 {
+					score -= 20
+				} else if m.Value >= 85 {
+					score -= 10
+				}
+			}
+		}
+	}
+
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+	return score
 }
 
 // PrometheusMetrics exposes all registered application metrics in Prometheus
@@ -931,4 +993,113 @@ func (h *Handler) HandleIncidents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, events)
+}
+
+// HandleIncidentsFull returns structured incidents with SEV/status/MTTR.
+// GET /api/incidents/full?limit=50&severity=SEV1&status=OPEN
+func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.incidentStore == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"incidents": []struct{}{}, "mttr_avg_seconds": 0, "count": 0})
+		return
+	}
+
+	q := r.URL.Query()
+	limit := 50
+	if l := q.Get("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	incidents, err := h.incidentStore.GetRecentIncidents(q.Get("severity"), q.Get("status"), limit)
+	if err != nil {
+		slog.Error("get incidents", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	avg, count, _ := h.incidentStore.MTTRStats()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"incidents":        incidents,
+		"count":            len(incidents),
+		"mttr_avg_seconds": avg,
+		"mttr_count":       count,
+	})
+}
+
+// HandleIncidentStatus updates an incident's status (OPEN→INVESTIGATING→MITIGATED→RESOLVED).
+// PATCH /api/incidents/full/<id>
+func (h *Handler) HandleIncidentStatus(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.incidentStore == nil {
+		http.Error(w, "incident store not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/incidents/full/")
+	var id uint
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
+		http.Error(w, "invalid incident id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	inc, err := h.incidentStore.GetIncidentByID(id)
+	if err != nil {
+		http.Error(w, "incident not found", http.StatusNotFound)
+		return
+	}
+
+	now := time.Now()
+	switch body.Status {
+	case "MITIGATED":
+		inc.Status = "MITIGATED"
+		inc.MitigatedAt = &now
+		inc.ComputeMTTR()
+	case "RESOLVED":
+		inc.Status = "RESOLVED"
+		inc.ResolvedAt = &now
+		if inc.MitigatedAt == nil {
+			inc.MitigatedAt = &now
+		}
+		inc.ComputeMTTR()
+	case "INVESTIGATING":
+		inc.Status = "INVESTIGATING"
+	case "OPEN":
+		inc.Status = "OPEN"
+	default:
+		http.Error(w, "invalid status", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.incidentStore.UpdateIncident(inc); err != nil {
+		slog.Error("update incident status", "id", id, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, inc)
 }
