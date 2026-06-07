@@ -23,6 +23,7 @@ const (
 type Alert struct {
 	ID         uint          `gorm:"primaryKey;autoIncrement" json:"id"`
 	RuleName   string        `gorm:"index;not null"           json:"ruleName"`
+	MetricName string        `gorm:"index"                    json:"metricName"` // metric that triggered the rule
 	Severity   AlertSeverity `gorm:"not null"                 json:"severity"`
 	Status     AlertStatus   `gorm:"index;not null"           json:"status"`
 	ResourceID string        `gorm:"index"                    json:"resourceID"` // node/pod name
