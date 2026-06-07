@@ -34,6 +34,10 @@ type MemoryStore struct {
 	// notification events
 	notifEvents []*models.NotificationEvent
 	notifSeq    uint
+
+	// incidents
+	incidents   []*models.Incident
+	incidentSeq uint
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -307,4 +311,90 @@ func (s *MemoryStore) GetRecentNotificationEvents(limit int) ([]models.Notificat
 		}
 	}
 	return out, nil
+}
+
+// ─── IncidentStore ────────────────────────────────────────────────────────────
+
+func (s *MemoryStore) SaveIncident(inc *models.Incident) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.incidentSeq++
+	inc.ID = s.incidentSeq
+	cp := *inc
+	s.incidents = append(s.incidents, &cp)
+	return nil
+}
+
+func (s *MemoryStore) UpdateIncident(inc *models.Incident) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, existing := range s.incidents {
+		if existing.ID == inc.ID {
+			cp := *inc
+			s.incidents[i] = &cp
+			return nil
+		}
+	}
+	return fmt.Errorf("incident %d not found", inc.ID)
+}
+
+func (s *MemoryStore) GetIncidentByID(id uint) (*models.Incident, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, inc := range s.incidents {
+		if inc.ID == id {
+			cp := *inc
+			return &cp, nil
+		}
+	}
+	return nil, fmt.Errorf("incident %d not found", id)
+}
+
+func (s *MemoryStore) GetIncidentByAlertID(alertID uint) (*models.Incident, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := len(s.incidents) - 1; i >= 0; i-- {
+		if s.incidents[i].AlertID == alertID {
+			cp := *s.incidents[i]
+			return &cp, nil
+		}
+	}
+	return nil, fmt.Errorf("no incident for alert %d", alertID)
+}
+
+func (s *MemoryStore) GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []models.Incident
+	for i := len(s.incidents) - 1; i >= 0; i-- {
+		inc := s.incidents[i]
+		if severityFilter != "" && string(inc.Severity) != severityFilter {
+			continue
+		}
+		if statusFilter != "" && string(inc.Status) != statusFilter {
+			continue
+		}
+		out = append(out, *inc)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+func (s *MemoryStore) MTTRStats() (float64, int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var total int
+	var count int
+	for _, inc := range s.incidents {
+		if inc.MTTRSeconds != nil {
+			total += *inc.MTTRSeconds
+			count++
+		}
+	}
+	if count == 0 {
+		return 0, 0, nil
+	}
+	return float64(total) / float64(count), count, nil
 }
