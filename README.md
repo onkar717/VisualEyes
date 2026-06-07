@@ -11,45 +11,48 @@
 
 **Cloud-Native Observability · AI-Powered RCA · Real-Time Monitoring**
 
+[![CI](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml)
+[![Release](https://img.shields.io/github/v/release/onkar717/VisualEyes?color=blue&label=Release)](https://github.com/onkar717/VisualEyes/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/onkar717/VisualEyes?label=Go)](https://golang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/onkar717/VisualEyes/pulls)
+
+### Open-source observability platform for system and Kubernetes monitoring with AI-powered incident response
+
 </div>
 
-# VisualEyes
+---
 
-[![CI](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml)
-[![Release](https://github.com/onkar717/VisualEyes/actions/workflows/release.yml/badge.svg)](https://github.com/onkar717/VisualEyes/releases)
-[![Go Version](https://img.shields.io/badge/go-1.24-blue.svg)](https://golang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-**VisualEyes** is an open-source, cloud-native observability platform for system and Kubernetes monitoring. It combines real-time metrics collection, AI-powered Root Cause Analysis (RCA), alerting, and a live CLI dashboard — giving on-call engineers full visibility from a single tool.
+**VisualEyes** combines real-time metrics collection, a Bubbletea TUI dashboard, AI Root Cause Analysis, and a full React web UI — giving on-call engineers complete visibility from a single tool.
 
 ---
 
-## Overview
+## 🌟 Two Ways to Use VisualEyes
 
-VisualEyes operates in two modes:
+### 1. veye CLI (Terminal-First)
+A Bubbletea-powered interactive TUI. Run `veye watch` on your machine and get live metrics, active alerts, pod logs, and AI RCA without opening a browser. Perfect for on-call engineers.
 
-| Mode | What it does |
-|------|-------------|
-| **veye CLI** | Interactive terminal dashboard — live metrics, alerts, logs, and RCA from your machine |
-| **Hub + Agents** | Deployed in-cluster agents push metrics to a central backend with a full React web UI |
-
----
-
-## Features
-
-- **System metrics** — CPU, memory, disk, network, load average (via `gopsutil`)
-- **Kubernetes metrics** — pod-level and node-level stats via kubelet summary API
-- **AI-powered RCA** — Claude AI diagnoses incidents and suggests safe remediation commands
-- **Alert engine** — configurable rules with dedup, noise filtering, and auto-RCA trigger
-- **WebSocket streaming** — live metric push to dashboard, no polling
-- **Prometheus `/metrics`** — compatible with any Grafana/Prometheus stack
-- **veye CLI** — Bubbletea interactive TUI: `status`, `alerts`, `logs`, `rca`, `watch`
-- **PostgreSQL storage** — persistent incident history with MTTR tracking
-- **Docker & Kubernetes** — full containerized deployment with manifests and Compose
+### 2. Hub + Agents (Continuous Monitoring)
+Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a central backend with a React dashboard, WebSocket streaming, and PostgreSQL-backed incident history.
 
 ---
 
-## Architecture
+## ✨ Features
+
+- 📊 **System metrics** — CPU, memory, disk, network, load average via `gopsutil`
+- ☸️ **Kubernetes metrics** — pod-level and node-level stats via kubelet summary API
+- 🧠 **AI-powered RCA** — Claude AI diagnoses incidents and proposes safe remediation commands
+- 🚨 **Alert engine** — configurable rules with dedup, noise filtering, auto-RCA trigger
+- ⚡ **WebSocket streaming** — live metric push to React dashboard, no polling
+- 📈 **Prometheus `/metrics`** — plug into any Grafana/Prometheus stack
+- 🖥️ **veye CLI** — Bubbletea TUI: `status`, `alerts`, `logs`, `rca`, `watch`
+- 🗄️ **PostgreSQL storage** — persistent incident history with MTTR tracking
+- 🔒 **Safety-first RCA** — remediation commands validated before execution
+- 🐳 **Docker & Kubernetes** — full containerized deployment, Compose + manifests
+
+---
+
+## 🏗️ Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -70,7 +73,7 @@ VisualEyes operates in two modes:
 │           │  Alert Engine            │                       │
 │           │  RCA Processor (Claude)  │                       │
 │           │  WebSocket Broadcaster   │                       │
-│           │  Prometheus Registry     │                       │
+│           │  Prometheus /metrics     │                       │
 │           │  PostgreSQL / MemStore   │                       │
 │           └────────┬─────────────────┘                       │
 │                    │                                          │
@@ -86,9 +89,9 @@ VisualEyes operates in two modes:
 
 ---
 
-## Install (Pre-built Binaries)
+## 🚀 Install (Pre-built Binaries)
 
-No Go required. Download the latest binary:
+No Go required. One command:
 
 ```bash
 # Install veye CLI
@@ -98,98 +101,126 @@ curl -fsSL https://raw.githubusercontent.com/onkar717/VisualEyes/main/install.sh
 curl -fsSL https://raw.githubusercontent.com/onkar717/VisualEyes/main/install.sh | bash -s visual-eyes
 ```
 
-Or grab a binary directly from [Releases](https://github.com/onkar717/VisualEyes/releases).
+Or download directly from [Releases](https://github.com/onkar717/VisualEyes/releases).
 
 ---
 
-## Quick Start
+## 💻 Sample Output
+
+### veye watch — Interactive TUI Dashboard
+
+```
+┌──────────────────────── VisualEyes ─────────────────────────┐
+│  System        CPU: 23.4%  Mem: 6.1/16GB  Load: 0.87        │
+│  Kubernetes    Nodes: 1    Pods: 13/13     Alerts: 2         │
+├──────────────────── Active Alerts ──────────────────────────┤
+│  [SEV1] payment-service  CrashLoopBackOff  2m ago           │
+│  [SEV2] db-worker        OOMKilled         8m ago           │
+├──────────────────────── RCA Result ─────────────────────────┤
+│  ROOT CAUSE (94% confidence):                               │
+│  payment-service cannot connect to Redis at                 │
+│  redis.prod.svc:6379 — connection refused.                  │
+│                                                              │
+│  PROPOSED FIX:                                              │
+│  kubectl get svc redis -n prod                              │
+│  Execute? [y / dry / n]: _                                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### veye alerts
+
+```
+$ veye alerts
+
+ID        SEVERITY  COMPONENT          REASON              AGE
+-------   --------  -----------------  ------------------  ----
+a1b2c3    SEV1      payment-service    CrashLoopBackOff    2m
+d4e5f6    SEV2      db-worker          OOMKilled           8m
+g7h8i9    SEV3      frontend-deploy    HighCPUThrottle     14m
+
+3 active alerts. Run: veye rca <id> for root cause analysis.
+```
+
+### veye rca
+
+```
+$ veye rca a1b2c3
+
+[VisualEyes RCA] Incident a1b2c3 — payment-service (SEV1)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROOT CAUSE:
+  Container 'payment-service' is CrashLoopBackOff.
+  Exit code 1 — unable to connect to Redis cache at
+  redis.prod.svc.cluster.local:6379. TCP connection refused.
+
+CONTRIBUTING FACTORS:
+  • Redis service has 0 ready endpoints (selector mismatch)
+  • Pod redis-0 is Pending — PVC not bound
+
+REMEDIATION PLAN:
+  Step 1: Check Redis pod status
+  $ kubectl get pods -n prod -l app=redis
+  Execute? [y/dry/n]: y
+  ✓ Output: redis-0 is Pending (PVC unbound)
+
+  Step 2: Check PersistentVolumeClaim
+  $ kubectl describe pvc redis-data -n prod
+  Execute? [y/dry/n]:
+```
+
+---
+
+## 🛠️ Getting Started (Build from Source)
 
 ### Prerequisites
 
 - Go 1.24+
 - Node.js 18+
 - Docker & Docker Compose
-- PostgreSQL 14+ (or use Docker Compose)
-- `kubectl` + a Kubernetes cluster (for K8s mode)
+- PostgreSQL 14+ (or use Docker Compose — no local install needed)
+- `kubectl` + cluster (for Kubernetes mode)
 
 ### 1. Clone & Build
 
 ```bash
-git clone https://github.com/onkar717/visual-eyes.git
-cd visual-eyes
+git clone https://github.com/onkar717/VisualEyes.git
+cd VisualEyes
 
-# Install Go dependencies
-make deps
-
-# Build all components (server, system agent, k8s agent, veye CLI)
-make build
-
-# Install UI dependencies
-make install-ui
+make deps        # Download Go dependencies
+make build       # Build server, agents, and veye CLI → bin/
+make install-ui  # Install frontend dependencies
 ```
 
 ### 2. Configure
 
 ```bash
 cp .env.example .env
-# Edit .env — set ANTHROPIC_API_KEY for AI RCA, DATABASE_URL for PostgreSQL
+# Set ANTHROPIC_API_KEY for AI RCA (optional — RCA disabled if not set)
+# Set DATABASE_URL for PostgreSQL (optional — falls back to in-memory)
 ```
 
-### 3. Run Everything Locally
+### 3. Run Locally
 
 ```bash
-# Start the backend server (port 8080)
-./bin/visual-eyes-server
-
-# Start the system metrics agent (separate terminal)
-./bin/visual-eyes-agent
-
-# Start the React UI dev server (port 5173)
-make run-ui
-
-# Open the dashboard
+./bin/visual-eyes-server   # Backend API on :8080
+./bin/visual-eyes-agent    # System metrics push (separate terminal)
+make run-ui                # React UI on :5173
 open http://localhost:5173
 ```
 
-### 4. Use the veye CLI
-
-```bash
-# Live status
-./bin/veye status
-
-# View active alerts
-./bin/veye alerts
-
-# Stream logs from a pod
-./bin/veye logs --follow
-
-# Show RCA for an incident
-./bin/veye rca
-
-# Interactive TUI dashboard
-./bin/veye watch
-```
-
----
-
-## Docker Compose (Full Stack)
+### 4. Or — Full Stack with Docker Compose
 
 ```bash
 docker-compose up --build -d
+# Backend :8080 · UI :3000 · PostgreSQL :5432 · system-agent
 ```
-
-Services started:
-- `backend` → port 8080
-- `ui` → port 3000
-- `postgres` → port 5432
-- `system-agent` → pushes host metrics
 
 ---
 
-## Kubernetes Deployment
+## ☸️ Kubernetes Deployment
 
 ```bash
-# Apply RBAC, config, and DaemonSet
 kubectl apply -f deployments/kubernetes/rbac.yaml
 kubectl apply -f deployments/kubernetes/config.yaml
 kubectl apply -f deployments/kubernetes/agent.yaml
@@ -198,78 +229,119 @@ kubectl apply -f deployments/kubernetes/agent.yaml
 kubectl get pods -n kube-system -l app=visual-eyes-k8s-agent
 ```
 
-For detailed Kubernetes setup including minikube and kind, see [INSTALLATION.md](INSTALLATION.md).
+For minikube, kind, and production setup see [INSTALLATION.md](INSTALLATION.md).
 
 ---
 
-## Configuration
+## 📋 Alert Categories
+
+VisualEyes detects and automatically triggers RCA for:
+
+- **Pod Lifecycle** — `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Pending`, `CreateContainerConfigError`
+- **Resource Pressure** — CPU throttling, memory saturation, disk pressure, node not-ready
+- **Kubernetes Health** — pod restarts exceeding threshold, deployment replica mismatch
+- **Network** — service endpoint unavailability, DNS resolution failures
+- **Storage** — unbound PVCs, volume mount failures
+- **Custom Rules** — define your own threshold-based alert rules in `configs/config.yaml`
+
+---
+
+## ⚖️ Comparison
+
+| Feature | VisualEyes | Prometheus + Grafana | Datadog | Robusta |
+|---------|-----------|---------------------|---------|---------|
+| System + K8s metrics | ✅ | ✅ | ✅ | ✅ K8s only |
+| AI-powered RCA | ✅ Claude | ❌ | ❌ | Partial |
+| Interactive TUI CLI | ✅ veye | ❌ | ❌ | ❌ |
+| WebSocket live stream | ✅ | ❌ | ✅ | ❌ |
+| Prometheus compatible | ✅ | ✅ | ✅ | ✅ |
+| Self-hosted | ✅ | ✅ | ❌ SaaS | ✅ |
+| Safe remediation | ✅ | ❌ | ❌ | Partial |
+| Cost | Free / OSS | Free / OSS | $$$$ | Free/Paid |
+
+---
+
+## ⚙️ Configuration
 
 | Source | Description |
 |--------|-------------|
-| `configs/config.yaml` | Default config — collection interval, endpoints |
+| `configs/config.yaml` | Default config — collection interval, endpoints, alert rules |
 | `.env` | Secrets — `ANTHROPIC_API_KEY`, `DATABASE_URL` |
 | `deployments/kubernetes/config.yaml` | In-cluster ConfigMap overrides |
-| Environment variables | Override any config key — e.g., `VISUAL_EYES_AGENT_COLLECTION_INTERVAL=5s` |
+| Environment variables | Override any key — e.g., `VISUAL_EYES_AGENT_COLLECTION_INTERVAL=5s` |
 
 ---
 
-## Development
+## 🧑‍💻 Development
 
 ```bash
-make build      # Build all binaries
-make test       # Run tests
+make build      # Build all binaries (server, agents, veye)
+make test       # Run Go tests
 make fmt        # Format Go code
 make lint       # Run golangci-lint
 make clean      # Remove build artifacts
-make cross      # Cross-compile for all platforms (outputs to dist/)
+make cross      # Cross-compile all binaries → dist/ (5 platforms)
 ```
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-visual-eyes/
+VisualEyes/
 ├── agents/
-│   ├── system/          # System metrics agent (CPU, mem, disk, net, load)
-│   └── kubernetes/      # Kubernetes metrics agent (kubelet API)
+│   ├── system/          # Host metrics agent — CPU, mem, disk, net, load
+│   └── kubernetes/      # K8s agent — kubelet API, pod/node metrics, events
 ├── backend/
-│   ├── alerts/          # Alert engine — rules, dedup, noise filter
+│   ├── alerts/          # Alert engine: rule eval, dedup, noise filter
 │   ├── api/             # HTTP handlers, routes, middleware
-│   ├── config/          # Config loading
-│   ├── metrics/         # Prometheus registry
-│   ├── models/          # Data models
-│   ├── rca/             # AI RCA engine (Claude client, context builder)
-│   ├── storage/         # Storage interface, PostgreSQL, in-memory
+│   ├── rca/             # AI RCA: Claude client, context builder, executor
+│   ├── storage/         # Interface, PostgreSQL (GORM), in-memory
 │   └── ws/              # WebSocket broadcaster
 ├── cli/
-│   └── cmd/             # veye CLI commands (status, alerts, logs, rca, watch)
-├── configs/             # Default YAML configuration
+│   └── cmd/             # veye commands: status, alerts, logs, rca, watch
+├── configs/             # Default YAML config
 ├── deployments/
-│   └── kubernetes/      # RBAC, ConfigMap, DaemonSet manifests
-├── docs/
-│   └── images/          # Screenshots and architecture diagrams
-├── ui/                  # React + MUI + Vite frontend
-└── docker-compose.yml   # Full stack local deployment
+│   └── kubernetes/      # RBAC, ConfigMap, DaemonSet
+├── docs/images/         # Screenshots, architecture diagrams
+├── ui/                  # React 19 + MUI 7 + Vite dashboard
+└── docker-compose.yml
 ```
 
 ---
 
-## Contributing
+## 📍 Roadmap
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- [x] System metrics agent (CPU, mem, disk, net, load)
+- [x] Kubernetes DaemonSet agent (kubelet API, pod/node metrics)
+- [x] Backend with alert engine, RCA processor, WebSocket, Prometheus
+- [x] PostgreSQL persistent storage
+- [x] React dashboard with dark/light theme, live updates
+- [x] AI-powered RCA with Claude — safe remediation command execution
+- [x] veye CLI — interactive Bubbletea TUI (status, alerts, logs, rca, watch)
+- [x] GitHub Actions CI/CD + cross-platform release pipeline
+- [ ] Distributed tracing integration (OpenTelemetry)
+- [ ] Slack / PagerDuty alert routing
+- [ ] Multi-cluster support in the web dashboard
+- [ ] Custom runbook library (YAML-based, embeddable)
+- [ ] eBPF network flow visibility
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ```bash
 git checkout -b feature/your-feature
-# make changes
 make test && make lint
-git commit -m "feat: your feature"
+git commit -m "feat: describe your change"
 git push origin feature/your-feature
-# open a pull request
+# open a pull request — template will guide you
 ```
 
 ---
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE).
