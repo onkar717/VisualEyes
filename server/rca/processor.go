@@ -248,7 +248,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 
 	// 8. Create/update Incident record from RCA output.
 	if p.incidentStore != nil {
-		p.upsertIncident(alert, result, autoRemediated, scanDuration, resp.RunbookUsed, resp.RawOutput)
+		p.upsertIncident(alert, result, autoRemediated, scanDuration, resp.RunbookUsed, resp.RawOutput, resp.ServiceImpacts)
 	}
 
 	log.Info("rca processing complete",
@@ -269,31 +269,62 @@ func (p *Processor) upsertIncident(
 	scanDurationSecs float64,
 	runbookUsed string,
 	rawOutput string,
+	serviceImpacts []ServiceImpact,
 ) {
 	rawSnip := rawOutput
 	if len(rawSnip) > 2000 {
 		rawSnip = rawSnip[:2000]
 	}
 
+	impactsJSON := "[]"
+	if len(serviceImpacts) > 0 {
+		if b, err := json.Marshal(serviceImpacts); err == nil {
+			impactsJSON = string(b)
+		}
+	}
+
 	// Check if an incident already exists for this alert.
 	existing, _ := p.incidentStore.GetIncidentByAlertID(alert.ID)
 	if existing != nil {
-		existing.RootCause          = result.RootCause
-		existing.ContributingFactors = result.ContributingFactors
-		existing.AffectedServices   = result.AffectedServices
-		existing.ConfidenceScore    = result.ConfidenceScore
-		existing.Severity           = models.SeverityFromRCA(result.Severity)
-		existing.Category           = result.Category
-		existing.AutoRemediated     = autoRemediated
-		existing.ScanDurationSecs   = scanDurationSecs
-		existing.RunbookUsed        = runbookUsed
-		existing.RawAgentOutput     = rawSnip
+		existing.RootCause           = result.RootCause
+		existing.ContributingFactors  = result.ContributingFactors
+		existing.AffectedServices    = result.AffectedServices
+		existing.ServiceImpacts      = impactsJSON
+		existing.ConfidenceScore     = result.ConfidenceScore
+		existing.Severity            = models.SeverityFromRCA(result.Severity)
+		existing.Category            = result.Category
+		existing.AutoRemediated      = autoRemediated
+		existing.ScanDurationSecs    = scanDurationSecs
+		existing.RunbookUsed         = runbookUsed
+		existing.RawAgentOutput      = rawSnip
 		if existing.Status == models.IncidentOpen {
 			existing.Status = models.IncidentInvestigating
 		}
 		existing.RCAID = &result.ID
 		if err := p.incidentStore.UpdateIncident(existing); err != nil {
 			slog.Error("upsertIncident: update failed", "alert_id", alert.ID, "error", err)
+		}
+		return
+	}
+
+	// Dedup: if an open/investigating incident with same category+namespace exists
+	// within last 4 hours, update it instead of creating a duplicate.
+	if dup, err := p.incidentStore.FindOpenByCategory(result.Category, alert.Namespace, 4); err == nil && dup != nil {
+		dup.RootCause           = result.RootCause
+		dup.ContributingFactors  = result.ContributingFactors
+		dup.AffectedServices    = result.AffectedServices
+		dup.ServiceImpacts      = impactsJSON
+		dup.ConfidenceScore     = result.ConfidenceScore
+		dup.Severity            = models.SeverityFromRCA(result.Severity)
+		dup.AutoRemediated      = autoRemediated || dup.AutoRemediated
+		dup.ScanDurationSecs    = scanDurationSecs
+		dup.RunbookUsed         = runbookUsed
+		dup.RawAgentOutput      = rawSnip
+		dup.UpdatedAt           = time.Now()
+		if err := p.incidentStore.UpdateIncident(dup); err != nil {
+			slog.Error("upsertIncident: dedup update failed", "incident_code", dup.IncidentCode, "error", err)
+		} else {
+			slog.Info("incident deduped — merged into existing", "code", dup.IncidentCode, "alert_id", alert.ID)
 		}
 		return
 	}
@@ -318,6 +349,7 @@ func (p *Processor) upsertIncident(
 		RootCause:           result.RootCause,
 		ContributingFactors: result.ContributingFactors,
 		AffectedServices:    result.AffectedServices,
+		ServiceImpacts:      impactsJSON,
 		ConfidenceScore:     result.ConfidenceScore,
 		AutoRemediated:      autoRemediated,
 		ScanDurationSecs:    scanDurationSecs,

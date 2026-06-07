@@ -89,6 +89,11 @@ type IncidentStore interface {
 	GetIncidentByAlertID(alertID uint) (*models.Incident, error)
 	// GetRecentIncidents returns incidents filtered by severity/status, optionally within the last `hours` hours (0 = no time filter).
 	GetRecentIncidents(severityFilter, statusFilter string, limit, hours int) ([]models.Incident, error)
+	// FindOpenByCategory returns an open/investigating incident with matching category and namespace
+	// created within the last windowHours hours; used for deduplication.
+	FindOpenByCategory(category, namespace string, windowHours int) (*models.Incident, error)
 	MTTRStats() (avgSeconds float64, count int, err error)
+	// MTTRStatsBySeverity returns average MTTR seconds grouped by severity level.
+	MTTRStatsBySeverity() (map[string]float64, error)
 	GetStats() (IncidentStats, error)
 }

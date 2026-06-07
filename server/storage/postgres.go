@@ -387,6 +387,41 @@ func (s *PostgresStore) MTTRStats() (float64, int, error) {
 	return result.Avg, result.Count, nil
 }
 
+func (s *PostgresStore) MTTRStatsBySeverity() (map[string]float64, error) {
+	type row struct {
+		Severity string  `gorm:"column:severity"`
+		Avg      float64 `gorm:"column:avg"`
+	}
+	var rows []row
+	err := s.db.Raw(`
+		SELECT severity, AVG(mttr_seconds) AS avg
+		FROM incidents
+		WHERE mttr_seconds IS NOT NULL
+		GROUP BY severity
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("mttr by severity: %w", err)
+	}
+	out := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		out[r.Severity] = r.Avg
+	}
+	return out, nil
+}
+
+func (s *PostgresStore) FindOpenByCategory(category, namespace string, windowHours int) (*models.Incident, error) {
+	var inc models.Incident
+	cutoff := time.Now().Add(-time.Duration(windowHours) * time.Hour)
+	err := s.db.Where(
+		"category = ? AND status IN ('OPEN','INVESTIGATING') AND created_at >= ?",
+		category, cutoff,
+	).Order("created_at DESC").First(&inc).Error
+	if err != nil {
+		return nil, err
+	}
+	return &inc, nil
+}
+
 func (s *PostgresStore) SaveNotificationEvent(e *models.NotificationEvent) error {
 	if err := s.db.Create(e).Error; err != nil {
 		return fmt.Errorf("save notification event: %w", err)
