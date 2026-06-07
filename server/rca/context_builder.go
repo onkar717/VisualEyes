@@ -17,6 +17,8 @@ type AlertContext struct {
 	PodLogs        []models.PodLog // current container log lines
 	PrevLogs       []models.PodLog // previous container logs (pre-crash evidence for crashloop)
 	SiblingAlerts  []models.Alert  // other firing alerts on the same resource
+	// Pre-classified log patterns — populated by ClassifyLogs before LLM stages.
+	LogClassification ClassifiedLogs
 	// Observability stack availability — hints for the LLM agents.
 	PrometheusURL     string
 	PrometheusEnabled bool
@@ -144,6 +146,9 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
+	// Pre-classify logs deterministically before handing to LLM.
+	ctx.LogClassification = ClassifyLogs(ctx.PodLogs, ctx.PrevLogs)
+
 	// Sibling alerts on the same resource (cap at 10 to bound prompt size).
 	if all, err := b.alertStore.GetActiveAlerts(); err == nil {
 		for _, a := range all {
@@ -230,6 +235,11 @@ func (c AlertContext) Format() string {
 			b.WriteString(fmt.Sprintf("  [PREV][%s] %s\n", l.Timestamp.Format("15:04:05"), l.Line))
 		}
 		b.WriteString("\n")
+	}
+
+	// Pre-classified log patterns — deterministic signal, placed after raw logs.
+	if c.LogClassification.Summary != "" {
+		b.WriteString(c.LogClassification.Summary)
 	}
 
 	return b.String()

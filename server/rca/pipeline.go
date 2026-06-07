@@ -85,6 +85,12 @@ Everything else: is_auto_safe=false.`
 // --- Stage 6: Commander ---
 const commanderSystemPrompt = `You are the Incident Commander.
 Synthesise all six stage outputs into the definitive incident report.
+
+CRITICAL RULES FOR COMMANDS:
+- Use ACTUAL pod/deployment/namespace names from the alert and triage data — NEVER use placeholders like {pod} or {namespace}.
+- If you do not know the exact name, omit that command rather than using a placeholder.
+- Every command must be immediately executable by an operator with kubectl access.
+
 Output ONLY valid JSON:
 
 {
@@ -178,10 +184,11 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	}
 	total += tok
 
-	// Stage 3: Log Analysis
+	// Stage 3: Log Analysis — prepend pre-classified log patterns for signal clarity.
 	slog.Info("rca stage 3/6: log analysis", "alert_id", ac.Alert.ID)
-	logUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nALERT+LOGS:\n%s",
-		truncStage(triageRaw), truncStage(metricsRaw), ac.Format())
+	logUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nPRE-CLASSIFIED LOG PATTERNS:\n%s\n\nALERT+LOGS:\n%s",
+		truncStage(triageRaw), truncStage(metricsRaw),
+		ac.LogClassification.Summary, ac.Format())
 	logRaw, tok, err := p.llm.Complete(ctx, logSystemPrompt, logUser, p.maxTokens)
 	if err != nil {
 		return nil, total, fmt.Errorf("stage 3 logs: %w", err)
@@ -221,7 +228,8 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	// Stage 6: Commander — synthesise all stages
 	slog.Info("rca stage 6/6: commander", "alert_id", ac.Alert.ID)
 	cmdUser := fmt.Sprintf(
-		"TRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
+		"ACTUAL RESOURCE NAMES (use these verbatim in commands):\n  pod/resource: %s\n  namespace: %s\n\nTRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
+		ac.Alert.ResourceID, ac.Alert.Namespace,
 		truncStage(triageRaw), truncStage(metricsRaw), truncStage(logRaw),
 		truncStage(infraRaw), truncStage(remRaw), ac.Format(),
 	)
