@@ -74,6 +74,13 @@ type IncidentStats struct {
 	ByStatus       map[string]int `json:"by_status"`
 }
 
+// ClusterSnapshotStore persists point-in-time cluster health samples for trending.
+type ClusterSnapshotStore interface {
+	SaveSnapshot(s *models.ClusterSnapshot) error
+	// GetSnapshots returns up to limit samples for a cluster within the last hours hours (0 = all time).
+	GetSnapshots(clusterName string, hours, limit int) ([]models.ClusterSnapshot, error)
+}
+
 // IncidentStore persists and queries the full incident lifecycle.
 type IncidentStore interface {
 	SaveIncident(inc *models.Incident) error

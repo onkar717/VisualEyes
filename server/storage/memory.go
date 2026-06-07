@@ -43,7 +43,9 @@ type MemoryStore struct {
 	remediationSeq  uint
 
 	// cluster registry: name → health
-	clusters map[string]*models.ClusterHealth
+	clusters  map[string]*models.ClusterHealth
+	snapshots []*models.ClusterSnapshot
+	snapSeq   uint
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -510,4 +512,45 @@ func (s *MemoryStore) GetStats() (IncidentStats, error) {
 		st.AvgMTTRSeconds = float64(mttrTotal) / float64(st.MTTRCount)
 	}
 	return st, nil
+}
+
+// ClusterSnapshotStore
+func (s *MemoryStore) SaveSnapshot(snap *models.ClusterSnapshot) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapSeq++
+	snap.ID = s.snapSeq
+	cp := *snap
+	s.snapshots = append(s.snapshots, &cp)
+	// Keep at most 10k snapshots in memory.
+	if len(s.snapshots) > 10000 {
+		s.snapshots = s.snapshots[len(s.snapshots)-10000:]
+	}
+	return nil
+}
+
+func (s *MemoryStore) GetSnapshots(clusterName string, hours, limit int) ([]models.ClusterSnapshot, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 288
+	}
+	cutoff := time.Time{}
+	if hours > 0 {
+		cutoff = time.Now().Add(-time.Duration(hours) * time.Hour)
+	}
+	var out []models.ClusterSnapshot
+	for _, sn := range s.snapshots {
+		if sn.ClusterName != clusterName {
+			continue
+		}
+		if !cutoff.IsZero() && sn.RecordedAt.Before(cutoff) {
+			continue
+		}
+		out = append(out, *sn)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
 }

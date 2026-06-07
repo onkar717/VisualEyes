@@ -147,6 +147,9 @@ func main() {
 	if cs, ok := store.(storage.ClusterStore); ok {
 		handler.SetClusterStore(cs)
 	}
+	if ss, ok := store.(storage.ClusterSnapshotStore); ok {
+		handler.SetSnapshotStore(ss)
+	}
 	handler.SetBroadcaster(broadcaster)
 
 	// RCA Engine (Claude)

@@ -58,6 +58,7 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 		&models.Incident{},
 		&models.RemediationLogEntry{},
 		&models.ClusterHealth{},
+		&models.ClusterSnapshot{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
@@ -446,6 +447,27 @@ func (s *PostgresStore) GetRecentRemediationLogs(limit int) ([]models.Remediatio
 	var logs []models.RemediationLogEntry
 	err := s.db.Order("executed_at DESC").Limit(limit).Find(&logs).Error
 	return logs, err
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ClusterSnapshotStore
+// ═══════════════════════════════════════════════════════════════════
+
+func (s *PostgresStore) SaveSnapshot(snap *models.ClusterSnapshot) error {
+	return s.db.Create(snap).Error
+}
+
+func (s *PostgresStore) GetSnapshots(clusterName string, hours, limit int) ([]models.ClusterSnapshot, error) {
+	if limit <= 0 {
+		limit = 288 // 24 h at 5-min resolution
+	}
+	q := s.db.Where("cluster_name = ?", clusterName).Order("recorded_at ASC")
+	if hours > 0 {
+		q = q.Where("recorded_at >= ?", time.Now().Add(-time.Duration(hours)*time.Hour))
+	}
+	var snaps []models.ClusterSnapshot
+	err := q.Limit(limit).Find(&snaps).Error
+	return snaps, err
 }
 
 // pruneMetrics deletes oldest rows to keep at most maxRecords per metric name.
