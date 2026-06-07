@@ -14,6 +14,7 @@
 [![CI](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/VisualEyes/actions/workflows/ci.yaml)
 [![Release](https://img.shields.io/github/v/release/onkar717/VisualEyes?color=blue&label=Release)](https://github.com/onkar717/VisualEyes/releases)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/onkar717/VisualEyes?label=Go)](https://golang.org)
+[![Go Report Card](https://goreportcard.com/badge/github.com/onkar717/visual-eyes)](https://goreportcard.com/report/github.com/onkar717/visual-eyes)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/onkar717/VisualEyes/pulls)
 
