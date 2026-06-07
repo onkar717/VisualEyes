@@ -102,9 +102,3 @@ func Limit(rl *RateLimiter) func(http.Handler) http.Handler {
 	}
 }
 
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
