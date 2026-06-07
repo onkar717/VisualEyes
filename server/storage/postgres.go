@@ -57,6 +57,7 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 		&models.NotificationEvent{},
 		&models.Incident{},
 		&models.RemediationLogEntry{},
+		&models.ClusterHealth{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
@@ -408,6 +409,26 @@ func (s *PostgresStore) GetRecentNotificationEvents(limit int) ([]models.Notific
 		return nil, fmt.Errorf("get recent notification events: %w", err)
 	}
 	return events, nil
+}
+
+// ClusterStore
+func (s *PostgresStore) UpsertCluster(c *models.ClusterHealth) error {
+	return s.db.Save(c).Error
+}
+
+func (s *PostgresStore) GetCluster(name string) (*models.ClusterHealth, error) {
+	var c models.ClusterHealth
+	err := s.db.Where("name = ?", name).First(&c).Error
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (s *PostgresStore) ListClusters() ([]models.ClusterHealth, error) {
+	var clusters []models.ClusterHealth
+	err := s.db.Order("name ASC").Find(&clusters).Error
+	return clusters, err
 }
 
 // RemediationLogStore

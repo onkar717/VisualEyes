@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -49,5 +49,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&apiURL, "api", "http://localhost:8080", "VisualEyes backend URL")
-	rootCmd.AddCommand(statusCmd, alertsCmd, logsCmd, rcaCmd, watchCmd, scanCmd, incidentsCmd, applyCmd, showCmd, reportCmd)
+	rootCmd.AddCommand(statusCmd, alertsCmd, logsCmd, rcaCmd, watchCmd, scanCmd, incidentsCmd, applyCmd, showCmd, reportCmd, clustersCmd)
 }
