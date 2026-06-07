@@ -3,10 +3,13 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/onkar717/visual-eyes/server/models"
 )
@@ -20,9 +23,27 @@ type Collector struct {
 
 // New creates a new Kubernetes metrics collector.
 // allowedNamespaces restricts pod collection; pass nil or empty slice for all namespaces.
+// Out-of-cluster (dev) mode: kubelet metrics are unavailable but k8s API features still work.
 func New(allowedNamespaces []string) (*Collector, error) {
 	if !IsInCluster() {
-		return nil, fmt.Errorf("not running in a Kubernetes cluster")
+		// Out-of-cluster: build k8sClient from kubeconfig but skip kubelet.
+		nsSet := make(map[string]struct{}, len(allowedNamespaces))
+		for _, ns := range allowedNamespaces {
+			if ns != "" {
+				nsSet[ns] = struct{}{}
+			}
+		}
+		var k8sClient kubernetes.Interface
+		if restCfg, err := buildK8sConfig(); err == nil {
+			if cs, err := kubernetes.NewForConfig(restCfg); err == nil {
+				k8sClient = cs
+			}
+		}
+		return &Collector{
+			client:     nil, // kubelet not available out-of-cluster
+			k8sClient:  k8sClient,
+			namespaces: nsSet,
+		}, nil
 	}
 
 	kubeletClient, err := NewClient()
@@ -30,9 +51,9 @@ func New(allowedNamespaces []string) (*Collector, error) {
 		return nil, fmt.Errorf("failed to create Kubelet client: %w", err)
 	}
 
-	// Build a standard in-cluster kubernetes client for Events collection.
+	// Build a kubernetes client: prefer in-cluster config, fall back to kubeconfig.
 	var k8sClient kubernetes.Interface
-	if restCfg, err := rest.InClusterConfig(); err == nil {
+	if restCfg, err := buildK8sConfig(); err == nil {
 		if cs, err := kubernetes.NewForConfig(restCfg); err == nil {
 			k8sClient = cs
 		}
@@ -64,8 +85,12 @@ func (c *Collector) allowedNamespace(ns string) bool {
 // Client returns the kubernetes.Interface client (may be nil outside a cluster).
 func (c *Collector) Client() kubernetes.Interface { return c.k8sClient }
 
-// Collect gathers metrics from the Kubelet API
+// Collect gathers metrics from the Kubelet API.
+// Returns empty slice (not error) when running out-of-cluster where kubelet is unavailable.
 func (c *Collector) Collect(ctx context.Context) ([]models.Metric, error) {
+	if c.client == nil {
+		return nil, nil // out-of-cluster dev mode — no kubelet access
+	}
 	stats, err := c.client.GetSummary()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Kubelet stats: %w", err)
@@ -137,4 +162,26 @@ func (c *Collector) Collect(ctx context.Context) ([]models.Metric, error) {
 	}
 
 	return metrics, nil
+}
+
+// buildK8sConfig returns an in-cluster config when running inside a pod,
+// or loads ~/.kube/config for out-of-cluster development use.
+// The KUBECONFIG env var overrides the default kubeconfig path.
+func buildK8sConfig() (*rest.Config, error) {
+	// In-cluster takes precedence.
+	if cfg, err := rest.InClusterConfig(); err == nil {
+		return cfg, nil
+	}
+
+	// Out-of-cluster: resolve kubeconfig path.
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("cannot determine home dir: %w", err)
+		}
+		kubeconfig = filepath.Join(home, ".kube", "config")
+	}
+
+	return clientcmd.BuildConfigFromFlags("", kubeconfig)
 }
