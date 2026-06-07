@@ -187,8 +187,8 @@ func setDefaults(v *viper.Viper) {
 
 	// RCA
 	v.SetDefault("rca.enabled", false)
-	v.SetDefault("rca.model", "claude-sonnet-4-5")
-	v.SetDefault("rca.max_tokens", 2048)
+	v.SetDefault("rca.model", "claude-sonnet-4-6")
+	v.SetDefault("rca.max_tokens", 4096)
 	v.SetDefault("rca.log_lines", 100)
 	v.SetDefault("rca.metric_samples", 20)
 
