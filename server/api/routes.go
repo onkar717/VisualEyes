@@ -47,6 +47,9 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// Aggregate stats
 	mux.HandleFunc("/api/stats", h.HandleStats)
 
+	// Remediation audit log
+	mux.HandleFunc("/api/remediation-log", h.HandleRemediationLog)
+
 	// WebSocket real-time stream
 	mux.HandleFunc("/ws", h.WebSocketStream)
 

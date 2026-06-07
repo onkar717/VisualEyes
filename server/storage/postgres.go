@@ -56,6 +56,7 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 		&models.RCAResult{},
 		&models.NotificationEvent{},
 		&models.Incident{},
+		&models.RemediationLogEntry{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
@@ -407,6 +408,23 @@ func (s *PostgresStore) GetRecentNotificationEvents(limit int) ([]models.Notific
 		return nil, fmt.Errorf("get recent notification events: %w", err)
 	}
 	return events, nil
+}
+
+// RemediationLogStore
+func (s *PostgresStore) SaveRemediationLog(e *models.RemediationLogEntry) error {
+	return s.db.Create(e).Error
+}
+
+func (s *PostgresStore) GetRemediationLogs(incidentID uint) ([]models.RemediationLogEntry, error) {
+	var logs []models.RemediationLogEntry
+	err := s.db.Where("incident_id = ?", incidentID).Order("step_number ASC").Find(&logs).Error
+	return logs, err
+}
+
+func (s *PostgresStore) GetRecentRemediationLogs(limit int) ([]models.RemediationLogEntry, error) {
+	var logs []models.RemediationLogEntry
+	err := s.db.Order("executed_at DESC").Limit(limit).Find(&logs).Error
+	return logs, err
 }
 
 // pruneMetrics deletes oldest rows to keep at most maxRecords per metric name.
