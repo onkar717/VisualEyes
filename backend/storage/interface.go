@@ -13,7 +13,6 @@ type MetricStore interface {
 }
 
 // QueryableStore extends MetricStore with time-range history queries.
-// SQLiteStore (Commit 2) implements this; MemoryStore does not.
 // Callers type-assert to QueryableStore before using history features.
 type QueryableStore interface {
 	MetricStore
@@ -22,7 +21,6 @@ type QueryableStore interface {
 }
 
 // LogStore persists and retrieves pod log lines.
-// Wired in Commit 4.
 type LogStore interface {
 	StoreLogs(logs []models.PodLog) error
 	GetLogs(pod, namespace string, limit int) ([]models.PodLog, error)
@@ -30,7 +28,6 @@ type LogStore interface {
 }
 
 // AlertStore persists and retrieves alert records.
-// Wired in Commit 3.
 type AlertStore interface {
 	SaveAlert(a *models.Alert) error
 	UpdateAlert(a *models.Alert) error
@@ -40,9 +37,15 @@ type AlertStore interface {
 }
 
 // RCAStore persists and retrieves RCA results.
-// Wired in Commit 5.
 type RCAStore interface {
 	SaveRCAResult(r *models.RCAResult) error
 	UpdateRCAResult(r *models.RCAResult) error
 	GetRCAResult(alertID uint) (*models.RCAResult, error)
+}
+
+// NotificationStore persists alert delivery event records.
+type NotificationStore interface {
+	SaveNotificationEvent(e *models.NotificationEvent) error
+	GetNotificationEvents(alertID uint) ([]models.NotificationEvent, error)
+	GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error)
 }

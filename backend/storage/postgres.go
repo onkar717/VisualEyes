@@ -54,6 +54,7 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 		&models.PodLog{},
 		&models.Alert{},
 		&models.RCAResult{},
+		&models.NotificationEvent{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
@@ -266,6 +267,35 @@ func (s *PostgresStore) GetRCAResult(alertID uint) (*models.RCAResult, error) {
 // ═══════════════════════════════════════════════════════════════════
 // Internal helpers
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// NotificationStore
+// ═══════════════════════════════════════════════════════════════════
+
+func (s *PostgresStore) SaveNotificationEvent(e *models.NotificationEvent) error {
+	if err := s.db.Create(e).Error; err != nil {
+		return fmt.Errorf("save notification event: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) GetNotificationEvents(alertID uint) ([]models.NotificationEvent, error) {
+	var events []models.NotificationEvent
+	err := s.db.Where("alert_id = ?", alertID).Order("created_at DESC").Find(&events).Error
+	if err != nil {
+		return nil, fmt.Errorf("get notification events for alert %d: %w", alertID, err)
+	}
+	return events, nil
+}
+
+func (s *PostgresStore) GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error) {
+	var events []models.NotificationEvent
+	err := s.db.Order("created_at DESC").Limit(limit).Find(&events).Error
+	if err != nil {
+		return nil, fmt.Errorf("get recent notification events: %w", err)
+	}
+	return events, nil
+}
 
 // pruneMetrics deletes oldest rows to keep at most maxRecords per metric name.
 func (s *PostgresStore) pruneMetrics(metrics []models.Metric) {

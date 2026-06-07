@@ -109,6 +109,19 @@ type ScanResult struct {
 	Summary    ScanSummary `json:"summary"`
 }
 
+// NotificationEvent mirrors models.NotificationEvent.
+type NotificationEvent struct {
+	ID        uint   `json:"id"`
+	AlertID   uint   `json:"alertID"`
+	RuleName  string `json:"ruleName"`
+	Severity  string `json:"severity"`
+	EventType string `json:"eventType"`
+	Channel   string `json:"channel"`
+	Success   bool   `json:"success"`
+	ErrMsg    string `json:"error,omitempty"`
+	CreatedAt string `json:"createdAt"`
+}
+
 // K8sMetrics is the /api/kubernetes/metrics response.
 type K8sMetrics struct {
 	Timestamp string `json:"timestamp"`
@@ -200,6 +213,16 @@ func (c *Client) RCA(alertID uint) (*RCAResult, error) {
 func (c *Client) Scan() (*ScanResult, error) {
 	var r ScanResult
 	return &r, c.get("/api/scan", &r)
+}
+
+// Incidents calls /api/incidents and returns recent notification delivery events.
+func (c *Client) Incidents(limit int, alertID uint) ([]NotificationEvent, error) {
+	var r []NotificationEvent
+	q := fmt.Sprintf("/api/incidents?limit=%d", limit)
+	if alertID > 0 {
+		q += fmt.Sprintf("&alert_id=%d", alertID)
+	}
+	return r, c.get(q, &r)
 }
 
 // Logs calls /api/pod-logs with optional filters.

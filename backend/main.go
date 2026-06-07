@@ -57,10 +57,17 @@ func main() {
 	k8sStore := store
 
 	// ── Notifications ─────────────────────────────────────────────────────────
-	var notifier notifications.Notifier = notifications.Noop{}
+	var baseNotifier notifications.Notifier = notifications.Noop{}
+	channel := "noop"
 	if cfg.Notifications.Slack.Enabled && cfg.Notifications.Slack.WebhookURL != "" {
-		notifier = notifications.NewSlackNotifier(cfg.Notifications.Slack.WebhookURL)
+		baseNotifier = notifications.NewSlackNotifier(cfg.Notifications.Slack.WebhookURL)
+		channel = "slack"
 		slog.Info("slack notifications enabled")
+	}
+	// Wrap with LoggingNotifier so every delivery attempt is persisted.
+	var notifier notifications.Notifier = baseNotifier
+	if ns, ok := store.(storage.NotificationStore); ok {
+		notifier = notifications.NewLoggingNotifier(baseNotifier, channel, ns)
 	}
 
 	// ── Alert Engine ─────────────────────────────────────────────────────────
@@ -100,6 +107,9 @@ func main() {
 	}
 	if ls, ok := store.(storage.LogStore); ok {
 		handler.SetLogStore(ls)
+	}
+	if ns, ok := store.(storage.NotificationStore); ok {
+		handler.SetNotificationStore(ns)
 	}
 	handler.SetBroadcaster(broadcaster)
 
