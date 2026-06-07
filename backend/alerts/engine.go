@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/backend/notifications"
 	"github.com/onkar717/visual-eyes/backend/storage"
 )
 
@@ -30,7 +31,8 @@ type Engine struct {
 	mu     sync.Mutex
 
 	// trigger is written to when a new alert fires; nil means no downstream.
-	trigger chan<- models.Alert
+	trigger  chan<- models.Alert
+	notifier notifications.Notifier
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup
@@ -38,13 +40,18 @@ type Engine struct {
 
 // NewEngine builds an Engine from the given stores, rules, and timing parameters.
 // trigger may be nil if no downstream processor is needed.
+// notifier receives fire/resolve events; pass notifications.Noop{} to disable.
 func NewEngine(
 	store storage.QueryableStore,
 	alertStore storage.AlertStore,
 	rules []Rule,
 	evalInterval, lookbackWindow time.Duration,
 	trigger chan<- models.Alert,
+	notifier notifications.Notifier,
 ) *Engine {
+	if notifier == nil {
+		notifier = notifications.Noop{}
+	}
 	return &Engine{
 		store:          store,
 		alertStore:     alertStore,
@@ -53,6 +60,7 @@ func NewEngine(
 		lookbackWindow: lookbackWindow,
 		active:         make(map[string]uint),
 		trigger:        trigger,
+		notifier:       notifier,
 		stopCh:         make(chan struct{}),
 	}
 }
@@ -169,6 +177,10 @@ func (e *Engine) fire(rule Rule, resourceID, namespace string, value float64, de
 		"threshold", rule.Threshold,
 	)
 
+	if err := e.notifier.AlertFired(*alert); err != nil {
+		slog.Warn("failed to send alert notification", "rule", rule.Name, "error", err)
+	}
+
 	if e.trigger != nil {
 		select {
 		case e.trigger <- *alert:
@@ -198,6 +210,10 @@ func (e *Engine) resolve(alertID uint, dedupeKey string) {
 	e.mu.Lock()
 	delete(e.active, dedupeKey)
 	e.mu.Unlock()
+
+	if err := e.notifier.AlertResolved(*a); err != nil {
+		slog.Warn("failed to send resolve notification", "id", alertID, "error", err)
+	}
 
 	slog.Info("alert resolved", "id", alertID, "rule", a.RuleName, "resource", a.ResourceID)
 }

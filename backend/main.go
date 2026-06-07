@@ -16,6 +16,7 @@ import (
 	"github.com/onkar717/visual-eyes/backend/internal/logger"
 	appmetrics "github.com/onkar717/visual-eyes/backend/metrics"
 	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/backend/notifications"
 	"github.com/onkar717/visual-eyes/backend/rca"
 	"github.com/onkar717/visual-eyes/backend/storage"
 	"github.com/onkar717/visual-eyes/backend/ws"
@@ -55,9 +56,16 @@ func main() {
 	systemStore := store
 	k8sStore := store
 
+	// ── Notifications ─────────────────────────────────────────────────────────
+	var notifier notifications.Notifier = notifications.Noop{}
+	if cfg.Notifications.Slack.Enabled && cfg.Notifications.Slack.WebhookURL != "" {
+		notifier = notifications.NewSlackNotifier(cfg.Notifications.Slack.WebhookURL)
+		slog.Info("slack notifications enabled")
+	}
+
 	// ── Alert Engine ─────────────────────────────────────────────────────────
-	// rcaTrigger is a buffered channel feeding fired alerts to the RCA processor
-	// (Commit 5). Buffer of 100 so fast bursts don't block the eval loop.
+	// rcaTrigger is a buffered channel feeding fired alerts to the RCA processor.
+	// Buffer of 100 so fast bursts don't block the eval loop.
 	rcaTrigger := make(chan models.Alert, 100)
 
 	var alertEngine *alerts.Engine
@@ -70,6 +78,7 @@ func main() {
 					cfg.Alerts.EvalInterval,
 					cfg.Alerts.LookbackWindow,
 					rcaTrigger,
+					notifier,
 				)
 				alertEngine.Start()
 			}

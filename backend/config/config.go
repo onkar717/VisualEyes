@@ -9,13 +9,25 @@ import (
 
 // Config is the root configuration for the VisualEyes server.
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Alerts   AlertsConfig   `mapstructure:"alerts"`
-	RCA      RCAConfig      `mapstructure:"rca"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
-	Agent    AgentConfig    `mapstructure:"agent"`
-	Output   OutputConfig   `mapstructure:"output"`
+	Server        ServerConfig        `mapstructure:"server"`
+	Database      DatabaseConfig      `mapstructure:"database"`
+	Alerts        AlertsConfig        `mapstructure:"alerts"`
+	RCA           RCAConfig           `mapstructure:"rca"`
+	Notifications NotificationsConfig `mapstructure:"notifications"`
+	Logging       LoggingConfig       `mapstructure:"logging"`
+	Agent         AgentConfig         `mapstructure:"agent"`
+	Output        OutputConfig        `mapstructure:"output"`
+}
+
+// NotificationsConfig holds alert delivery integrations.
+type NotificationsConfig struct {
+	Slack SlackConfig `mapstructure:"slack"`
+}
+
+// SlackConfig configures the Slack incoming webhook notifier.
+type SlackConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	WebhookURL string `mapstructure:"webhook_url"`
 }
 
 type ServerConfig struct {
@@ -135,6 +147,14 @@ func Load() (*Config, error) {
 		cfg.RCA.APIKey = v.GetString("ANTHROPIC_API_KEY")
 	}
 
+	// Allow SLACK_WEBHOOK_URL env var to set notifications.slack.webhook_url.
+	if cfg.Notifications.Slack.WebhookURL == "" {
+		if wh := v.GetString("SLACK_WEBHOOK_URL"); wh != "" {
+			cfg.Notifications.Slack.WebhookURL = wh
+			cfg.Notifications.Slack.Enabled = true
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -184,6 +204,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("alerts.lookback_window", "5m")
 	v.SetDefault("alerts.deduplicate_ttl", "10m")
 	v.SetDefault("alerts.rules", defaultAlertRules())
+
+	// Notifications
+	v.SetDefault("notifications.slack.enabled", false)
+	v.SetDefault("notifications.slack.webhook_url", "")
 
 	// RCA
 	v.SetDefault("rca.enabled", false)
