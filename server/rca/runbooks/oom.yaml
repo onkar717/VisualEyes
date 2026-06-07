@@ -5,6 +5,13 @@ triggers:
   - pod.reason = OOMKilled
 categories:
   - oom
+diagnosis:
+  - Confirm OOMKilled exit code 137 in pod events or previous container state
+  - Determine if memory.limit was set and how close to it the container was running
+  - Check previous container logs for heap allocation failures just before kill
+  - Distinguish single-kill (transient spike) from repeat OOM (persistent leak)
+  - Look for Java/JVM -Xmx settings that exceed container limits
+  - Verify no other containers on the node are also OOMing simultaneously (node-level issue)
 remediation:
   - step: 1
     description: Delete OOMKilled pod so it restarts with a clean memory state

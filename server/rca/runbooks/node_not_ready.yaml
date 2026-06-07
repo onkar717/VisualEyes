@@ -5,6 +5,13 @@ triggers:
   - kubernetes.node.condition = NotReady
 categories:
   - node_not_ready
+diagnosis:
+  - Check kubelet status: systemctl status kubelet on the node for errors
+  - Look for network partition — can the API server reach the node IP?
+  - Inspect node conditions: MemoryPressure, DiskPressure, PIDPressure alongside NotReady
+  - Check if node clock is skewed — large drift causes TLS failures and NotReady
+  - Look for kernel OOM events in dmesg or /var/log/kern.log on the node
+  - Check cloud provider console for underlying VM health (stopped, underlying hardware fault)
 remediation:
   - step: 1
     description: Drain the NotReady node to migrate workloads to healthy nodes

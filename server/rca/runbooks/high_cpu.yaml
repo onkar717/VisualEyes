@@ -5,6 +5,13 @@ triggers:
   - kubernetes.node.cpu.usage > 0.8
 categories:
   - high_cpu
+diagnosis:
+  - Identify which pod/container is the top CPU consumer using kubelet metrics
+  - Check if CPU throttling (throttled_periods_total) is high relative to total_periods_total
+  - Look for GC pauses, tight loops, or CPU-bound batch jobs in application logs
+  - Verify CPU requests and limits are set; missing limits allow noisy-neighbor saturation
+  - Check load average vs. node CPU count — sustained load > N CPUs indicates starvation
+  - Correlate spike timing with deployment events or scheduled jobs (CronJobs)
 remediation:
   - step: 1
     description: Restart high-CPU deployment to clear runaway process
