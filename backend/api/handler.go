@@ -561,7 +561,9 @@ func (h *Handler) getRCAResult(w http.ResponseWriter, r *http.Request, alertIDSt
 	// Parse commands JSON for the response.
 	var commands []models.FixCommand
 	if result.Commands != "" {
-		json.Unmarshal([]byte(result.Commands), &commands)
+		if err := json.Unmarshal([]byte(result.Commands), &commands); err != nil {
+			slog.Warn("getRCAResult: failed to parse commands JSON", "alert_id", alertID, "error", err)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -627,10 +629,17 @@ func (h *Handler) executeRCACommand(w http.ResponseWriter, r *http.Request, aler
 	}
 
 	// Persist updated command status.
-	updated, _ := json.Marshal(commands)
+	updated, err := json.Marshal(commands)
+	if err != nil {
+		slog.Error("executeRCACommand: failed to marshal commands", "alert_id", alertID, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to persist command status")
+		return
+	}
 	result.Commands = string(updated)
 	result.UpdatedAt = time.Now()
-	h.rcaStore.UpdateRCAResult(result)
+	if err := h.rcaStore.UpdateRCAResult(result); err != nil {
+		slog.Error("executeRCACommand: failed to update rca result", "alert_id", alertID, "error", err)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status": string(cmd.Status),
