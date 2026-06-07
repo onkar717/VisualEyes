@@ -35,6 +35,9 @@ Use --dry-run to print commands without executing them.`,
 
 		rca, err := api.RCA(alertID)
 		if err != nil {
+			if strings.Contains(err.Error(), "HTTP 404") {
+				return fmt.Errorf("no RCA result for alert %d — trigger RCA first (requires rca.enabled=true and a provider API key)", alertID)
+			}
 			return fmt.Errorf("fetch rca for alert %d: %w", alertID, err)
 		}
 
