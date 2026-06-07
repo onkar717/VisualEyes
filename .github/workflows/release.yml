@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Cross-compile binaries
+        run: make cross
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/visual-eyes-linux-amd64
+            dist/visual-eyes-linux-arm64
+            dist/visual-eyes-darwin-amd64
+            dist/visual-eyes-darwin-arm64
+            dist/visual-eyes-windows-amd64.exe
+            dist/veye-linux-amd64
+            dist/veye-linux-arm64
+            dist/veye-darwin-amd64
+            dist/veye-darwin-arm64
+            dist/veye-windows-amd64.exe
+            dist/checksums.txt
+          generate_release_notes: true
