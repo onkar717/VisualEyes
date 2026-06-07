@@ -1,0 +1,32 @@
+# CODEOWNERS — assigns automatic reviewers to pull requests
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @onkar717
+
+# Backend server and core logic
+/backend/ @onkar717
+
+# Kubernetes and system agents
+/agents/ @onkar717
+
+# veye CLI
+/cli/ @onkar717
+
+# React frontend
+/ui/ @onkar717
+
+# Kubernetes deployment manifests — extra scrutiny
+/deployments/ @onkar717
+
+# CI/CD — changes require review
+/.github/workflows/ @onkar717
+
+# Security policy — always requires owner review
+SECURITY.md @onkar717
+
+# Dependency files — require review to avoid supply chain issues
+go.mod @onkar717
+go.sum @onkar717
+ui/package.json @onkar717
+ui/package-lock.json @onkar717
