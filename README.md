@@ -1,152 +1,244 @@
-# VisualEyes - Modern System & Kubernetes Monitoring Dashboard
+# VisualEyes
 
-VisualEyes is a modern, lightweight monitoring solution that provides real-time insights into both system-level metrics and Kubernetes cluster health. With its sleek UI featuring dark/light mode support and glass-morphism effects, VisualEyes offers an intuitive monitoring experience.
+[![CI](https://github.com/onkar717/visual-eyes/actions/workflows/ci.yaml/badge.svg)](https://github.com/onkar717/visual-eyes/actions/workflows/ci.yaml)
+[![Release](https://github.com/onkar717/visual-eyes/actions/workflows/release.yml/badge.svg)](https://github.com/onkar717/visual-eyes/releases)
+[![Go Version](https://img.shields.io/badge/go-1.24-blue.svg)](https://golang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**VisualEyes** is an open-source, cloud-native observability platform for system and Kubernetes monitoring. It combines real-time metrics collection, AI-powered Root Cause Analysis (RCA), alerting, and a live CLI dashboard — giving on-call engineers full visibility from a single tool.
+
+---
+
+## Overview
+
+VisualEyes operates in two modes:
+
+| Mode | What it does |
+|------|-------------|
+| **veye CLI** | Interactive terminal dashboard — live metrics, alerts, logs, and RCA from your machine |
+| **Hub + Agents** | Deployed in-cluster agents push metrics to a central backend with a full React web UI |
+
+---
 
 ## Features
 
-- Real-time system metrics monitoring
-- Kubernetes cluster metrics visualization
-- Modern UI with theme support (dark/light mode)
-- Efficient metrics collection via agents
-- Kubernetes-native deployment support
-- Flexible configuration management
+- **System metrics** — CPU, memory, disk, network, load average (via `gopsutil`)
+- **Kubernetes metrics** — pod-level and node-level stats via kubelet summary API
+- **AI-powered RCA** — Claude AI diagnoses incidents and suggests safe remediation commands
+- **Alert engine** — configurable rules with dedup, noise filtering, and auto-RCA trigger
+- **WebSocket streaming** — live metric push to dashboard, no polling
+- **Prometheus `/metrics`** — compatible with any Grafana/Prometheus stack
+- **veye CLI** — Bubbletea interactive TUI: `status`, `alerts`, `logs`, `rca`, `watch`
+- **PostgreSQL storage** — persistent incident history with MTTR tracking
+- **Docker & Kubernetes** — full containerized deployment with manifests and Compose
 
-## Prerequisites
+---
 
-- Go 1.19 or later
-- Node.js 16 or later
-- Docker
-- kubectl
-- Either kind or k3d for local Kubernetes cluster
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                        VisualEyes                            │
+│                                                              │
+│  ┌─────────────────┐    ┌─────────────────────────────────┐  │
+│  │  System Agent   │    │      Kubernetes Agent           │  │
+│  │  (gopsutil)     │    │  (kubelet summary API)          │  │
+│  │  CPU/Mem/Disk   │    │  Pod & Node metrics             │  │
+│  │  Net/Load       │    │  Events + Logs                  │  │
+│  └────────┬────────┘    └────────────┬────────────────────┘  │
+│           │  POST /api/system-metrics │ POST /api/k8s-metrics  │
+│           └──────────────┬───────────┘                       │
+│                          ▼                                    │
+│           ┌──────────────────────────┐                       │
+│           │      Backend Server      │                       │
+│           │  Go HTTP · port 8080     │                       │
+│           │  Alert Engine            │                       │
+│           │  RCA Processor (Claude)  │                       │
+│           │  WebSocket Broadcaster   │                       │
+│           │  Prometheus Registry     │                       │
+│           │  PostgreSQL / MemStore   │                       │
+│           └────────┬─────────────────┘                       │
+│                    │                                          │
+│          ┌─────────┴──────────┐                              │
+│          ▼                    ▼                              │
+│  ┌───────────────┐   ┌─────────────────────┐                │
+│  │  React UI     │   │  veye CLI (TUI)      │               │
+│  │  port 5173    │   │  status / alerts     │               │
+│  │  Dark/Light   │   │  logs / rca / watch  │               │
+│  └───────────────┘   └─────────────────────┘                │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Quick Start
 
-### 1. Setting up Local Development Environment
+### Prerequisites
 
-   ```bash
-# Clone the repository
-git clone https://github.com/yourusername/VisualEyes.git
-   cd VisualEyes
+- Go 1.24+
+- Node.js 18+
+- Docker & Docker Compose
+- PostgreSQL 14+ (or use Docker Compose)
+- `kubectl` + a Kubernetes cluster (for K8s mode)
+
+### 1. Clone & Build
+
+```bash
+git clone https://github.com/onkar717/visual-eyes.git
+cd visual-eyes
 
 # Install Go dependencies
 make deps
 
-# Build both agent and server
+# Build all components (server, system agent, k8s agent, veye CLI)
 make build
 
-# Start the backend server
-make run-server
-   ```
-
-### 2. Starting the UI Development Server
-
-```bash
-# Navigate to UI directory
-cd ui
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+# Install UI dependencies
+make install-ui
 ```
 
-The UI will be available at `http://localhost:5173`
-
-### 3. Running Local System Metrics Collection
+### 2. Configure
 
 ```bash
-# Run agent with host metrics only
-make run-agent-host
+cp .env.example .env
+# Edit .env — set ANTHROPIC_API_KEY for AI RCA, DATABASE_URL for PostgreSQL
 ```
 
-### 4. Setting up a Local Kubernetes Cluster
-
-#### Using kind
+### 3. Run Everything Locally
 
 ```bash
-# Create a kind cluster
-kind create cluster --name visual-eyes
+# Start the backend server (port 8080)
+./bin/visual-eyes-server
 
-# Set context
-kubectl cluster-info --context kind-visual-eyes
+# Start the system metrics agent (separate terminal)
+./bin/visual-eyes-agent
+
+# Start the React UI dev server (port 5173)
+make run-ui
+
+# Open the dashboard
+open http://localhost:5173
 ```
 
-#### Using k3d
+### 4. Use the veye CLI
 
 ```bash
-# Create a k3d cluster
-k3d cluster create visual-eyes
+# Live status
+./bin/veye status
 
-# Set context
-kubectl cluster-info --context k3d-visual-eyes
+# View active alerts
+./bin/veye alerts
+
+# Stream logs from a pod
+./bin/veye logs --follow
+
+# Show RCA for an incident
+./bin/veye rca
+
+# Interactive TUI dashboard
+./bin/veye watch
 ```
 
-### 5. Deploying VisualEyes in Kubernetes
+---
 
-   ```bash
-# Apply the Kubernetes configurations
-kubectl apply -f deploy/kubernetes/service.yaml
-kubectl apply -f deploy/kubernetes/config.yaml
-kubectl apply -f deploy/kubernetes/agent.yaml
+## Docker Compose (Full Stack)
 
-# Verify deployment
+```bash
+docker-compose up --build -d
+```
+
+Services started:
+- `backend` → port 8080
+- `ui` → port 3000
+- `postgres` → port 5432
+- `system-agent` → pushes host metrics
+
+---
+
+## Kubernetes Deployment
+
+```bash
+# Apply RBAC, config, and DaemonSet
+kubectl apply -f deployments/kubernetes/rbac.yaml
+kubectl apply -f deployments/kubernetes/config.yaml
+kubectl apply -f deployments/kubernetes/agent.yaml
+
+# Verify
 kubectl get pods -n kube-system -l app=visual-eyes-k8s-agent
-kubectl get services -n kube-system -l app=visual-eyes-backend
 ```
 
-Required YAML files:
-- `deploy/kubernetes/service.yaml`: Backend service configuration
-- `deploy/kubernetes/config.yaml`: ConfigMap for agent configuration
-- `deploy/kubernetes/agent.yaml`: DaemonSet for deploying agents
+For detailed Kubernetes setup including minikube and kind, see [INSTALLATION.md](INSTALLATION.md).
+
+---
 
 ## Configuration
 
-The system uses a hierarchical configuration system:
+| Source | Description |
+|--------|-------------|
+| `configs/config.yaml` | Default config — collection interval, endpoints |
+| `.env` | Secrets — `ANTHROPIC_API_KEY`, `DATABASE_URL` |
+| `deployments/kubernetes/config.yaml` | In-cluster ConfigMap overrides |
+| Environment variables | Override any config key — e.g., `VISUAL_EYES_AGENT_COLLECTION_INTERVAL=5s` |
 
-1. Default configurations in `/configs/`
-2. Kubernetes-specific overrides in `/deploy/kubernetes/config.yaml`
-3. Environment variables for runtime configuration
+---
 
-## Accessing the Dashboard
+## Development
 
-1. Ensure the backend server is running (`make run-server`)
-2. Start the UI development server (`cd ui && npm run dev`)
-3. Access the dashboard at `http://localhost:5173`
-4. Use the theme toggle in the top navigation bar to switch between dark and light modes
+```bash
+make build      # Build all binaries
+make test       # Run tests
+make fmt        # Format Go code
+make lint       # Run golangci-lint
+make clean      # Remove build artifacts
+make cross      # Cross-compile for all platforms (outputs to dist/)
+```
 
-## Development Commands
+---
 
-   ```bash
-# Format code
-make fmt
+## Project Structure
 
-# Run linter
-make lint
+```
+visual-eyes/
+├── agents/
+│   ├── system/          # System metrics agent (CPU, mem, disk, net, load)
+│   └── kubernetes/      # Kubernetes metrics agent (kubelet API)
+├── backend/
+│   ├── alerts/          # Alert engine — rules, dedup, noise filter
+│   ├── api/             # HTTP handlers, routes, middleware
+│   ├── config/          # Config loading
+│   ├── metrics/         # Prometheus registry
+│   ├── models/          # Data models
+│   ├── rca/             # AI RCA engine (Claude client, context builder)
+│   ├── storage/         # Storage interface, PostgreSQL, in-memory
+│   └── ws/              # WebSocket broadcaster
+├── cli/
+│   └── cmd/             # veye CLI commands (status, alerts, logs, rca, watch)
+├── configs/             # Default YAML configuration
+├── deployments/
+│   └── kubernetes/      # RBAC, ConfigMap, DaemonSet manifests
+├── docs/
+│   └── images/          # Screenshots and architecture diagrams
+├── ui/                  # React + MUI + Vite frontend
+└── docker-compose.yml   # Full stack local deployment
+```
 
-# Run tests
-make test
-
-# Clean build artifacts
-make clean
-   ```
-
-## Architecture
-
-VisualEyes consists of three main components:
-
-1. **Backend Server**: Handles metrics storage and API endpoints
-2. **Agents**: Collect metrics from either host system or Kubernetes cluster
-3. **Frontend UI**: Modern React-based dashboard for visualization
+---
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+```bash
+git checkout -b feature/your-feature
+# make changes
+make test && make lint
+git commit -m "feat: your feature"
+git push origin feature/your-feature
+# open a pull request
+```
+
+---
 
 ## License
 
-[Add your license information here]
+MIT — see [LICENSE](LICENSE).
