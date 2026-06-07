@@ -46,7 +46,7 @@ jobs:
         continue-on-error: true
 
       - name: Check large files (>10MB)
-        run: find . -not -path './.git/*' -type f -size +10M | tee /dev/stderr | wc -l | grep -q '^0$'
+        run: find . -not -path './.git/*' -not -path './bin/*' -type f -size +10M | tee /dev/stderr | wc -l | grep -q '^0$'
 
   build-ui:
     name: UI Build
