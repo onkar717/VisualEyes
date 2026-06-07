@@ -86,6 +86,22 @@ VisualEyes operates in two modes:
 
 ---
 
+## Install (Pre-built Binaries)
+
+No Go required. Download the latest binary:
+
+```bash
+# Install veye CLI
+curl -fsSL https://raw.githubusercontent.com/onkar717/VisualEyes/main/install.sh | bash
+
+# Install server binary
+curl -fsSL https://raw.githubusercontent.com/onkar717/VisualEyes/main/install.sh | bash -s visual-eyes
+```
+
+Or grab a binary directly from [Releases](https://github.com/onkar717/VisualEyes/releases).
+
+---
+
 ## Quick Start
 
 ### Prerequisites
