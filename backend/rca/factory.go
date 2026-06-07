@@ -23,7 +23,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			return nil
 		}
 		slog.Info("rca provider: claude", "model", cfg.RCA.Model)
-		return NewClaudeClient(cfg.RCA.APIKey, cfg.RCA.Model, cfg.RCA.MaxTokens)
+		return NewClaudeClient(cfg.RCA.APIKey, cfg.RCA.Model, cfg.RCA.MaxTokens, cfg.RCA.Temperature)
 
 	case "openai":
 		if cfg.RCA.OpenAIAPIKey == "" {
@@ -31,7 +31,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			return nil
 		}
 		slog.Info("rca provider: openai", "model", cfg.RCA.Model)
-		return NewOpenAIClient("openai", cfg.RCA.OpenAIAPIKey, cfg.RCA.Model, cfg.RCA.BaseURL)
+		return NewOpenAIClient("openai", cfg.RCA.OpenAIAPIKey, cfg.RCA.Model, cfg.RCA.BaseURL, cfg.RCA.Temperature)
 
 	case "groq":
 		if cfg.RCA.GroqAPIKey == "" {
@@ -43,7 +43,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			model = "llama-3.3-70b-versatile"
 		}
 		slog.Info("rca provider: groq", "model", model)
-		return NewOpenAIClient("groq", cfg.RCA.GroqAPIKey, model, cfg.RCA.BaseURL)
+		return NewOpenAIClient("groq", cfg.RCA.GroqAPIKey, model, cfg.RCA.BaseURL, cfg.RCA.Temperature)
 
 	case "mistral":
 		if cfg.RCA.MistralAPIKey == "" {
@@ -55,7 +55,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			model = "mistral-large-latest"
 		}
 		slog.Info("rca provider: mistral", "model", model)
-		return NewOpenAIClient("mistral", cfg.RCA.MistralAPIKey, model, cfg.RCA.BaseURL)
+		return NewOpenAIClient("mistral", cfg.RCA.MistralAPIKey, model, cfg.RCA.BaseURL, cfg.RCA.Temperature)
 
 	default:
 		// Custom base URL (e.g. local Ollama, Azure OpenAI, LM Studio)
@@ -68,6 +68,6 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			return nil
 		}
 		slog.Info("rca provider: custom openai-compatible", "base_url", cfg.RCA.BaseURL, "model", cfg.RCA.Model)
-		return NewOpenAIClient("custom", apiKey, cfg.RCA.Model, cfg.RCA.BaseURL)
+		return NewOpenAIClient("custom", apiKey, cfg.RCA.Model, cfg.RCA.BaseURL, cfg.RCA.Temperature)
 	}
 }

@@ -1,0 +1,20 @@
+name: crashloop
+description: Pod is in CrashLoopBackOff — container repeatedly crashes and restarts
+triggers:
+  - kubernetes.pod.restart_count > 3
+  - pod.reason = CrashLoopBackOff
+categories:
+  - crashloop
+remediation:
+  - step: 1
+    description: Restart the deployment to clear transient state
+    command_template: "kubectl rollout restart deployment/{deployment} -n {namespace}"
+    is_auto_safe: true
+  - step: 2
+    description: Force delete the crashing pod so Kubernetes recreates it cleanly
+    command_template: "kubectl delete pod {pod} -n {namespace} --grace-period=0 --force"
+    is_auto_safe: true
+  - step: 3
+    description: Patch memory limit if OOM-induced crash loop
+    command_template: "kubectl patch deployment {deployment} -n {namespace} --type=json -p='[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/resources/limits/memory\",\"value\":\"512Mi\"}]'"
+    is_auto_safe: false

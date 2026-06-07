@@ -1,0 +1,20 @@
+name: node_not_ready
+description: Kubernetes node is NotReady — workloads cannot be scheduled or are evicted
+triggers:
+  - kubernetes.node.status = NotReady
+  - kubernetes.node.condition = NotReady
+categories:
+  - node_not_ready
+remediation:
+  - step: 1
+    description: Drain the NotReady node to migrate workloads to healthy nodes
+    command_template: "kubectl drain {node} --ignore-daemonsets --delete-emptydir-data --force"
+    is_auto_safe: false
+  - step: 2
+    description: Uncordon node once kubelet recovers
+    command_template: "kubectl uncordon {node}"
+    is_auto_safe: false
+  - step: 3
+    description: Restart kubelet on the node (requires SSH)
+    command_template: "ssh {node} sudo systemctl restart kubelet"
+    is_auto_safe: false

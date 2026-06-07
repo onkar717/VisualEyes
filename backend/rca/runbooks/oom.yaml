@@ -1,0 +1,20 @@
+name: oom
+description: Container OOMKilled — killed by kernel due to memory exhaustion
+triggers:
+  - memory.usage_percent > 90
+  - pod.reason = OOMKilled
+categories:
+  - oom
+remediation:
+  - step: 1
+    description: Delete OOMKilled pod so it restarts with a clean memory state
+    command_template: "kubectl delete pod {pod} -n {namespace}"
+    is_auto_safe: true
+  - step: 2
+    description: Increase memory limit to prevent repeat OOM kill
+    command_template: "kubectl patch deployment {deployment} -n {namespace} --type=json -p='[{\"op\":\"replace\",\"path\":\"/spec/template/spec/containers/0/resources/limits/memory\",\"value\":\"1Gi\"}]'"
+    is_auto_safe: false
+  - step: 3
+    description: Scale down replicas temporarily to free node memory
+    command_template: "kubectl scale deployment {deployment} -n {namespace} --replicas=1"
+    is_auto_safe: false

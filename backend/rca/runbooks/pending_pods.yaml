@@ -1,0 +1,20 @@
+name: pending_pods
+description: Pods stuck in Pending — scheduler cannot place them due to resource or taint constraints
+triggers:
+  - pod.phase = Pending
+  - kubernetes.pod.status = Pending
+categories:
+  - pending
+remediation:
+  - step: 1
+    description: Delete competing low-priority pods to free scheduling capacity
+    command_template: "kubectl delete pod {pod} -n {namespace}"
+    is_auto_safe: false
+  - step: 2
+    description: Scale down non-critical deployments to free resources
+    command_template: "kubectl scale deployment {deployment} -n {namespace} --replicas=0"
+    is_auto_safe: false
+  - step: 3
+    description: Remove taint blocking scheduling
+    command_template: "kubectl taint node {node} {taint_key}-"
+    is_auto_safe: false

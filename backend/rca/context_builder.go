@@ -9,13 +9,14 @@ import (
 	"github.com/onkar717/visual-eyes/backend/storage"
 )
 
-// AlertContext bundles everything Claude needs to produce a high-quality RCA.
+// AlertContext bundles everything the LLM pipeline needs for high-quality RCA.
 type AlertContext struct {
 	Alert          models.Alert
-	RecentMetrics  []models.Metric  // last N samples of the triggering metric
-	RelatedMetrics []models.Metric  // samples of related metrics on same resource
-	PodLogs        []models.PodLog  // recent log lines for the pod (if applicable)
-	SiblingAlerts  []models.Alert   // other firing alerts on the same resource
+	RecentMetrics  []models.Metric // last N samples of the triggering metric
+	RelatedMetrics []models.Metric // samples of related metrics on same resource
+	PodLogs        []models.PodLog // current container log lines
+	PrevLogs       []models.PodLog // previous container logs (pre-crash evidence for crashloop)
+	SiblingAlerts  []models.Alert  // other firing alerts on the same resource
 }
 
 // ContextBuilder assembles AlertContext from multiple stores.
@@ -65,10 +66,17 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 		}
 	}
 
-	// Pod logs (only if resource looks like a pod name).
+	// Pod logs (current + previous container for crashloop detection).
 	if b.logStore != nil && looksLikePod(alert.ResourceID) {
 		if logLines, err := b.logStore.GetLogs(alert.ResourceID, alert.Namespace, b.logLines); err == nil {
-			ctx.PodLogs = logLines
+			// Split by stream: "prev" goes to PrevLogs, rest to PodLogs.
+			for _, l := range logLines {
+				if l.Stream == "prev" || l.Stream == "previous" {
+					ctx.PrevLogs = append(ctx.PrevLogs, l)
+				} else {
+					ctx.PodLogs = append(ctx.PodLogs, l)
+				}
+			}
 		}
 	}
 
@@ -125,6 +133,14 @@ func (c AlertContext) Format() string {
 		b.WriteString(fmt.Sprintf("=== POD LOGS (last %d lines) ===\n", len(c.PodLogs)))
 		for _, l := range c.PodLogs {
 			b.WriteString(fmt.Sprintf("  [%s] %s\n", l.Timestamp.Format("15:04:05"), l.Line))
+		}
+		b.WriteString("\n")
+	}
+
+	if len(c.PrevLogs) > 0 {
+		b.WriteString(fmt.Sprintf("=== PREVIOUS CONTAINER LOGS (pre-crash — %d lines) ===\n", len(c.PrevLogs)))
+		for _, l := range c.PrevLogs {
+			b.WriteString(fmt.Sprintf("  [PREV][%s] %s\n", l.Timestamp.Format("15:04:05"), l.Line))
 		}
 		b.WriteString("\n")
 	}

@@ -8,52 +8,66 @@ import (
 	"strings"
 )
 
-// Stage prompts
+// --- Stage 1: Triage ---
 const triageSystemPrompt = `You are an expert SRE Triage Specialist.
-Analyse the Kubernetes alert data and classify the incident.
-Output ONLY valid JSON — no markdown, no code fences.
+Analyse the alert and classify the incident. Output ONLY valid JSON.
 
 Schema:
 {
   "severity": "SEV1|SEV2|SEV3|SEV4",
-  "category": "crashloop|oom|high_cpu|high_memory|disk|network|other",
+  "category": "crashloop|oom|high_cpu|high_memory|disk|image_pull|node_not_ready|pending|network|other",
   "title": "concise one-line incident title",
   "has_issue": true|false,
-  "affected_services": ["service1", "service2"],
+  "affected_services": ["service1"],
   "confidence": 0-100,
   "summary": "2-3 sentences describing the situation"
 }
 
-SEV levels: SEV1=service down, SEV2=major degradation, SEV3=minor, SEV4=healthy.`
+SEV: SEV1=service down, SEV2=major degradation, SEV3=minor, SEV4=healthy.`
 
-const diagnosisSystemPrompt = `You are an expert Kubernetes Root Cause Analyst.
-Given triage data and metric/log context, identify the root cause and contributing factors.
-Output ONLY valid JSON — no markdown, no code fences.
+// --- Stage 2: Metrics Analysis ---
+const metricsSystemPrompt = `You are a Kubernetes Metrics & Telemetry Analyst.
+Given triage classification and raw metric samples, analyse resource pressure.
+Output a concise prose summary (max 200 words) covering:
+1. Which resources show highest pressure (CPU/memory/disk)
+2. Trend direction (rising, stable, spike)
+3. Whether resource exhaustion is the likely root cause
+4. Estimated restart rate from counters if available`
 
-Schema:
-{
-  "root_cause": "1-2 sentence precise technical root cause",
-  "contributing_factors": ["factor1", "factor2", "factor3"],
-  "evidence": ["evidence point 1", "evidence point 2"],
-  "confidence": 0-100
-}`
+// --- Stage 3: Log Analysis ---
+const logSystemPrompt = `You are a Log Analysis & Pattern Mining Expert.
+Given triage, metrics summary, and pod log lines, identify root-cause error patterns.
+Output a concise prose summary (max 200 words) covering:
+1. Top error messages (exceptions, panics, OOM, connection errors)
+2. Error classification: application bug / config error / resource exhaustion / network
+3. First occurrence timestamp if determinable
+4. For CrashLoopBackOff: focus on PREVIOUS container logs`
 
+// --- Stage 4: Infra Diagnosis ---
+const infraSystemPrompt = `You are a Kubernetes Infrastructure Diagnostician.
+Based on triage, metrics, and log evidence, diagnose infrastructure constraints.
+Output a concise prose summary (max 200 words) covering:
+1. Resource quota hits in any namespace
+2. Scheduling constraints (taints, affinity, PVC binding)
+3. Node health — any nodes NotReady or cordoned?
+4. Whether root cause is infra-driven or application-driven`
+
+// --- Stage 5: Remediation ---
 const remediationSystemPrompt = `You are a senior SRE Remediation Engineer.
-Produce an ordered, EXECUTABLE remediation plan. Every command MUST change cluster state.
-NEVER suggest kubectl describe/get/logs as remediation — those are diagnostic.
+Produce an ordered, EXECUTABLE remediation plan informed by the runbook and prior analysis.
+Every command MUST change cluster state. NEVER use kubectl describe/get/logs.
 
-Output ONLY valid JSON — no markdown, no code fences.
-
-Schema:
+Output ONLY valid JSON:
 {
   "commands": [
     {
       "command": "kubectl ...",
-      "description": "what this does and why",
+      "description": "what this fixes and why",
       "is_auto_safe": true|false,
       "risk": "low|medium|high"
     }
-  ]
+  ],
+  "runbook_used": "runbook name or none"
 }
 
 AUTO-SAFE RULES — is_auto_safe=true ONLY for:
@@ -61,16 +75,16 @@ AUTO-SAFE RULES — is_auto_safe=true ONLY for:
   kubectl rollout restart ...
 Everything else: is_auto_safe=false.`
 
+// --- Stage 6: Commander ---
 const commanderSystemPrompt = `You are the Incident Commander.
-Synthesise all stage outputs into the final incident report.
-Output ONLY valid JSON — no markdown, no code fences.
+Synthesise all six stage outputs into the definitive incident report.
+Output ONLY valid JSON:
 
-Schema (exact):
 {
   "explanation": "2-3 plain-English sentences describing what is happening",
   "root_cause": "1-2 sentence precise root cause",
   "severity": "SEV1|SEV2|SEV3|SEV4",
-  "category": "crashloop|oom|high_cpu|high_memory|disk|network|other",
+  "category": "crashloop|oom|high_cpu|high_memory|disk|image_pull|node_not_ready|pending|network|other",
   "contributing_factors": ["factor1", "factor2"],
   "affected_services": ["svc1"],
   "confidence": 0-100,
@@ -84,15 +98,14 @@ Schema (exact):
   ]
 }`
 
-// Pipeline
-// Pipeline runs a 5-stage sequential RCA analysis, each stage informed by the
-// previous. This produces richer, more accurate results than a single LLM call.
+// Pipeline runs a 6-stage sequential RCA analysis.
+// Each stage receives structured output from all prior stages, producing
+// higher-fidelity signal than single-stage or raw-text chaining.
 type Pipeline struct {
 	llm       LLMProvider
 	maxTokens int
 }
 
-// NewPipeline creates a Pipeline with the given LLM provider.
 func NewPipeline(llm LLMProvider, maxTokens int) *Pipeline {
 	if maxTokens <= 0 {
 		maxTokens = 2048
@@ -100,7 +113,6 @@ func NewPipeline(llm LLMProvider, maxTokens int) *Pipeline {
 	return &Pipeline{llm: llm, maxTokens: maxTokens}
 }
 
-// triageStage holds Stage 1 output.
 type triageStage struct {
 	Severity         string   `json:"severity"`
 	Category         string   `json:"category"`
@@ -111,93 +123,109 @@ type triageStage struct {
 	Summary          string   `json:"summary"`
 }
 
-// diagnosisStage holds Stage 2 output.
-type diagnosisStage struct {
-	RootCause           string   `json:"root_cause"`
-	ContributingFactors []string `json:"contributing_factors"`
-	Evidence            []string `json:"evidence"`
-	Confidence          int      `json:"confidence"`
+type remediationStage struct {
+	Commands    []FixCommand `json:"commands"`
+	RunbookUsed string       `json:"runbook_used"`
 }
 
-// RunPipeline executes all 5 stages and returns the final RCAResponse.
-// Total input tokens across all stages are summed.
+// RunPipeline executes all 6 stages and returns the final RCAResponse.
 func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCAResponse, int, error) {
-	totalTokens := 0
+	total := 0
 
 	// Stage 1: Triage
-	slog.Info("rca pipeline stage 1/5: triage", "alert_id", ac.Alert.ID)
-	triageUser := fmt.Sprintf("Alert context:\n\n%s", ac.Format())
-	triageRaw, tok, err := p.llm.Complete(ctx, triageSystemPrompt, triageUser, p.maxTokens)
+	slog.Info("rca stage 1/6: triage", "alert_id", ac.Alert.ID)
+	triageRaw, tok, err := p.llm.Complete(ctx, triageSystemPrompt,
+		"Alert context:\n\n"+ac.Format(), p.maxTokens)
 	if err != nil {
 		return nil, 0, fmt.Errorf("stage 1 triage: %w", err)
 	}
-	totalTokens += tok
+	total += tok
 
 	var triage triageStage
 	if err := json.Unmarshal([]byte(stripFences(triageRaw)), &triage); err != nil {
-		slog.Warn("triage stage parse failed — using defaults", "error", err)
+		slog.Warn("triage parse failed — defaults", "err", err)
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
 
-	// Stage 2: Diagnosis
-	slog.Info("rca pipeline stage 2/5: diagnosis", "alert_id", ac.Alert.ID)
-	diagUser := fmt.Sprintf(
-		"TRIAGE:\n%s\n\nORIGINAL ALERT CONTEXT:\n%s",
-		triageRaw, ac.Format(),
-	)
-	diagRaw, tok, err := p.llm.Complete(ctx, diagnosisSystemPrompt, diagUser, p.maxTokens)
+	// Stage 2: Metrics Analysis
+	slog.Info("rca stage 2/6: metrics analysis", "alert_id", ac.Alert.ID)
+	metricsUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRIC DATA:\n%s",
+		truncStage(triageRaw), ac.Format())
+	metricsRaw, tok, err := p.llm.Complete(ctx, metricsSystemPrompt, metricsUser, p.maxTokens)
 	if err != nil {
-		return nil, totalTokens, fmt.Errorf("stage 2 diagnosis: %w", err)
+		return nil, total, fmt.Errorf("stage 2 metrics: %w", err)
 	}
-	totalTokens += tok
+	total += tok
 
-	var diag diagnosisStage
-	if err := json.Unmarshal([]byte(stripFences(diagRaw)), &diag); err != nil {
-		slog.Warn("diagnosis stage parse failed", "error", err)
-		diag = diagnosisStage{RootCause: "Unable to determine root cause — insufficient signal.", Confidence: 30}
+	// Stage 3: Log Analysis
+	slog.Info("rca stage 3/6: log analysis", "alert_id", ac.Alert.ID)
+	logUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nALERT+LOGS:\n%s",
+		truncStage(triageRaw), truncStage(metricsRaw), ac.Format())
+	logRaw, tok, err := p.llm.Complete(ctx, logSystemPrompt, logUser, p.maxTokens)
+	if err != nil {
+		return nil, total, fmt.Errorf("stage 3 logs: %w", err)
 	}
+	total += tok
 
-	// Stage 3: Remediation
-	slog.Info("rca pipeline stage 3/5: remediation", "alert_id", ac.Alert.ID)
+	// Stage 4: Infra Diagnosis
+	slog.Info("rca stage 4/6: infra diagnosis", "alert_id", ac.Alert.ID)
+	infraUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nALERT:\n%s",
+		truncStage(triageRaw), truncStage(metricsRaw), truncStage(logRaw), ac.Format())
+	infraRaw, tok, err := p.llm.Complete(ctx, infraSystemPrompt, infraUser, p.maxTokens)
+	if err != nil {
+		return nil, total, fmt.Errorf("stage 4 infra: %w", err)
+	}
+	total += tok
+
+	// Stage 5: Remediation (with runbook injection)
+	slog.Info("rca stage 5/6: remediation", "alert_id", ac.Alert.ID, "category", triage.Category)
+	rb := SelectRunbook(triage.Category)
+	runbookContext := RunbookSummary(rb)
 	remUser := fmt.Sprintf(
-		"TRIAGE:\n%s\n\nDIAGNOSIS:\n%s\n\nALERT:\n%s",
-		truncStage(triageRaw), truncStage(diagRaw), ac.Format(),
+		"TRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nMATCHED RUNBOOK:\n%s",
+		truncStage(triageRaw), truncStage(metricsRaw),
+		truncStage(logRaw), truncStage(infraRaw), runbookContext,
 	)
 	remRaw, tok, err := p.llm.Complete(ctx, remediationSystemPrompt, remUser, p.maxTokens)
 	if err != nil {
-		return nil, totalTokens, fmt.Errorf("stage 3 remediation: %w", err)
+		return nil, total, fmt.Errorf("stage 5 remediation: %w", err)
 	}
-	totalTokens += tok
+	total += tok
 
-	// Stage 4: Synthesis (Commander)
-	slog.Info("rca pipeline stage 4/5: commander", "alert_id", ac.Alert.ID)
+	var rem remediationStage
+	if err := json.Unmarshal([]byte(stripFences(remRaw)), &rem); err != nil {
+		slog.Warn("remediation parse failed", "err", err)
+	}
+
+	// Stage 6: Commander — synthesise all stages
+	slog.Info("rca stage 6/6: commander", "alert_id", ac.Alert.ID)
 	cmdUser := fmt.Sprintf(
-		"TRIAGE:\n%s\n\nDIAGNOSIS:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
-		truncStage(triageRaw), truncStage(diagRaw), truncStage(remRaw), ac.Format(),
+		"TRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
+		truncStage(triageRaw), truncStage(metricsRaw), truncStage(logRaw),
+		truncStage(infraRaw), truncStage(remRaw), ac.Format(),
 	)
 	finalRaw, tok, err := p.llm.Complete(ctx, commanderSystemPrompt, cmdUser, p.maxTokens)
 	if err != nil {
-		return nil, totalTokens, fmt.Errorf("stage 4 commander: %w", err)
+		return nil, total, fmt.Errorf("stage 6 commander: %w", err)
 	}
-	totalTokens += tok
+	total += tok
 
-	// Parse final output
 	var resp RCAResponse
 	if err := json.Unmarshal([]byte(stripFences(finalRaw)), &resp); err != nil {
-		// Best-effort fallback from parsed stages.
-		slog.Warn("commander stage parse failed — building from sub-stages", "error", err)
+		slog.Warn("commander parse failed — building from sub-stages", "err", err)
 		resp = RCAResponse{
 			Explanation:         triage.Summary,
-			RootCause:           diag.RootCause,
-			Confidence:          (triage.Confidence + diag.Confidence) / 2,
+			RootCause:           "See log and infra analysis",
+			Confidence:          triage.Confidence,
 			Severity:            triage.Severity,
 			Category:            triage.Category,
-			ContributingFactors: diag.ContributingFactors,
+			ContributingFactors: nil,
 			AffectedServices:    triage.AffectedServices,
+			Commands:            rem.Commands,
 		}
 	}
 
-	// Ensure severity/category populated from triage if commander omitted them.
+	// Fill gaps from sub-stages when commander omits fields.
 	if resp.Severity == "" {
 		resp.Severity = triage.Severity
 	}
@@ -207,11 +235,11 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	if len(resp.AffectedServices) == 0 {
 		resp.AffectedServices = triage.AffectedServices
 	}
-	if len(resp.ContributingFactors) == 0 {
-		resp.ContributingFactors = diag.ContributingFactors
+	if len(resp.Commands) == 0 {
+		resp.Commands = rem.Commands
 	}
 
-	// Enforce auto-safe allowlist.
+	// Enforce auto-safe allowlist regardless of what LLM said.
 	for i := range resp.Commands {
 		resp.Commands[i].IsAutoSafe = isSafe(resp.Commands[i].Command)
 	}
@@ -222,10 +250,10 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		"category", resp.Category,
 		"confidence", resp.Confidence,
 		"commands", len(resp.Commands),
-		"total_tokens", totalTokens,
+		"total_tokens", total,
 	)
 
-	return &resp, totalTokens, nil
+	return &resp, total, nil
 }
 
 func truncStage(s string) string {

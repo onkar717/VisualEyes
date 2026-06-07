@@ -21,15 +21,16 @@ var openAIBaseURLs = map[string]string{
 // OpenAIClient calls any OpenAI-compatible chat completions endpoint.
 // Supports OpenAI, Groq (llama-3.3-70b-versatile etc.), and Mistral.
 type OpenAIClient struct {
-	baseURL string
-	apiKey  string
-	model   string
-	http    *http.Client
+	baseURL     string
+	apiKey      string
+	model       string
+	temperature float64
+	http        *http.Client
 }
 
 // NewOpenAIClient creates a client for the given provider (openai|groq|mistral)
 // or accepts an explicit baseURL (for self-hosted / proxy endpoints).
-func NewOpenAIClient(provider, apiKey, model, baseURL string) *OpenAIClient {
+func NewOpenAIClient(provider, apiKey, model, baseURL string, temperature float64) *OpenAIClient {
 	if baseURL == "" {
 		if u, ok := openAIBaseURLs[strings.ToLower(provider)]; ok {
 			baseURL = u
@@ -37,11 +38,15 @@ func NewOpenAIClient(provider, apiKey, model, baseURL string) *OpenAIClient {
 			baseURL = openAIBaseURLs["openai"]
 		}
 	}
+	if temperature <= 0 {
+		temperature = 0.1
+	}
 	return &OpenAIClient{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		apiKey:  apiKey,
-		model:   model,
-		http:    &http.Client{Timeout: 120 * time.Second},
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		apiKey:      apiKey,
+		model:       model,
+		temperature: temperature,
+		http:        &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
@@ -57,7 +62,7 @@ func (c *OpenAIClient) Complete(ctx context.Context, systemPrompt, userPrompt st
 			{"role": "user", "content": userPrompt},
 		},
 		"max_tokens":  maxTokens,
-		"temperature": 0.1,
+		"temperature": c.temperature,
 	}
 
 	payload, err := json.Marshal(body)
