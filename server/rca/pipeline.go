@@ -28,11 +28,18 @@ SEV: SEV1=service down, SEV2=major degradation, SEV3=minor, SEV4=healthy.`
 // --- Stage 2: Metrics Analysis ---
 const metricsSystemPrompt = `You are a Kubernetes Metrics & Telemetry Analyst.
 Given triage classification and raw metric samples, analyse resource pressure.
+
+Check the OBSERVABILITY STACK section in the context:
+- If Prometheus is AVAILABLE: you may reference PromQL queries the operator can run (e.g. rate(container_cpu_usage_seconds_total[5m])) to deepen the investigation.
+- If Loki is AVAILABLE: you may reference LogQL queries for correlated log investigation.
+- If neither is configured: use only the inline kubelet/agent metric samples provided.
+
 Output a concise prose summary (max 200 words) covering:
 1. Which resources show highest pressure (CPU/memory/disk)
 2. Trend direction (rising, stable, spike)
 3. Whether resource exhaustion is the likely root cause
-4. Estimated restart rate from counters if available`
+4. Estimated restart rate from counters if available
+5. (If Prometheus available) Suggested PromQL queries for deeper investigation`
 
 // --- Stage 3: Log Analysis ---
 const logSystemPrompt = `You are a Log Analysis & Pattern Mining Expert.

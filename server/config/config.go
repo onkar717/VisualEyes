@@ -120,6 +120,12 @@ type RCAConfig struct {
 	LogLines             int     `mapstructure:"log_lines"`
 	MetricSamples        int     `mapstructure:"metric_samples"`
 	AgentTimeoutSeconds  int     `mapstructure:"agent_timeout_seconds"` // per-stage timeout; total = 6× this
+	// Prometheus integration — when set, the metrics agent stage knows Prometheus is available.
+	PrometheusURL     string `mapstructure:"prometheus_url"`
+	PrometheusEnabled bool   `mapstructure:"prometheus_enabled"`
+	// Loki integration — when set, log stage queries Loki instead of stored push logs.
+	LokiURL     string `mapstructure:"loki_url"`
+	LokiEnabled bool   `mapstructure:"loki_enabled"`
 }
 
 type LoggingConfig struct {
@@ -296,6 +302,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("rca.metric_samples", 20)
 	v.SetDefault("rca.base_url", "")
 	v.SetDefault("rca.agent_timeout_seconds", 120)
+	v.SetDefault("rca.prometheus_url", "")
+	v.SetDefault("rca.prometheus_enabled", false)
+	v.SetDefault("rca.loki_url", "")
+	v.SetDefault("rca.loki_enabled", false)
 
 	// Logging
 	v.SetDefault("logging.level", "info")

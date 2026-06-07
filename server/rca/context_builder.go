@@ -17,15 +17,24 @@ type AlertContext struct {
 	PodLogs        []models.PodLog // current container log lines
 	PrevLogs       []models.PodLog // previous container logs (pre-crash evidence for crashloop)
 	SiblingAlerts  []models.Alert  // other firing alerts on the same resource
+	// Observability stack availability — hints for the LLM agents.
+	PrometheusURL     string
+	PrometheusEnabled bool
+	LokiURL           string
+	LokiEnabled       bool
 }
 
 // ContextBuilder assembles AlertContext from multiple stores.
 type ContextBuilder struct {
-	metricStore storage.QueryableStore
-	logStore    storage.LogStore    // may be nil
-	alertStore  storage.AlertStore
-	logLines    int
-	metricSamples int
+	metricStore    storage.QueryableStore
+	logStore       storage.LogStore // may be nil
+	alertStore     storage.AlertStore
+	logLines       int
+	metricSamples  int
+	prometheusURL  string
+	prometheusEnabled bool
+	lokiURL        string
+	lokiEnabled    bool
 }
 
 // NewContextBuilder creates a ContextBuilder with the given stores and limits.
@@ -44,10 +53,28 @@ func NewContextBuilder(
 	}
 }
 
+// SetPrometheus injects Prometheus connection info into context.
+func (b *ContextBuilder) SetPrometheus(url string, enabled bool) {
+	b.prometheusURL = url
+	b.prometheusEnabled = enabled
+}
+
+// SetLoki injects Loki connection info into context.
+func (b *ContextBuilder) SetLoki(url string, enabled bool) {
+	b.lokiURL = url
+	b.lokiEnabled = enabled
+}
+
 // Build assembles a complete AlertContext for the given alert.
 func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 	since := time.Now().Add(-30 * time.Minute)
-	ctx := AlertContext{Alert: alert}
+	ctx := AlertContext{
+		Alert:             alert,
+		PrometheusURL:     b.prometheusURL,
+		PrometheusEnabled: b.prometheusEnabled,
+		LokiURL:           b.lokiURL,
+		LokiEnabled:       b.lokiEnabled,
+	}
 
 	// Primary metric samples — use MetricName (e.g. "cpu.usage"), not RuleName.
 	metricName := alert.MetricName
@@ -104,6 +131,20 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 // Format serialises the context into a structured prompt section for Claude.
 func (c AlertContext) Format() string {
 	var b strings.Builder
+
+	// Observability stack availability — let agents know what they can reference.
+	b.WriteString("=== OBSERVABILITY STACK ===\n")
+	if c.PrometheusEnabled && c.PrometheusURL != "" {
+		b.WriteString(fmt.Sprintf("Prometheus: AVAILABLE at %s (use PromQL for CPU/memory/error-rate queries)\n", c.PrometheusURL))
+	} else {
+		b.WriteString("Prometheus: NOT configured — use kubelet/agent metrics only\n")
+	}
+	if c.LokiEnabled && c.LokiURL != "" {
+		b.WriteString(fmt.Sprintf("Loki: AVAILABLE at %s (use LogQL for log queries)\n", c.LokiURL))
+	} else {
+		b.WriteString("Loki: NOT configured — logs provided inline below\n")
+	}
+	b.WriteString("\n")
 
 	b.WriteString("=== ALERT ===\n")
 	b.WriteString(fmt.Sprintf("Rule: %s | Severity: %s | Status: %s\n", c.Alert.RuleName, c.Alert.Severity, c.Alert.Status))
