@@ -1,32 +1,139 @@
 package cmd
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
+)
+
+var (
+	scanApply bool
+	scanForce bool
 )
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Proactive cluster health check — surfaces issues before they page you",
-	Long:  "Queries the VisualEyes backend for active alerts and metric thresholds, then prints a prioritised list of findings.",
+	Long: `Queries the VisualEyes backend for active alerts and metric thresholds,
+then prints a prioritised list of findings.
+
+With --apply: for each critical finding that has an RCA result, prompt
+interactively to execute the remediation plan. Use --force to execute all
+commands including non-auto-safe ones.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		result, err := api.Scan()
 		if err != nil {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 		printScanResult(result)
+
+		if scanApply && len(result.Issues) > 0 {
+			if err := interactiveRemediate(result.Issues); err != nil {
+				fmt.Fprintf(os.Stderr, "remediation error: %v\n", err)
+			}
+		}
+
 		// Exit non-zero when critical issues found so CI/scripts can act on it.
 		if result.Overall == "critical" {
 			os.Exit(2)
 		}
 		return nil
 	},
+}
+
+func init() {
+	scanCmd.Flags().BoolVar(&scanApply, "apply", false, "Interactively prompt to apply remediation for each critical finding")
+	scanCmd.Flags().BoolVar(&scanForce, "force", false, "Execute all commands including non-auto-safe ones (use with --apply)")
+}
+
+// interactiveRemediate walks through critical findings that have an RCA result
+// and asks the operator whether to execute each remediation plan.
+func interactiveRemediate(issues []client.ScanIssue) error {
+	reader := bufio.NewReader(os.Stdin)
+	remediated := 0
+
+	for _, issue := range issues {
+		if issue.Severity != "critical" || issue.AlertID == 0 {
+			continue
+		}
+
+		rca, err := api.RCA(uint(issue.AlertID))
+		if err != nil || rca.Status != "done" {
+			continue
+		}
+
+		var cmds []client.FixCommand
+		if err := json.Unmarshal([]byte(rca.Commands), &cmds); err != nil || len(cmds) == 0 {
+			continue
+		}
+
+		fmt.Println()
+		fmt.Printf("%s  Alert %d: %s\n",
+			styles.Bad.Render("[critical]"),
+			issue.AlertID,
+			styles.ValStyle.Render(issue.Message),
+		)
+		fmt.Printf("   Root cause: %s\n", styles.Mute.Render(rca.RootCause))
+		fmt.Println()
+
+		for i, c := range cmds {
+			safety := styles.Good.Render("auto-safe")
+			if !c.IsAutoSafe {
+				safety = styles.SevWarning.Render("manual")
+			}
+			fmt.Printf("   %d. [%s] %s\n", i+1, safety, c.Command)
+		}
+		fmt.Println()
+		fmt.Printf("   Apply remediation? [y/N] ")
+		line, _ := reader.ReadString('\n')
+		line = strings.TrimSpace(strings.ToLower(line))
+		if line != "y" && line != "yes" {
+			fmt.Println("   Skipped.")
+			continue
+		}
+
+		applied, skipped, failed := 0, 0, 0
+		for i, c := range cmds {
+			if !c.IsAutoSafe && !scanForce {
+				fmt.Printf("   Step %d: %s\n", i+1, styles.Mute.Render("skipped — not auto-safe. Use --force to execute."))
+				skipped++
+				continue
+			}
+			start := time.Now()
+			out, err := runCommand(c.Command)
+			dur := time.Since(start).Round(time.Millisecond)
+			if err != nil {
+				fmt.Printf("   Step %d: %s %s\n", i+1, styles.Bad.Render("✗"), styles.Mute.Render(err.Error()))
+				failed++
+			} else {
+				fmt.Printf("   Step %d: %s (%s)\n", i+1, styles.Good.Render("✓"), dur)
+				if strings.TrimSpace(out) != "" {
+					fmt.Printf("          %s\n", styles.Mute.Render(strings.TrimSpace(out)))
+				}
+				applied++
+			}
+		}
+		fmt.Printf("   Applied: %s  Skipped: %s  Failed: %s\n",
+			styles.Good.Render(fmt.Sprintf("%d", applied)),
+			styles.Mute.Render(fmt.Sprintf("%d", skipped)),
+			styles.Bad.Render(fmt.Sprintf("%d", failed)),
+		)
+		remediated++
+	}
+
+	if remediated == 0 {
+		fmt.Println()
+		fmt.Println(styles.Mute.Render("  No remediable critical findings with completed RCA."))
+	}
+	return nil
 }
 
 func printScanResult(r *client.ScanResult) {
