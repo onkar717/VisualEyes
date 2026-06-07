@@ -50,6 +50,13 @@ type NotificationStore interface {
 	GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error)
 }
 
+// ClusterStore manages the multi-cluster registry.
+type ClusterStore interface {
+	UpsertCluster(c *models.ClusterHealth) error
+	GetCluster(name string) (*models.ClusterHealth, error)
+	ListClusters() ([]models.ClusterHealth, error)
+}
+
 // RemediationLogStore persists per-step remediation execution records.
 type RemediationLogStore interface {
 	SaveRemediationLog(e *models.RemediationLogEntry) error

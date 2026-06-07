@@ -144,6 +144,9 @@ func main() {
 	if rls, ok := store.(storage.RemediationLogStore); ok {
 		handler.SetRemediationLogStore(rls)
 	}
+	if cs, ok := store.(storage.ClusterStore); ok {
+		handler.SetClusterStore(cs)
+	}
 	handler.SetBroadcaster(broadcaster)
 
 	// RCA Engine (Claude)

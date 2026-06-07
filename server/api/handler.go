@@ -29,6 +29,7 @@ type Handler struct {
 	notificationStore   storage.NotificationStore
 	incidentStore       storage.IncidentStore
 	remediationLogStore storage.RemediationLogStore
+	clusterStore        storage.ClusterStore
 	broadcaster         *ws.Broadcaster
 	hostname          string
 	corsOrigins       string
@@ -41,8 +42,9 @@ func (h *Handler) SetLogStore(s storage.LogStore)                   { h.logStore
 func (h *Handler) SetRCAStore(s storage.RCAStore)                   { h.rcaStore = s }
 func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notificationStore = s }
 func (h *Handler) SetIncidentStore(s storage.IncidentStore)                 { h.incidentStore = s }
-func (h *Handler) SetRemediationLogStore(s storage.RemediationLogStore)     { h.remediationLogStore = s }
-func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                         { h.broadcaster = b }
+func (h *Handler) SetRemediationLogStore(s storage.RemediationLogStore) { h.remediationLogStore = s }
+func (h *Handler) SetClusterStore(s storage.ClusterStore)               { h.clusterStore = s }
+func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                     { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -1041,6 +1043,103 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 		"mttr_avg_seconds": avg,
 		"mttr_count":       count,
 	})
+}
+
+// HandleClusters lists all registered clusters.
+// GET /api/clusters
+func (h *Handler) HandleClusters(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if h.clusterStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	clusters, err := h.clusterStore.ListClusters()
+	if err != nil {
+		slog.Error("list clusters", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if clusters == nil {
+		clusters = []models.ClusterHealth{}
+	}
+	writeJSON(w, http.StatusOK, clusters)
+}
+
+// HandleClusterDetail returns one cluster and optionally its incidents.
+// GET /api/clusters/{name}
+// GET /api/clusters/{name}/incidents
+func (h *Handler) HandleClusterDetail(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/api/clusters/")
+	parts := strings.SplitN(path, "/", 2)
+	name := parts[0]
+
+	if len(parts) == 2 && parts[1] == "incidents" && h.incidentStore != nil {
+		incidents, err := h.incidentStore.GetRecentIncidents("", "", 100, 0)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, incidents)
+		return
+	}
+
+	if h.clusterStore == nil {
+		http.Error(w, "cluster store not available", http.StatusServiceUnavailable)
+		return
+	}
+	c, err := h.clusterStore.GetCluster(name)
+	if err != nil {
+		http.Error(w, "cluster not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// HandleClusterHeartbeat accepts a health snapshot from a cluster agent.
+// POST /api/clusters/heartbeat
+func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.clusterStore == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	var c models.ClusterHealth
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if c.Name == "" {
+		http.Error(w, "cluster name required", http.StatusBadRequest)
+		return
+	}
+	c.LastSeen = time.Now()
+
+	// Attach open incident count if incidentStore is available.
+	if h.incidentStore != nil {
+		open, _ := h.incidentStore.GetRecentIncidents("", "OPEN", 1000, 0)
+		c.OpenIncidents = len(open)
+	}
+
+	if err := h.clusterStore.UpsertCluster(&c); err != nil {
+		slog.Error("upsert cluster", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "cluster": c.Name})
 }
 
 // HandleRemediationLog handles GET and POST for remediation step audit log.

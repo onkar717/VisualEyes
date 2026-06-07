@@ -41,6 +41,9 @@ type MemoryStore struct {
 	// remediation log
 	remediationLogs []*models.RemediationLogEntry
 	remediationSeq  uint
+
+	// cluster registry: name → health
+	clusters map[string]*models.ClusterHealth
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -48,6 +51,7 @@ func NewMemoryStore() *MemoryStore {
 		metrics:    make(map[string][]models.Metric),
 		maxPerKey:  200,
 		rcaResults: make(map[uint]*models.RCAResult),
+		clusters:   make(map[string]*models.ClusterHealth),
 	}
 }
 
@@ -400,6 +404,47 @@ func (s *MemoryStore) MTTRStats() (float64, int, error) {
 		return 0, 0, nil
 	}
 	return float64(total) / float64(count), count, nil
+}
+
+// ClusterStore
+func (s *MemoryStore) UpsertCluster(c *models.ClusterHealth) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	if existing, ok := s.clusters[c.Name]; ok {
+		c.ID = existing.ID
+		c.CreatedAt = existing.CreatedAt
+	} else {
+		c.CreatedAt = now
+	}
+	c.UpdatedAt = now
+	if c.LastSeen.IsZero() {
+		c.LastSeen = now
+	}
+	cp := *c
+	s.clusters[c.Name] = &cp
+	return nil
+}
+
+func (s *MemoryStore) GetCluster(name string) (*models.ClusterHealth, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c, ok := s.clusters[name]
+	if !ok {
+		return nil, fmt.Errorf("cluster %q not found", name)
+	}
+	cp := *c
+	return &cp, nil
+}
+
+func (s *MemoryStore) ListClusters() ([]models.ClusterHealth, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]models.ClusterHealth, 0, len(s.clusters))
+	for _, c := range s.clusters {
+		out = append(out, *c)
+	}
+	return out, nil
 }
 
 // RemediationLogStore

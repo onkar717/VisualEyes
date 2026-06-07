@@ -295,6 +295,29 @@ func (c *Client) GetIncident(id uint) (*Incident, error) {
 	return &inc, c.get(fmt.Sprintf("/api/incidents/full/%d", id), &inc)
 }
 
+// ClusterHealth mirrors models.ClusterHealth.
+type ClusterHealth struct {
+	ID            uint      `json:"id"`
+	Name          string    `json:"name"`
+	Namespace     string    `json:"namespace"`
+	LastSeen      time.Time `json:"last_seen"`
+	HealthScore   float64   `json:"health_score"`
+	TotalNodes    int       `json:"total_nodes"`
+	ReadyNodes    int       `json:"ready_nodes"`
+	TotalPods     int       `json:"total_pods"`
+	RunningPods   int       `json:"running_pods"`
+	PendingPods   int       `json:"pending_pods"`
+	FailedPods    int       `json:"failed_pods"`
+	CrashloopPods int       `json:"crashloop_pods"`
+	OpenIncidents int       `json:"open_incidents"`
+}
+
+// ListClusters calls /api/clusters and returns all registered clusters.
+func (c *Client) ListClusters() ([]ClusterHealth, error) {
+	var clusters []ClusterHealth
+	return clusters, c.get("/api/clusters", &clusters)
+}
+
 // Incidents calls /api/incidents and returns recent notification delivery events.
 func (c *Client) Incidents(limit int, alertID uint) ([]NotificationEvent, error) {
 	var r []NotificationEvent

@@ -47,6 +47,11 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// Aggregate stats
 	mux.HandleFunc("/api/stats", h.HandleStats)
 
+	// Multi-cluster registry
+	mux.HandleFunc("/api/clusters", h.HandleClusters)
+	mux.HandleFunc("/api/clusters/heartbeat", h.HandleClusterHeartbeat)
+	mux.HandleFunc("/api/clusters/", h.HandleClusterDetail)
+
 	// Remediation audit log
 	mux.HandleFunc("/api/remediation-log", h.HandleRemediationLog)
 
