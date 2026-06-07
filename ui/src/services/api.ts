@@ -104,7 +104,7 @@ const getRCA = async (alertId: number): Promise<RCAResult> => {
 const executeRCACommand = async (alertId: number, commandIndex: number): Promise<{ output: string; error?: string }> => {
   const response = await axios.post<{ output: string; error?: string }>(
     `${API_BASE_URL}/rca/${alertId}/execute`,
-    { command_index: commandIndex }
+    { commandIndex }
   );
   return response.data;
 };
