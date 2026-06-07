@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
-// SlackNotifier sends alert events to a Slack incoming webhook.
+// SlackNotifier sends alert events to a Slack incoming webhook using Block Kit.
 type SlackNotifier struct {
 	webhookURL string
 	client     *http.Client
@@ -24,76 +24,115 @@ func NewSlackNotifier(webhookURL string) *SlackNotifier {
 	}
 }
 
-type slackPayload struct {
-	Attachments []slackAttachment `json:"attachments"`
+// --- Block Kit types ---
+
+type blockKitPayload struct {
+	Blocks []bkBlock `json:"blocks"`
 }
 
-type slackAttachment struct {
-	Color    string       `json:"color"`
-	Title    string       `json:"title"`
-	Text     string       `json:"text"`
-	Fields   []slackField `json:"fields,omitempty"`
-	Footer   string       `json:"footer"`
-	Ts       int64        `json:"ts"`
+type bkBlock struct {
+	Type     string      `json:"type"`
+	Text     *bkText     `json:"text,omitempty"`
+	Fields   []bkText    `json:"fields,omitempty"`
+	Elements []bkElement `json:"elements,omitempty"`
 }
 
-type slackField struct {
-	Title string `json:"title"`
-	Value string `json:"value"`
-	Short bool   `json:"short"`
+type bkText struct {
+	Type  string `json:"type"` // plain_text | mrkdwn
+	Text  string `json:"text"`
+	Emoji bool   `json:"emoji,omitempty"`
 }
 
-// AlertFired sends a firing alert notification.
-func (s *SlackNotifier) AlertFired(alert models.Alert) error {
-	color := "#e01e5a" // critical — red
-	switch alert.Severity {
+type bkElement struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// sevEmoji maps severity to an emoji prefix for header readability.
+func sevEmoji(sev models.AlertSeverity) string {
+	switch sev {
+	case models.SeverityCritical:
+		return ":red_circle:"
 	case models.SeverityWarning:
-		color = "#ecb22e" // warning — amber
-	case models.SeverityInfo:
-		color = "#2eb886" // info — green
+		return ":large_yellow_circle:"
+	default:
+		return ":large_green_circle:"
+	}
+}
+
+// AlertFired sends a firing alert notification using Block Kit.
+func (s *SlackNotifier) AlertFired(alert models.Alert) error {
+	header := fmt.Sprintf("%s *[%s] %s*", sevEmoji(alert.Severity), string(alert.Severity), alert.RuleName)
+
+	fields := []bkText{
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Resource*\n%s", alert.ResourceID)},
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Namespace*\n%s", alert.Namespace)},
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Metric*\n%s", alert.MetricName)},
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Value / Threshold*\n%.2f / %.2f", alert.Value, alert.Threshold)},
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Alert ID*\n%d", alert.ID)},
+		{Type: "mrkdwn", Text: fmt.Sprintf("*Fired At*\n<!date^%d^{date_short_pretty} {time}|%s>",
+			alert.FiredAt.Unix(), alert.FiredAt.Format(time.RFC3339))},
 	}
 
-	return s.send(slackPayload{
-		Attachments: []slackAttachment{
-			{
-				Color: color,
-				Title: fmt.Sprintf("[%s] %s", string(alert.Severity), alert.RuleName),
-				Text:  alert.Message,
-				Fields: []slackField{
-					{Title: "Resource", Value: alert.ResourceID, Short: true},
-					{Title: "Namespace", Value: alert.Namespace, Short: true},
-					{Title: "Value", Value: fmt.Sprintf("%.2f", alert.Value), Short: true},
-					{Title: "Threshold", Value: fmt.Sprintf("%.2f", alert.Threshold), Short: true},
-					{Title: "Metric", Value: alert.MetricName, Short: true},
-					{Title: "Alert ID", Value: fmt.Sprintf("%d", alert.ID), Short: true},
-				},
-				Footer: "VisualEyes",
-				Ts:     alert.FiredAt.Unix(),
+	payload := blockKitPayload{Blocks: []bkBlock{
+		{
+			Type: "section",
+			Text: &bkText{Type: "mrkdwn", Text: header},
+		},
+		{
+			Type: "section",
+			Text: &bkText{Type: "mrkdwn", Text: alert.Message},
+		},
+		{
+			Type:   "section",
+			Fields: fields,
+		},
+		{
+			Type: "divider",
+		},
+		{
+			Type: "context",
+			Elements: []bkElement{
+				{Type: "mrkdwn", Text: ":telescope: *VisualEyes* | Autonomous Observability Platform"},
 			},
 		},
-	})
+	}}
+
+	return s.send(payload)
 }
 
-// AlertResolved sends a resolution notification.
+// AlertResolved sends a resolution notification using Block Kit.
 func (s *SlackNotifier) AlertResolved(alert models.Alert) error {
-	return s.send(slackPayload{
-		Attachments: []slackAttachment{
-			{
-				Color: "#2eb886",
-				Title: fmt.Sprintf("[RESOLVED] %s", alert.RuleName),
-				Text:  fmt.Sprintf("Alert cleared on *%s/%s*", alert.Namespace, alert.ResourceID),
-				Fields: []slackField{
-					{Title: "Alert ID", Value: fmt.Sprintf("%d", alert.ID), Short: true},
-					{Title: "Metric", Value: alert.MetricName, Short: true},
-				},
-				Footer: "VisualEyes",
-				Ts:     time.Now().Unix(),
+	payload := blockKitPayload{Blocks: []bkBlock{
+		{
+			Type: "section",
+			Text: &bkText{
+				Type: "mrkdwn",
+				Text: fmt.Sprintf(":large_green_circle: *[RESOLVED] %s*", alert.RuleName),
 			},
 		},
-	})
+		{
+			Type: "section",
+			Fields: []bkText{
+				{Type: "mrkdwn", Text: fmt.Sprintf("*Resource*\n%s/%s", alert.Namespace, alert.ResourceID)},
+				{Type: "mrkdwn", Text: fmt.Sprintf("*Metric*\n%s", alert.MetricName)},
+				{Type: "mrkdwn", Text: fmt.Sprintf("*Alert ID*\n%d", alert.ID)},
+				{Type: "mrkdwn", Text: fmt.Sprintf("*Resolved At*\n<!date^%d^{date_short_pretty} {time}|%s>",
+					time.Now().Unix(), time.Now().Format(time.RFC3339))},
+			},
+		},
+		{
+			Type: "context",
+			Elements: []bkElement{
+				{Type: "mrkdwn", Text: ":telescope: *VisualEyes* | Autonomous Observability Platform"},
+			},
+		},
+	}}
+
+	return s.send(payload)
 }
 
-func (s *SlackNotifier) send(payload slackPayload) error {
+func (s *SlackNotifier) send(payload blockKitPayload) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("slack marshal: %w", err)

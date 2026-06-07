@@ -126,3 +126,21 @@ func coreMemQuery(pod, namespace string) string {
 		pod, namespace,
 	)
 }
+
+// errRateQuery returns PromQL for HTTP 5xx error rate percentage for a service.
+// Returns a value in [0,100]. Zero when no requests are observed.
+func errRateQuery(service, namespace string) string {
+	return fmt.Sprintf(
+		`100 * sum(rate(http_requests_total{service="%s",namespace="%s",status=~"5.."}[5m])) / `+
+			`sum(rate(http_requests_total{service="%s",namespace="%s"}[5m]))`,
+		service, namespace, service, namespace,
+	)
+}
+
+// p99LatencyQuery returns PromQL for the P99 request latency in milliseconds for a service.
+func p99LatencyQuery(service, namespace string) string {
+	return fmt.Sprintf(
+		`1000 * histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service="%s",namespace="%s"}[5m])) by (le))`,
+		service, namespace,
+	)
+}
