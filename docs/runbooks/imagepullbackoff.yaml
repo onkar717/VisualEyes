@@ -1,0 +1,62 @@
+name: ImagePullBackOff
+description: Kubernetes cannot pull the container image — authentication failure, wrong tag, or registry unavailable
+severity: SEV2
+tags: [pod-lifecycle, image, registry]
+
+symptoms:
+  - Pod status shows ImagePullBackOff or ErrImagePull
+  - kubectl describe shows "Failed to pull image"
+  - Alert fired: reason=ImagePullBackOff
+
+triage_steps:
+  - step: 1
+    description: Check pod status and image name
+    command: "kubectl get pod -n {namespace} {pod} -o jsonpath='{.spec.containers[*].image}'"
+    safe: true
+
+  - step: 2
+    description: Describe pod — Events section shows exact pull error
+    command: "kubectl describe pod -n {namespace} {pod}"
+    safe: true
+
+  - step: 3
+    description: Check if image pull secret exists in namespace
+    command: "kubectl get secrets -n {namespace} | grep docker"
+    safe: true
+
+  - step: 4
+    description: Verify imagePullSecrets on the pod spec
+    command: "kubectl get pod -n {namespace} {pod} -o jsonpath='{.spec.imagePullSecrets}'"
+    safe: true
+
+common_causes:
+  - cause: Wrong image tag (typo or tag doesn't exist)
+    signal: "Error: manifest unknown / tag does not exist"
+    fix: "Check the image tag in the deployment spec; verify it exists in the registry"
+
+  - cause: Private registry — missing imagePullSecret
+    signal: "Error: unauthorized / authentication required"
+    fix: "Create secret: kubectl create secret docker-registry regcred --docker-server=... and add to spec.imagePullSecrets"
+
+  - cause: Image pull secret expired or incorrect credentials
+    signal: "Error: 401 Unauthorized"
+    fix: "Delete and recreate the docker-registry secret with fresh credentials"
+
+  - cause: Registry unavailable (network issue or outage)
+    signal: "Error: timeout / connection refused to registry host"
+    fix: "Check cluster DNS and egress rules; verify registry is reachable from node"
+
+  - cause: Image deleted from registry
+    signal: "Error: 404 Not Found"
+    fix: "Rebuild and push the image; update deployment to use a pinned digest"
+
+remediation:
+  - scenario: Create missing image pull secret
+    command: "kubectl create secret docker-registry regcred -n {namespace} --docker-server={registry} --docker-username={user} --docker-password={token}"
+    destructive: false
+    confirm_required: true
+
+  - scenario: Patch deployment to use pull secret
+    command: "kubectl patch deployment {deployment} -n {namespace} -p '{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"regcred\"}]}}}}'"
+    destructive: false
+    confirm_required: true

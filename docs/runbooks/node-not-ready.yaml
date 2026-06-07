@@ -1,0 +1,72 @@
+name: NodeNotReady
+description: Kubernetes node is not in Ready state — all pods on that node stop receiving traffic and may be rescheduled
+severity: SEV1
+tags: [node, infrastructure, unavailable]
+
+symptoms:
+  - Node shows NotReady in kubectl get nodes
+  - Pods on the node show Unknown or Terminating state
+  - Alert fired: reason=NodeNotReady
+
+triage_steps:
+  - step: 1
+    description: List all nodes and their status
+    command: "kubectl get nodes -o wide"
+    safe: true
+
+  - step: 2
+    description: Describe the affected node — check Conditions and Events
+    command: "kubectl describe node {node}"
+    safe: true
+
+  - step: 3
+    description: Check kubelet status on the node (if SSH access available)
+    command: "kubectl get node {node} -o jsonpath='{.status.conditions}' | python3 -m json.tool"
+    safe: true
+
+  - step: 4
+    description: Check pods running on the affected node
+    command: "kubectl get pods -A --field-selector spec.nodeName={node}"
+    safe: true
+
+  - step: 5
+    description: Check node resource usage
+    command: "kubectl top node {node}"
+    safe: true
+
+common_causes:
+  - cause: Kubelet process crashed or stopped
+    signal: "Last heartbeat time is old; node condition LastTransitionTime is recent"
+    fix: "SSH to node and restart kubelet: systemctl restart kubelet"
+
+  - cause: Node ran out of memory — OOM at OS level
+    signal: "MemoryPressure condition on node; kernel OOM kill events in dmesg"
+    fix: "Add node memory; reduce pod memory requests; check for memory leaks"
+
+  - cause: Network partition — node cannot reach API server
+    signal: "Node was healthy before; no recent Events; other nodes are fine"
+    fix: "Check network/firewall between node and control plane; check CNI plugin"
+
+  - cause: Disk pressure caused kubelet to stop scheduling
+    signal: "DiskPressure condition True; disk usage >85%"
+    fix: "Free disk space on node; see disk-pressure runbook"
+
+  - cause: Cloud instance stopped or terminated
+    signal: "Node disappeared from provider console"
+    fix: "Start/replace the VM in cloud console; check autoscaler config"
+
+remediation:
+  - scenario: Cordon node to prevent new scheduling while investigating
+    command: "kubectl cordon {node}"
+    destructive: false
+    confirm_required: true
+
+  - scenario: Drain node to safely reschedule all pods
+    command: "kubectl drain {node} --ignore-daemonsets --delete-emptydir-data --grace-period=60"
+    destructive: true
+    confirm_required: true
+
+  - scenario: Remove node from cluster (cloud node replacement)
+    command: "kubectl delete node {node}"
+    destructive: true
+    confirm_required: true
