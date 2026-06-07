@@ -31,8 +31,9 @@ type ContextBuilder struct {
 	alertStore     storage.AlertStore
 	logLines       int
 	metricSamples  int
-	prometheusURL  string
+	prometheusURL     string
 	prometheusEnabled bool
+	prometheusClient  *PrometheusClient // non-nil when prometheusEnabled and URL set
 	lokiURL        string
 	lokiEnabled    bool
 	lokiClient     *LokiClient // non-nil when lokiEnabled and lokiURL set
@@ -55,9 +56,13 @@ func NewContextBuilder(
 }
 
 // SetPrometheus injects Prometheus connection info into context.
+// When enabled and url is non-empty, a PrometheusClient is created for live metric queries.
 func (b *ContextBuilder) SetPrometheus(url string, enabled bool) {
 	b.prometheusURL = url
 	b.prometheusEnabled = enabled
+	if enabled && url != "" {
+		b.prometheusClient = NewPrometheusClient(url)
+	}
 }
 
 // SetLoki injects Loki connection info into context.
@@ -95,6 +100,23 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 	for _, name := range relatedNames {
 		if samples, err := b.metricStore.QueryByName(name, since, 10); err == nil {
 			ctx.RelatedMetrics = append(ctx.RelatedMetrics, samples...)
+		}
+	}
+
+	// Supplement with Prometheus PromQL metrics when available.
+	// For pod-related alerts, fetch CPU and memory via standard cAdvisor queries.
+	if b.prometheusClient != nil && looksLikePod(alert.ResourceID) {
+		if promSamples, err := b.prometheusClient.QueryRange(
+			coreCPUQuery(alert.ResourceID, alert.Namespace),
+			30*time.Minute, 30*time.Second,
+		); err == nil {
+			ctx.RelatedMetrics = append(ctx.RelatedMetrics, promSamples...)
+		}
+		if promSamples, err := b.prometheusClient.QueryRange(
+			coreMemQuery(alert.ResourceID, alert.Namespace),
+			30*time.Minute, 30*time.Second,
+		); err == nil {
+			ctx.RelatedMetrics = append(ctx.RelatedMetrics, promSamples...)
 		}
 	}
 
