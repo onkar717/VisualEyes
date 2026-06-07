@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,7 @@ func runAlerts(_ *cobra.Command, _ []string) error {
 	if alertsWatch {
 		for {
 			printAlertsTable()
-			fmt.Println(styles.Mute.Render("  refreshing in 15s — Ctrl+C to quit"))
+			fmt.Println(styles.Mute.Render("  refreshing in 15s   Ctrl+C to quit"))
 			time.Sleep(15 * time.Second)
 		}
 	}
@@ -113,7 +113,7 @@ func rcaStatusLabel(s string) string {
 	case "failed":
 		return styles.Bad.Render("failed ✗")
 	default:
-		return styles.Mute.Render("—")
+		return styles.Mute.Render(" ")
 	}
 }
 

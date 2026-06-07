@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 func TestRule_Evaluate(t *testing.T) {
@@ -72,10 +72,10 @@ func TestRule_TagMatches(t *testing.T) {
 		t.Error("expected match with superset tags")
 	}
 	if r.TagMatches(map[string]string{"env": "prod"}) {
-		t.Error("expected no match — missing region tag")
+		t.Error("expected no match   missing region tag")
 	}
 	if r.TagMatches(map[string]string{"env": "staging", "region": "us-east-1"}) {
-		t.Error("expected no match — wrong env value")
+		t.Error("expected no match   wrong env value")
 	}
 
 	empty := Rule{}

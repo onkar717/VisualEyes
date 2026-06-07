@@ -1,5 +1,5 @@
 name: DiskPressure
-description: Node disk usage is critically high — kubelet may evict pods to reclaim space
+description: Node disk usage is critically high   kubelet may evict pods to reclaim space
 severity: SEV1
 tags: [resource-pressure, disk, node, eviction]
 

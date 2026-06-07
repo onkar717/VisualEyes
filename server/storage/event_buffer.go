@@ -46,7 +46,7 @@ func (b *EventBuffer) Store(events []K8sEvent) {
 }
 
 // GetRecent returns up to limit Warning events for the given namespace,
-// scanning from newest to oldest. Deduplicates by (Reason, Object) — only
+// scanning from newest to oldest. Deduplicates by (Reason, Object)   only
 // the most recent occurrence of each pair is returned.
 // Pass namespace="" to get all namespaces.
 func (b *EventBuffer) GetRecent(namespace string, limit int) []K8sEvent {

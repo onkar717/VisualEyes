@@ -1,5 +1,5 @@
 name: disk_pressure
-description: Disk usage critically high — risk of node disk pressure taint and pod eviction
+description: Disk usage critically high   risk of node disk pressure taint and pod eviction
 triggers:
   - disk.usage_percent > 90
   - kubernetes.node.condition = DiskPressure
@@ -9,8 +9,8 @@ diagnosis:
   - Check which path is full: root (/), /var/lib/docker, /var/lib/kubelet, or application PVC
   - Look for DiskPressure taint or NodeCondition in node events
   - Identify large log files, core dumps, or accumulated container layers
-  - Check if PVCs are filling — application writing unbounded data
-  - Look for pods in Evicted state — disk pressure causes automatic eviction
+  - Check if PVCs are filling   application writing unbounded data
+  - Look for pods in Evicted state   disk pressure causes automatic eviction
   - Verify imagefs vs. nodefs are on separate partitions and which is full
 remediation:
   - step: 1

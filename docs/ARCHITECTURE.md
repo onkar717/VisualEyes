@@ -104,10 +104,10 @@ React UI  →  WebSocket ws://localhost:8080/ws
 
 | Level | Meaning | Auto-RCA |
 |-------|---------|---------|
-| SEV1 | Critical — service down | ✅ |
-| SEV2 | High — degraded | ✅ |
-| SEV3 | Medium — warning threshold | configurable |
-| SEV4 | Low — informational | ❌ |
+| SEV1 | Critical   service down | ✅ |
+| SEV2 | High   degraded | ✅ |
+| SEV3 | Medium   warning threshold | configurable |
+| SEV4 | Low   informational | ❌ |
 
 ---
 

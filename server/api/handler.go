@@ -376,7 +376,7 @@ func (h *Handler) getPodLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 // -------------------------------------------------------------------
-// Kubernetes events — stub, fully implemented in Commit 4
+// Kubernetes events   stub, fully implemented in Commit 4
 // -------------------------------------------------------------------
 
 // HandleKubeEvents accepts K8s event batches (POST) and serves them (GET).
@@ -533,8 +533,8 @@ func (h *Handler) HandleAlertByID(w http.ResponseWriter, r *http.Request) {
 // -------------------------------------------------------------------
 
 // HandleRCA dispatches:
-//   GET  /api/rca/{alertID}          — fetch RCA result
-//   POST /api/rca/{alertID}/execute  — manually execute a specific command
+//   GET  /api/rca/{alertID}            fetch RCA result
+//   POST /api/rca/{alertID}/execute    manually execute a specific command
 func (h *Handler) HandleRCA(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
 		return
@@ -630,7 +630,7 @@ func (h *Handler) executeRCACommand(w http.ResponseWriter, r *http.Request, aler
 		return
 	}
 
-	// Manual execution (may not be in auto-safe list — let it through with warning).
+	// Manual execution (may not be in auto-safe list   let it through with warning).
 	slog.Info("manual rca command execution requested", "command", cmd.Command, "alert_id", alertID)
 	output, execErr := runCommand(cmd.Command)
 	if execErr != nil {
@@ -679,7 +679,7 @@ func runCommand(cmd string) (string, error) {
 // Observability endpoints
 // -------------------------------------------------------------------
 
-// Ping is a liveness probe — always returns 200.
+// Ping is a liveness probe   always returns 200.
 func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "pong")
@@ -914,7 +914,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 			if m.Value >= 95 {
 				result.Issues = append(result.Issues, ScanIssue{
 					Severity: "critical", Category: "disk",
-					Resource: "host", Message: "Disk usage critical — eviction risk",
+					Resource: "host", Message: "Disk usage critical   eviction risk",
 					Value: fmt.Sprintf("%.1f%%", m.Value),
 				})
 			} else if m.Value >= 85 {
@@ -1218,9 +1218,9 @@ func (h *Handler) HandleSnapshots(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleRemediationLog handles GET and POST for remediation step audit log.
-// GET  /api/remediation-log?incident_id=N  — fetch log for one incident
-// GET  /api/remediation-log?limit=N        — fetch recent entries (default 50)
-// POST /api/remediation-log                — record a step execution
+// GET  /api/remediation-log?incident_id=N    fetch log for one incident
+// GET  /api/remediation-log?limit=N          fetch recent entries (default 50)
+// POST /api/remediation-log                  record a step execution
 func (h *Handler) HandleRemediationLog(w http.ResponseWriter, r *http.Request) {
 	h.cors(w)
 	if h.preflight(w, r) {

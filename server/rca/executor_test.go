@@ -77,7 +77,7 @@ func TestExecutor_RejectsEmptyCommand(t *testing.T) {
 	// "kubectl get " by itself passes isSafe (starts with prefix) but has no binary args.
 	// We need to verify the empty-command guard:
 	_, err := e.Execute(context.Background(), "kubectl delete pod ")
-	// This passes isSafe but the actual execution may fail without a pod name — that's OK.
+	// This passes isSafe but the actual execution may fail without a pod name   that's OK.
 	// What matters is it doesn't panic. We just check it returns without crashing.
 	_ = err
 }
@@ -90,9 +90,9 @@ func TestExecutor_ContextCancellation(t *testing.T) {
 	// "kubectl get nodes" is safe but will fail with cancelled context.
 	_, err := e.Execute(ctx, "kubectl get nodes")
 	if err == nil {
-		t.Skip("kubectl not available or ran too fast — skipping cancellation test")
+		t.Skip("kubectl not available or ran too fast   skipping cancellation test")
 	}
-	// Any error is acceptable here — we just verify no panic.
+	// Any error is acceptable here   we just verify no panic.
 }
 
 func TestExecutor_Execute_EchoBinary(t *testing.T) {
@@ -103,11 +103,11 @@ func TestExecutor_Execute_EchoBinary(t *testing.T) {
 	// Verify the full path: safe command gets executed (may fail if kubectl absent).
 	output, err := e.Execute(context.Background(), "kubectl get pods --help")
 	if err != nil {
-		// kubectl not installed — acceptable in unit-test environments.
-		t.Logf("kubectl not available (%v) — output: %q", err, output)
+		// kubectl not installed   acceptable in unit-test environments.
+		t.Logf("kubectl not available (%v)   output: %q", err, output)
 	} else {
 		if output == "" {
-			t.Log("kubectl returned empty output — unexpected but not fatal")
+			t.Log("kubectl returned empty output   unexpected but not fatal")
 		}
 	}
 }

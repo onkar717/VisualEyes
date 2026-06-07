@@ -1,5 +1,5 @@
 name: PendingPods
-description: Pods stuck in Pending state — scheduler cannot find a suitable node
+description: Pods stuck in Pending state   scheduler cannot find a suitable node
 severity: SEV2
 tags: [scheduling, resources, pod-lifecycle]
 
@@ -15,7 +15,7 @@ triage_steps:
     safe: true
 
   - step: 2
-    description: Describe pending pod — Events will show scheduler reason
+    description: Describe pending pod   Events will show scheduler reason
     command: "kubectl describe pod -n {namespace} {pod}"
     safe: true
 

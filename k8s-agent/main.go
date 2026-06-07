@@ -23,7 +23,7 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Warn("could not load config file — using defaults", "error", err)
+		slog.Warn("could not load config file   using defaults", "error", err)
 		cfg = defaultConfig()
 	}
 
@@ -173,7 +173,7 @@ func main() {
 		}()
 	}
 
-	// Exec endpoint — allows the server to run commands inside pods in-cluster.
+	// Exec endpoint   allows the server to run commands inside pods in-cluster.
 	// Listens on VISUAL_EYES_EXEC_PORT (default 8090).
 	execPort := os.Getenv("VISUAL_EYES_EXEC_PORT")
 	if execPort == "" {
@@ -183,7 +183,7 @@ func main() {
 	agentMux := http.NewServeMux()
 
 	if execErr != nil {
-		slog.Warn("exec endpoint disabled — not running in-cluster", "error", execErr)
+		slog.Warn("exec endpoint disabled   not running in-cluster", "error", execErr)
 	} else {
 		agentMux.HandleFunc("/exec", makeExecHandler(exectr))
 	}
@@ -211,9 +211,9 @@ func main() {
 	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	slog.Info("kubernetes agent running — waiting for signal")
+	slog.Info("kubernetes agent running   waiting for signal")
 	<-sigChan
-	slog.Info("shutdown signal received — stopping agent")
+	slog.Info("shutdown signal received   stopping agent")
 	cancel()
 }
 

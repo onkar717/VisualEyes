@@ -54,13 +54,13 @@ linters-settings:
 
 issues:
   exclude-rules:
-    # Test files — relax some rules
+    # Test files   relax some rules
     - path: "_test\\.go"
       linters:
         - errcheck
         - gocritic
 
-    # Main entry points — allow fmt.Print
+    # Main entry points   allow fmt.Print
     - path: "main\\.go"
       linters:
         - forbidigo

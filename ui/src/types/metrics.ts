@@ -65,7 +65,7 @@ export interface RCAResult {
   alertID: number;
   explanation: string;
   rootCause: string;
-  commands: string; // JSON string of FixCommand[] — parsed on use
+  commands: string; // JSON string of FixCommand[]   parsed on use
   status: 'pending' | 'done' | 'failed';
   model: string;
   inputTokens: number;

@@ -3,7 +3,7 @@ package metrics
 import (
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 	"github.com/shirou/gopsutil/v3/cpu"
 )
 

@@ -74,10 +74,10 @@ type RemediationStep struct {
 type IncidentSeverity string
 
 const (
-	IncidentSEV1 IncidentSeverity = "SEV1" // Critical — service down, data loss risk
-	IncidentSEV2 IncidentSeverity = "SEV2" // High — major degradation
-	IncidentSEV3 IncidentSeverity = "SEV3" // Medium — partial degradation
-	IncidentSEV4 IncidentSeverity = "SEV4" // Low — no user impact / healthy
+	IncidentSEV1 IncidentSeverity = "SEV1" // Critical   service down, data loss risk
+	IncidentSEV2 IncidentSeverity = "SEV2" // High   major degradation
+	IncidentSEV3 IncidentSeverity = "SEV3" // Medium   partial degradation
+	IncidentSEV4 IncidentSeverity = "SEV4" // Low   no user impact / healthy
 )
 
 // IncidentStatus tracks the lifecycle of an incident.
@@ -93,7 +93,7 @@ const (
 
 // Incident is the top-level response record created when an alert fires and
 // RCA completes. It carries the full AI diagnosis, severity classification,
-// and lifecycle timeline — enabling MTTR tracking and incident reporting.
+// and lifecycle timeline   enabling MTTR tracking and incident reporting.
 type Incident struct {
 	ID           uint             `gorm:"primaryKey;autoIncrement"    json:"id"`
 	IncidentCode string           `gorm:"uniqueIndex;not null"        json:"incidentCode"` // INC-XXXXXXXX
@@ -110,13 +110,13 @@ type Incident struct {
 	AffectedServices    string `gorm:"type:text" json:"affectedServices"`    // JSON []string
 	ConfidenceScore     int    `json:"confidenceScore"`
 
-	// Service impact — JSON-encoded []ServiceImpact
+	// Service impact   JSON-encoded []ServiceImpact
 	ServiceImpacts string `gorm:"type:text" json:"serviceImpacts,omitempty"`
-	// EvidenceItems — JSON-encoded []Evidence
+	// EvidenceItems   JSON-encoded []Evidence
 	EvidenceItems string `gorm:"type:text" json:"evidenceItems,omitempty"`
-	// RemediationPlan — JSON-encoded []RemediationStep with per-step execution tracking
+	// RemediationPlan   JSON-encoded []RemediationStep with per-step execution tracking
 	RemediationPlan string `gorm:"type:text" json:"remediationPlan,omitempty"`
-	// AffectedNamespaces — JSON-encoded []string for cross-namespace incidents
+	// AffectedNamespaces   JSON-encoded []string for cross-namespace incidents
 	AffectedNamespaces string `gorm:"type:text" json:"affectedNamespaces,omitempty"`
 	// AffectedPodCount is total count of pods mentioned across all service impacts.
 	AffectedPodCount int `json:"affectedPodCount"`

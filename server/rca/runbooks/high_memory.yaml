@@ -1,5 +1,5 @@
 name: high_memory
-description: Memory usage approaching limit — risk of OOM or swap pressure
+description: Memory usage approaching limit   risk of OOM or swap pressure
 triggers:
   - memory.usage_percent > 85
   - kubernetes.node.memory.usage > 0.85
@@ -9,7 +9,7 @@ diagnosis:
   - Check if memory is growing monotonically (leak) vs. spiky (load-driven)
   - Look for heap dump, out of heap, or malloc error messages in application logs
   - Identify top memory consumers: pod memory.usage vs. memory.limits ratio
-  - Check for missing memory limits — unlimited containers can starve the node
+  - Check for missing memory limits   unlimited containers can starve the node
   - Inspect working set bytes vs. RSS: high working set with low RSS suggests cached data
   - Correlate with traffic spikes, batch imports, or session accumulation patterns
 remediation:

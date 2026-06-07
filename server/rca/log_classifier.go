@@ -153,7 +153,7 @@ func buildLogSummary(counts map[string]int, topErrors []ClassifiedLine, traces [
 	}
 
 	if hasPrev {
-		sb.WriteString("NOTE: Previous container logs included — focus on pre-crash errors for CrashLoopBackOff diagnosis.\n")
+		sb.WriteString("NOTE: Previous container logs included   focus on pre-crash errors for CrashLoopBackOff diagnosis.\n")
 	}
 
 	return sb.String()

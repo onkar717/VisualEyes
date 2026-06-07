@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/onkar717/visual-eyes/backend/config"
+	"github.com/onkar717/visual-eyes/server/config"
 )
 
 // BuildLLMProvider selects and constructs the appropriate LLM backend from config.
@@ -19,7 +19,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 	switch provider {
 	case "claude", "":
 		if cfg.RCA.APIKey == "" {
-			slog.Warn("rca.provider=claude but ANTHROPIC_API_KEY not set — rca disabled")
+			slog.Warn("rca.provider=claude but ANTHROPIC_API_KEY not set   rca disabled")
 			return nil
 		}
 		slog.Info("rca provider: claude", "model", cfg.RCA.Model)
@@ -27,7 +27,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 
 	case "openai":
 		if cfg.RCA.OpenAIAPIKey == "" {
-			slog.Warn("rca.provider=openai but OPENAI_API_KEY not set — rca disabled")
+			slog.Warn("rca.provider=openai but OPENAI_API_KEY not set   rca disabled")
 			return nil
 		}
 		slog.Info("rca provider: openai", "model", cfg.RCA.Model)
@@ -35,7 +35,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 
 	case "groq":
 		if cfg.RCA.GroqAPIKey == "" {
-			slog.Warn("rca.provider=groq but GROQ_API_KEY not set — rca disabled")
+			slog.Warn("rca.provider=groq but GROQ_API_KEY not set   rca disabled")
 			return nil
 		}
 		model := cfg.RCA.Model
@@ -47,7 +47,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 
 	case "mistral":
 		if cfg.RCA.MistralAPIKey == "" {
-			slog.Warn("rca.provider=mistral but MISTRAL_API_KEY not set — rca disabled")
+			slog.Warn("rca.provider=mistral but MISTRAL_API_KEY not set   rca disabled")
 			return nil
 		}
 		model := cfg.RCA.Model
@@ -64,7 +64,7 @@ func BuildLLMProvider(cfg *config.Config) LLMProvider {
 			apiKey = cfg.RCA.OpenAIAPIKey
 		}
 		if apiKey == "" || cfg.RCA.BaseURL == "" {
-			slog.Warn("rca.provider unknown and no base_url/api_key set — rca disabled", "provider", provider)
+			slog.Warn("rca.provider unknown and no base_url/api_key set   rca disabled", "provider", provider)
 			return nil
 		}
 		slog.Info("rca provider: custom openai-compatible", "base_url", cfg.RCA.BaseURL, "model", cfg.RCA.Model)

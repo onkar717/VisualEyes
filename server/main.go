@@ -45,7 +45,7 @@ func main() {
 	var store storage.MetricStore
 	pgStore, dbErr := storage.NewPostgresStore(cfg.Database.BuildDSN(), cfg.Database.MaxRecords)
 	if dbErr != nil {
-		slog.Error("failed to connect to postgres — falling back to in-memory store",
+		slog.Error("failed to connect to postgres   falling back to in-memory store",
 			"error", dbErr,
 			"dsn_hint", cfg.Database.Host+":"+fmt.Sprint(cfg.Database.Port),
 		)
@@ -125,7 +125,7 @@ func main() {
 		}
 	}
 
-	// K8s event ring buffer — shared between handler (writer) and RCA context builder (reader).
+	// K8s event ring buffer   shared between handler (writer) and RCA context builder (reader).
 	eventBuffer := storage.NewEventBuffer(500)
 
 	// WebSocket Broadcaster
@@ -218,7 +218,7 @@ func main() {
 			slog.Info("rca engine started", "provider", cfg.RCA.Provider, "model", cfg.RCA.Model)
 		}
 	} else {
-		slog.Info("rca engine disabled — set rca.enabled=true and a provider API key to enable")
+		slog.Info("rca engine disabled   set rca.enabled=true and a provider API key to enable")
 		// Wire store anyway so /api/rca/* returns empty results instead of 503.
 		if rs, ok := store.(storage.RCAStore); ok {
 			handler.SetRCAStore(rs)

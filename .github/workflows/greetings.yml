@@ -25,7 +25,7 @@ jobs:
             - For **bugs**: please include reproduction steps, your OS, Go/Node version, and any relevant logs (`make logs` or `kubectl logs`)
             - For **feature requests**: describe the problem it solves and any alternatives you've considered
 
-            A maintainer will review this soon. In the meantime, check the [docs](https://github.com/onkar717/VisualEyes/tree/main/docs) and [INSTALLATION.md](https://github.com/onkar717/VisualEyes/blob/main/INSTALLATION.md) — your question may already be answered.
+            A maintainer will review this soon. In the meantime, check the [docs](https://github.com/onkar717/VisualEyes/tree/main/docs) and [INSTALLATION.md](https://github.com/onkar717/VisualEyes/blob/main/INSTALLATION.md)   your question may already be answered.
 
           pr-message: |
             👋 Thanks for your first pull request to VisualEyes!

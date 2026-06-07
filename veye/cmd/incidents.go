@@ -21,7 +21,7 @@ var (
 
 var incidentsCmd = &cobra.Command{
 	Use:   "incidents",
-	Short: "Show incident history — SEV1-4 lifecycle, MTTR, root cause",
+	Short: "Show incident history   SEV1-4 lifecycle, MTTR, root cause",
 	Long:  "Displays structured incidents with severity classification, status lifecycle, MTTR, and AI-generated root cause. Use --severity/--status to filter.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resp, err := api.FullIncidents(incidentLimit, incidentSeverity, incidentStatus, incidentHours)

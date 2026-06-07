@@ -95,7 +95,7 @@ func NewClaudeClient(apiKey, model string, maxTokens int, temperature float64) *
 // Name implements LLMProvider.
 func (c *ClaudeClient) Name() string { return c.model }
 
-// Complete implements LLMProvider — single-turn chat with system + user message.
+// Complete implements LLMProvider   single-turn chat with system + user message.
 func (c *ClaudeClient) Complete(ctx context.Context, systemPrompt, userPrompt string, maxTokens int) (string, int, error) {
 	if maxTokens <= 0 {
 		maxTokens = c.maxTokens

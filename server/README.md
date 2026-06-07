@@ -42,9 +42,9 @@ Go HTTP server. Central hub for metrics ingestion, alert processing, AI RCA, Web
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/health` | Health check — `{"status":"ok"}` |
+| `GET` | `/health` | Health check   `{"status":"ok"}` |
 | `GET` | `/metrics` | Prometheus metrics endpoint |
-| `GET` | `/ws` | WebSocket — live metric stream |
+| `GET` | `/ws` | WebSocket   live metric stream |
 
 ## Architecture
 
@@ -94,8 +94,8 @@ ANTHROPIC_API_KEY=sk-ant-... ./bin/visual-eyes-server
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VISUAL_EYES_SERVER_PORT` | `8080` | HTTP listen port |
-| `DATABASE_URL` | — | PostgreSQL DSN; falls back to in-memory if unset |
-| `ANTHROPIC_API_KEY` | — | Claude API key for RCA; RCA disabled if unset |
+| `DATABASE_URL` |   | PostgreSQL DSN; falls back to in-memory if unset |
+| `ANTHROPIC_API_KEY` |   | Claude API key for RCA; RCA disabled if unset |
 | `VISUAL_EYES_LOG_LEVEL` | `info` | Log level: debug/info/warn/error |
 
 ## Storage Modes

@@ -1,4 +1,4 @@
-# UI — React Dashboard
+# UI   React Dashboard
 
 VisualEyes frontend. React 19 + MUI + Vite. Live system and Kubernetes monitoring with WebSocket-driven updates.
 
@@ -53,7 +53,7 @@ docker run --rm -p 3000:3000 visual-eyes-ui:latest
 
 | View | Route | Description |
 |------|-------|-------------|
-| System Dashboard | `/` | CPU, memory, disk, network, load — live charts |
+| System Dashboard | `/` | CPU, memory, disk, network, load   live charts |
 | Kubernetes Dashboard | `/kubernetes` | Pod list, node stats, events |
 | Alerts | `/alerts` | Active alerts with severity and timestamps |
 | RCA | `/rca/:id` | AI Root Cause Analysis detail drawer |

@@ -175,7 +175,7 @@ List all active alerts.
 
 Get a single alert by ID.
 
-**Response:** `200 OK` — same shape as single element above.
+**Response:** `200 OK`   same shape as single element above.
 
 **Error:** `404 Not Found`
 
@@ -205,10 +205,10 @@ List all RCA results.
   {
     "id": "r9x8y7",
     "incident_id": "a1b2c3",
-    "root_cause": "payment-service cannot connect to Redis at redis.prod.svc:6379 — TCP connection refused.",
+    "root_cause": "payment-service cannot connect to Redis at redis.prod.svc:6379   TCP connection refused.",
     "contributing_factors": [
       "Redis service has 0 ready endpoints (selector mismatch)",
-      "redis-0 pod is Pending — PVC not bound"
+      "redis-0 pod is Pending   PVC not bound"
     ],
     "confidence": 0.94,
     "steps": [
@@ -236,7 +236,7 @@ List all RCA results.
 
 Get a single RCA result by ID.
 
-**Response:** `200 OK` — same shape as single element above.
+**Response:** `200 OK`   same shape as single element above.
 
 ---
 
@@ -264,7 +264,7 @@ List collected pod logs.
     "namespace": "prod",
     "pod": "payment-service-84f9b8c-x2z9",
     "container": "payment-service",
-    "log_line": "Error: ECONNREFUSED — Redis connection failed",
+    "log_line": "Error: ECONNREFUSED   Redis connection failed",
     "timestamp": "2026-06-07T10:27:58Z"
   }
 ]
@@ -315,7 +315,7 @@ ws.onmessage = (event) => {
 };
 ```
 
-**Message types:** See [docs/ARCHITECTURE.md — WebSocket Protocol](ARCHITECTURE.md#websocket-protocol) for full message schemas.
+**Message types:** See [docs/ARCHITECTURE.md   WebSocket Protocol](ARCHITECTURE.md#websocket-protocol) for full message schemas.
 
 | `type` | Trigger |
 |--------|---------|
@@ -324,6 +324,6 @@ ws.onmessage = (event) => {
 | `alert` | Alert engine fires a new alert |
 | `alert_resolved` | Alert condition clears |
 | `rca_result` | RCA pipeline completes for an incident |
-| `snapshot` | Sent on connect — current state of all metrics/alerts |
+| `snapshot` | Sent on connect   current state of all metrics/alerts |
 
-**Reconnection:** Clients should implement exponential backoff reconnect. The backend does not persist connection state between reconnects — a new `snapshot` message is sent on each fresh connection.
+**Reconnection:** Clients should implement exponential backoff reconnect. The backend does not persist connection state between reconnects   a new `snapshot` message is sent on each fresh connection.

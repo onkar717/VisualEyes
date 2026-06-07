@@ -86,10 +86,10 @@ rca:
   log_lines: 100
   metric_samples: 20
   agent_timeout_seconds: 120   # per-stage LLM timeout; total pipeline cap = 6× this
-  # Prometheus integration — metrics agent stage references PromQL when enabled.
+  # Prometheus integration   metrics agent stage references PromQL when enabled.
   prometheus_enabled: false
   prometheus_url: ""           # e.g. http://prometheus:9090
-  # Loki integration — log queries use LogQL instead of inline push logs when enabled.
+  # Loki integration   log queries use LogQL instead of inline push logs when enabled.
   loki_enabled: false
   loki_url: ""                 # e.g. http://loki:3100
 

@@ -270,7 +270,7 @@ export const RCADrawer: React.FC<RCADrawerProps> = ({ alert, open, onClose }) =>
                 background: isDarkMode ? 'rgba(255,152,0,0.06)' : 'rgba(255,243,224,0.8)',
               }}
             >
-              <Typography variant="body2" lineHeight={1.7}>{rca.rootCause || '—'}</Typography>
+              <Typography variant="body2" lineHeight={1.7}>{rca.rootCause || ' '}</Typography>
             </Paper>
 
             {/* Explanation */}

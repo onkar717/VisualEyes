@@ -1,12 +1,12 @@
 name: image_pull
-description: Pod stuck in ImagePullBackOff or ErrImagePull — cannot pull container image
+description: Pod stuck in ImagePullBackOff or ErrImagePull   cannot pull container image
 triggers:
   - pod.reason = ImagePullBackOff
   - pod.reason = ErrImagePull
 categories:
   - image_pull
 diagnosis:
-  - Confirm image tag exists in registry — typo or deleted tag is the most common cause
+  - Confirm image tag exists in registry   typo or deleted tag is the most common cause
   - Check if imagePullSecret is present in the pod spec and not expired
   - Verify registry hostname is reachable from the cluster network (DNS resolution, firewall)
   - Look for rate-limit messages (429/toomanyrequests) from Docker Hub

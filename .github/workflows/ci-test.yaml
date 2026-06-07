@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test-backend:
-    name: Backend Tests (race detector + coverage)
+  test-server:
+    name: Server Tests (race detector + coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,17 +26,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Sync workspace
+        run: go work sync
 
       - name: Run tests with race detector and coverage
-        run: go test -v -race -count=1 -coverprofile=coverage-backend.out -covermode=atomic ./backend/...
+        run: go test -v -race -count=1 -coverprofile=coverage-server.out -covermode=atomic ./server/...
 
-      - name: Upload backend coverage to Codecov
+      - name: Upload server coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: coverage-backend.out
-          flags: backend
+          files: coverage-server.out
+          flags: server
           token: ${{ secrets.CODECOV_TOKEN }}
 
   test-agents:
@@ -58,8 +58,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Sync workspace
+        run: go work sync
+
       - name: Run agent tests with race detector and coverage
-        run: go test -v -race -count=1 -coverprofile=coverage-agents.out -covermode=atomic ./agents/...
+        run: go test -v -race -count=1 -coverprofile=coverage-agents.out -covermode=atomic ./system-agent/... ./k8s-agent/...
 
       - name: Upload agent coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -68,8 +71,8 @@ jobs:
           flags: agents
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  test-cli:
-    name: CLI Tests (race detector + coverage)
+  test-veye:
+    name: veye CLI Tests (race detector + coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,14 +90,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Run CLI tests with race detector and coverage
-        run: go test -v -race -count=1 -coverprofile=coverage-cli.out -covermode=atomic ./cli/...
+      - name: Sync workspace
+        run: go work sync
 
-      - name: Upload CLI coverage to Codecov
+      - name: Run veye tests with race detector and coverage
+        run: go test -v -race -count=1 -coverprofile=coverage-veye.out -covermode=atomic ./veye/...
+
+      - name: Upload veye coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: coverage-cli.out
-          flags: cli
+          files: coverage-veye.out
+          flags: veye
           token: ${{ secrets.CODECOV_TOKEN }}
 
   test-ui:

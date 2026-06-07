@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 	"github.com/spf13/cobra"
 )
 
@@ -36,13 +36,13 @@ Use --dry-run to print commands without executing them.`,
 		rca, err := api.RCA(alertID)
 		if err != nil {
 			if strings.Contains(err.Error(), "HTTP 404") {
-				return fmt.Errorf("no RCA result for alert %d — trigger RCA first (requires rca.enabled=true and a provider API key)", alertID)
+				return fmt.Errorf("no RCA result for alert %d   trigger RCA first (requires rca.enabled=true and a provider API key)", alertID)
 			}
 			return fmt.Errorf("fetch rca for alert %d: %w", alertID, err)
 		}
 
 		if rca.Status != "done" {
-			return fmt.Errorf("rca status is %q — must be 'done' before applying", rca.Status)
+			return fmt.Errorf("rca status is %q   must be 'done' before applying", rca.Status)
 		}
 
 		var cmds []client.FixCommand
@@ -78,7 +78,7 @@ Use --dry-run to print commands without executing them.`,
 			)
 
 			if skip {
-				fmt.Printf("      %s\n\n", styles.Mute.Render("Skipped — not auto-safe. Use --force to execute."))
+				fmt.Printf("      %s\n\n", styles.Mute.Render("Skipped   not auto-safe. Use --force to execute."))
 				skipped++
 				continue
 			}

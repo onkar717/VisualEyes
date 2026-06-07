@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onkar717/visual-eyes/agents/system/metrics"
-	"github.com/onkar717/visual-eyes/backend/config"
-	sharedhttp "github.com/onkar717/visual-eyes/backend/http"
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/system-agent/metrics"
+	"github.com/onkar717/visual-eyes/server/config"
+	sharedhttp "github.com/onkar717/visual-eyes/server/http"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // Agent represents the main VisualEyes agent

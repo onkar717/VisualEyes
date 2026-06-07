@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 const pdEventsV2URL = "https://events.pagerduty.com/v2/enqueue"
@@ -48,7 +48,7 @@ func (p *PagerDutyNotifier) AlertFired(alert models.Alert) error {
 		EventAction: "trigger",
 		DedupKey:    fmt.Sprintf("veye-alert-%d", alert.ID),
 		Payload: pdPayload{
-			Summary:   fmt.Sprintf("[%s] %s — %s/%s", string(alert.Severity), alert.RuleName, alert.Namespace, alert.ResourceID),
+			Summary:   fmt.Sprintf("[%s] %s   %s/%s", string(alert.Severity), alert.RuleName, alert.Namespace, alert.ResourceID),
 			Source:    "visual-eyes",
 			Severity:  pdSeverity(alert.Severity),
 			Timestamp: alert.FiredAt.UTC().Format(time.RFC3339),

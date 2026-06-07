@@ -7,12 +7,12 @@ Manifests for deploying the VisualEyes Kubernetes agent as a DaemonSet in your c
 | File | Kind | Description |
 |------|------|-------------|
 | `rbac.yaml` | ServiceAccount, ClusterRole, ClusterRoleBinding | Least-privilege access to kubelet and K8s APIs |
-| `config.yaml` | ConfigMap | Agent configuration — backend endpoint, collection interval |
+| `config.yaml` | ConfigMap | Agent configuration   backend endpoint, collection interval |
 | `agent.yaml` | DaemonSet | One agent pod per node; runs in `kube-system` namespace |
 
 ## Apply Order
 
-Always apply in this order — DaemonSet needs the ServiceAccount and ConfigMap to exist first:
+Always apply in this order   DaemonSet needs the ServiceAccount and ConfigMap to exist first:
 
 ```bash
 kubectl apply -f deployments/kubernetes/rbac.yaml
@@ -40,7 +40,7 @@ Edit `config.yaml` before applying. Key values:
 
 | Key | Description |
 |-----|-------------|
-| `VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT` | URL where agent pushes metrics — must be reachable from inside the cluster |
+| `VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT` | URL where agent pushes metrics   must be reachable from inside the cluster |
 | `VISUAL_EYES_AGENT_COLLECTION_INTERVAL` | How often to collect and push (e.g. `15s`) |
 
 ## Reaching the Backend from Inside the Cluster
@@ -70,8 +70,8 @@ data:
 
 The ClusterRole grants read-only access to:
 
-- `nodes`, `pods`, `namespaces` — for listing cluster resources
-- `nodes/stats`, `nodes/proxy` — for kubelet summary API access (CPU/memory per pod and node)
+- `nodes`, `pods`, `namespaces`   for listing cluster resources
+- `nodes/stats`, `nodes/proxy`   for kubelet summary API access (CPU/memory per pod and node)
 
 No write permissions are requested.
 

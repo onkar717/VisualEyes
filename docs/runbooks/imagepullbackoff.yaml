@@ -1,5 +1,5 @@
 name: ImagePullBackOff
-description: Kubernetes cannot pull the container image — authentication failure, wrong tag, or registry unavailable
+description: Kubernetes cannot pull the container image   authentication failure, wrong tag, or registry unavailable
 severity: SEV2
 tags: [pod-lifecycle, image, registry]
 
@@ -15,7 +15,7 @@ triage_steps:
     safe: true
 
   - step: 2
-    description: Describe pod — Events section shows exact pull error
+    description: Describe pod   Events section shows exact pull error
     command: "kubectl describe pod -n {namespace} {pod}"
     safe: true
 
@@ -34,7 +34,7 @@ common_causes:
     signal: "Error: manifest unknown / tag does not exist"
     fix: "Check the image tag in the deployment spec; verify it exists in the registry"
 
-  - cause: Private registry — missing imagePullSecret
+  - cause: Private registry   missing imagePullSecret
     signal: "Error: unauthorized / authentication required"
     fix: "Create secret: kubectl create secret docker-registry regcred --docker-server=... and add to spec.imagePullSecrets"
 

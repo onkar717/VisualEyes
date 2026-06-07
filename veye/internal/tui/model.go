@@ -9,8 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/onkar717/visual-eyes/cli/internal/client"
-	"github.com/onkar717/visual-eyes/cli/internal/styles"
+	"github.com/onkar717/visual-eyes/veye/internal/client"
+	"github.com/onkar717/visual-eyes/veye/internal/styles"
 )
 
 // view is one of the three main panes.
@@ -256,7 +256,7 @@ func (m Model) renderBody() string {
 
 func (m Model) renderAlerts(h int) string {
 	if len(m.alerts) == 0 {
-		return styles.Good.Render("\n  ✓ No firing alerts — system is healthy\n")
+		return styles.Good.Render("\n  ✓ No firing alerts   system is healthy\n")
 	}
 
 	var sb strings.Builder
@@ -314,7 +314,7 @@ func (m Model) renderAlerts(h int) string {
 
 func (m Model) renderLogs(h int) string {
 	if len(m.logs) == 0 {
-		return styles.Mute.Render("\n  no logs yet — K8s agent ships them automatically\n")
+		return styles.Mute.Render("\n  no logs yet   K8s agent ships them automatically\n")
 	}
 
 	// Window the log lines.

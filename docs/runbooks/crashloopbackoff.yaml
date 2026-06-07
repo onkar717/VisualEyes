@@ -20,7 +20,7 @@ triage_steps:
     safe: true
 
   - step: 3
-    description: Describe pod — check Events section for root cause
+    description: Describe pod   check Events section for root cause
     command: "kubectl describe pod -n {namespace} {pod}"
     safe: true
 

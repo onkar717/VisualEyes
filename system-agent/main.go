@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/onkar717/visual-eyes/backend/config"
+	"github.com/onkar717/visual-eyes/server/config"
 )
 
 func main() {

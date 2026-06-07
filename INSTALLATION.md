@@ -26,7 +26,7 @@ This guide covers all deployment modes for VisualEyes.
 | Docker | 24 | Container deployment |
 | Docker Compose | v2 | Full stack local |
 | kubectl | 1.26 | Kubernetes deployment |
-| PostgreSQL | 14 | Persistent storage (optional — falls back to in-memory) |
+| PostgreSQL | 14 | Persistent storage (optional   falls back to in-memory) |
 
 ---
 
@@ -54,7 +54,7 @@ Edit `.env`:
 # Required for AI RCA
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Optional — omit to use in-memory storage
+# Optional   omit to use in-memory storage
 DATABASE_URL=postgres://user:pass@localhost:5432/visualeyes?sslmode=disable
 
 # Backend server address (for agents and CLI)
@@ -65,21 +65,21 @@ VISUAL_EYES_SERVER_URL=http://localhost:8080
 
 Open three terminals:
 
-**Terminal 1 — Backend server:**
+**Terminal 1   Backend server:**
 
 ```bash
 ./bin/visual-eyes-server
 # Listening on :8080
 ```
 
-**Terminal 2 — System agent:**
+**Terminal 2   System agent:**
 
 ```bash
 ./bin/visual-eyes-agent
 # Pushing metrics every 10s
 ```
 
-**Terminal 3 — UI:**
+**Terminal 3   UI:**
 
 ```bash
 make run-ui
@@ -114,7 +114,7 @@ Services:
 | backend | 8080 | API + WebSocket |
 | ui | 3000 | React dashboard |
 | postgres | 5432 | Persistent storage |
-| system-agent | — | Host metrics push |
+| system-agent |   | Host metrics push |
 
 Check logs:
 
@@ -240,8 +240,8 @@ All settings can be set via `configs/config.yaml` or environment variables. Envi
 | `agent.output.remote_endpoint` | `VISUAL_EYES_OUTPUT_REMOTE_ENDPOINT` | `http://localhost:8080/api/system-metrics` | Backend push URL |
 | `agent.disable_kube_metrics` | `VISUAL_EYES_AGENT_DISABLE_KUBE_METRICS` | `false` | Skip K8s metric collection |
 | `agent.disable_host_metrics` | `VISUAL_EYES_AGENT_DISABLE_HOST_METRICS` | `false` | Skip system metric collection |
-| `database.url` | `DATABASE_URL` | — | PostgreSQL connection string |
-| `rca.anthropic_api_key` | `ANTHROPIC_API_KEY` | — | Claude API key for RCA |
+| `database.url` | `DATABASE_URL` |   | PostgreSQL connection string |
+| `rca.anthropic_api_key` | `ANTHROPIC_API_KEY` |   | Claude API key for RCA |
 
 ---
 

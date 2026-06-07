@@ -6,13 +6,13 @@ YAML runbooks for common Kubernetes and system failure modes. VisualEyes AI RCA 
 
 | Runbook | Severity | Description |
 |---------|----------|-------------|
-| [crashloopbackoff.yaml](crashloopbackoff.yaml) | SEV1 | Pod repeatedly crashes — startup failure, missing config, bad image |
+| [crashloopbackoff.yaml](crashloopbackoff.yaml) | SEV1 | Pod repeatedly crashes   startup failure, missing config, bad image |
 | [oomkilled.yaml](oomkilled.yaml) | SEV2 | Container exceeded memory limit |
-| [high-cpu.yaml](high-cpu.yaml) | SEV3 | CPU throttling — limit too low or hot-path inefficiency |
-| [imagepullbackoff.yaml](imagepullbackoff.yaml) | SEV2 | Image pull failure — bad tag, missing secret, registry down |
-| [disk-pressure.yaml](disk-pressure.yaml) | SEV1 | Node disk usage critical — kubelet may evict pods |
-| [node-not-ready.yaml](node-not-ready.yaml) | SEV1 | Node not in Ready state — kubelet crash, OOM, network partition |
-| [pending-pods.yaml](pending-pods.yaml) | SEV2 | Pods stuck in Pending — insufficient resources, taint, affinity |
+| [high-cpu.yaml](high-cpu.yaml) | SEV3 | CPU throttling   limit too low or hot-path inefficiency |
+| [imagepullbackoff.yaml](imagepullbackoff.yaml) | SEV2 | Image pull failure   bad tag, missing secret, registry down |
+| [disk-pressure.yaml](disk-pressure.yaml) | SEV1 | Node disk usage critical   kubelet may evict pods |
+| [node-not-ready.yaml](node-not-ready.yaml) | SEV1 | Node not in Ready state   kubelet crash, OOM, network partition |
+| [pending-pods.yaml](pending-pods.yaml) | SEV2 | Pods stuck in Pending   insufficient resources, taint, affinity |
 
 ## Runbook Format
 
@@ -44,7 +44,7 @@ remediation:
     destructive: bool      # true = deletes/patches/scales something
     confirm_required: bool
 
-monitoring:                # Optional — metric thresholds for proactive alerting
+monitoring:                # Optional   metric thresholds for proactive alerting
   - metric: string
     threshold: string
     action: string
@@ -56,7 +56,7 @@ monitoring:                # Optional — metric thresholds for proactive alerti
 2. Add it to the table in this README
 3. The AI RCA engine picks up all runbooks in this directory automatically
 
-**Placeholder convention:** Use `{namespace}`, `{pod}`, `{deployment}`, `{node}`, `{container}` in commands — the RCA engine substitutes real values from the incident context before displaying to the user.
+**Placeholder convention:** Use `{namespace}`, `{pod}`, `{deployment}`, `{node}`, `{container}` in commands   the RCA engine substitutes real values from the incident context before displaying to the user.
 
 ## Contributing Runbooks
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onkar717/visual-eyes/backend/config"
-	"github.com/onkar717/visual-eyes/backend/models"
+	"github.com/onkar717/visual-eyes/server/config"
+	"github.com/onkar717/visual-eyes/server/models"
 )
 
 // Operator defines how a metric value is compared to a threshold.
