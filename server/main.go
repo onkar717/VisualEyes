@@ -100,7 +100,7 @@ func main() {
 				channel = "multi"
 			}
 		}
-		notifier = notifications.NewLoggingNotifier(baseNotifier, channel, ns)
+		notifier = notifications.NewLoggingNotifier(notifier, channel, ns)
 	}
 
 	// Alert Engine
