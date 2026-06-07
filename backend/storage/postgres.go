@@ -55,6 +55,7 @@ func NewPostgresStore(dsn string, maxRecords int) (*PostgresStore, error) {
 		&models.Alert{},
 		&models.RCAResult{},
 		&models.NotificationEvent{},
+		&models.Incident{},
 	); err != nil {
 		return nil, fmt.Errorf("auto-migrate: %w", err)
 	}
@@ -271,6 +272,74 @@ func (s *PostgresStore) GetRCAResult(alertID uint) (*models.RCAResult, error) {
 // ═══════════════════════════════════════════════════════════════════
 // NotificationStore
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// IncidentStore
+// ═══════════════════════════════════════════════════════════════════
+
+func (s *PostgresStore) SaveIncident(inc *models.Incident) error {
+	if err := s.db.Create(inc).Error; err != nil {
+		return fmt.Errorf("save incident: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) UpdateIncident(inc *models.Incident) error {
+	if err := s.db.Save(inc).Error; err != nil {
+		return fmt.Errorf("update incident: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) GetIncidentByID(id uint) (*models.Incident, error) {
+	var inc models.Incident
+	if err := s.db.First(&inc, id).Error; err != nil {
+		return nil, fmt.Errorf("get incident %d: %w", id, err)
+	}
+	return &inc, nil
+}
+
+func (s *PostgresStore) GetIncidentByAlertID(alertID uint) (*models.Incident, error) {
+	var inc models.Incident
+	if err := s.db.Where("alert_id = ?", alertID).Order("created_at DESC").First(&inc).Error; err != nil {
+		return nil, fmt.Errorf("get incident for alert %d: %w", alertID, err)
+	}
+	return &inc, nil
+}
+
+func (s *PostgresStore) GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error) {
+	q := s.db.Order("detected_at DESC")
+	if severityFilter != "" {
+		q = q.Where("severity = ?", severityFilter)
+	}
+	if statusFilter != "" {
+		q = q.Where("status = ?", statusFilter)
+	}
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var incidents []models.Incident
+	if err := q.Find(&incidents).Error; err != nil {
+		return nil, fmt.Errorf("get recent incidents: %w", err)
+	}
+	return incidents, nil
+}
+
+func (s *PostgresStore) MTTRStats() (float64, int, error) {
+	var result struct {
+		Avg   float64 `gorm:"column:avg"`
+		Count int     `gorm:"column:count"`
+	}
+	err := s.db.Raw(`
+		SELECT AVG(mttr_seconds) AS avg, COUNT(*) AS count
+		FROM incidents
+		WHERE mttr_seconds IS NOT NULL
+	`).Scan(&result).Error
+	if err != nil {
+		return 0, 0, fmt.Errorf("mttr stats: %w", err)
+	}
+	return result.Avg, result.Count, nil
+}
 
 func (s *PostgresStore) SaveNotificationEvent(e *models.NotificationEvent) error {
 	if err := s.db.Create(e).Error; err != nil {

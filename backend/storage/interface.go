@@ -49,3 +49,13 @@ type NotificationStore interface {
 	GetNotificationEvents(alertID uint) ([]models.NotificationEvent, error)
 	GetRecentNotificationEvents(limit int) ([]models.NotificationEvent, error)
 }
+
+// IncidentStore persists and queries the full incident lifecycle.
+type IncidentStore interface {
+	SaveIncident(inc *models.Incident) error
+	UpdateIncident(inc *models.Incident) error
+	GetIncidentByID(id uint) (*models.Incident, error)
+	GetIncidentByAlertID(alertID uint) (*models.Incident, error)
+	GetRecentIncidents(severityFilter, statusFilter string, limit int) ([]models.Incident, error)
+	MTTRStats() (avgSeconds float64, count int, err error)
+}
