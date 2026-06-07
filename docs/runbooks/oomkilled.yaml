@@ -1,0 +1,68 @@
+name: OOMKilled
+description: Container exceeded its memory limit and was killed by the kernel OOM killer
+severity: SEV2
+tags: [resource-pressure, memory, oomkill]
+
+symptoms:
+  - Pod shows OOMKilled in Last State
+  - Sudden container restart with exit code 137
+  - Alert fired: reason=OOMKilled
+
+triage_steps:
+  - step: 1
+    description: Confirm OOMKilled in pod events
+    command: "kubectl describe pod -n {namespace} {pod}"
+    safe: true
+
+  - step: 2
+    description: Check current memory usage vs limits
+    command: "kubectl top pod -n {namespace} {pod} --containers"
+    safe: true
+
+  - step: 3
+    description: Check deployment memory limits
+    command: "kubectl get deployment {deployment} -n {namespace} -o jsonpath='{.spec.template.spec.containers[*].resources}'"
+    safe: true
+
+  - step: 4
+    description: Review recent logs for memory-intensive operations
+    command: "kubectl logs -n {namespace} {pod} --previous --tail=200"
+    safe: true
+
+  - step: 5
+    description: Check node memory pressure
+    command: "kubectl describe node | grep -A5 'Conditions'"
+    safe: true
+
+common_causes:
+  - cause: Memory limit set too low for workload
+    signal: "Usage consistently near or at limit before kill"
+    fix: "Increase memory limit; use kubectl top to baseline real usage first"
+
+  - cause: Memory leak in application
+    signal: "Steady memory growth in metrics over time before each kill"
+    fix: "Profile application memory; add heap dump on OOM; fix leak"
+
+  - cause: Unbounded cache or queue growth
+    signal: "Memory grows proportionally to request rate"
+    fix: "Add eviction policy to in-memory caches; bound queue depth"
+
+  - cause: Single large request (e.g. large file upload, full-table scan)
+    signal: "Spike to OOM on specific operations"
+    fix: "Add streaming for large payloads; paginate DB queries"
+
+remediation:
+  - scenario: Immediate relief — increase memory limit
+    command: "kubectl set resources deployment {deployment} -n {namespace} --limits=memory=1Gi --requests=memory=512Mi"
+    destructive: false
+    confirm_required: true
+
+  - scenario: Scale out to distribute load
+    command: "kubectl scale deployment {deployment} -n {namespace} --replicas=3"
+    destructive: false
+    confirm_required: true
+
+monitoring:
+  - metric: container_memory_working_set_bytes
+    threshold: "80% of limit"
+    action: "Fire SEV3 warning before OOMKill occurs"
