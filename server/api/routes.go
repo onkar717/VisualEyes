@@ -52,6 +52,9 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	mux.HandleFunc("/api/clusters/heartbeat", h.HandleClusterHeartbeat)
 	mux.HandleFunc("/api/clusters/", h.HandleClusterDetail)
 
+	// Cluster health trend snapshots
+	mux.HandleFunc("/api/snapshots", h.HandleSnapshots)
+
 	// Remediation audit log
 	mux.HandleFunc("/api/remediation-log", h.HandleRemediationLog)
 

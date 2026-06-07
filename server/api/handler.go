@@ -30,6 +30,7 @@ type Handler struct {
 	incidentStore       storage.IncidentStore
 	remediationLogStore storage.RemediationLogStore
 	clusterStore        storage.ClusterStore
+	snapshotStore       storage.ClusterSnapshotStore
 	broadcaster         *ws.Broadcaster
 	hostname          string
 	corsOrigins       string
@@ -44,6 +45,7 @@ func (h *Handler) SetNotificationStore(s storage.NotificationStore) { h.notifica
 func (h *Handler) SetIncidentStore(s storage.IncidentStore)                 { h.incidentStore = s }
 func (h *Handler) SetRemediationLogStore(s storage.RemediationLogStore) { h.remediationLogStore = s }
 func (h *Handler) SetClusterStore(s storage.ClusterStore)               { h.clusterStore = s }
+func (h *Handler) SetSnapshotStore(s storage.ClusterSnapshotStore)      { h.snapshotStore = s }
 func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                     { h.broadcaster = b }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
@@ -1139,7 +1141,62 @@ func (h *Handler) HandleClusterHeartbeat(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	// Persist immutable time-series snapshot for trending.
+	if h.snapshotStore != nil {
+		snap := &models.ClusterSnapshot{
+			ClusterName:   c.Name,
+			RecordedAt:    c.LastSeen,
+			HealthScore:   c.HealthScore,
+			TotalNodes:    c.TotalNodes,
+			ReadyNodes:    c.ReadyNodes,
+			TotalPods:     c.TotalPods,
+			RunningPods:   c.RunningPods,
+			PendingPods:   c.PendingPods,
+			FailedPods:    c.FailedPods,
+			CrashloopPods: c.CrashloopPods,
+			OpenIncidents: c.OpenIncidents,
+		}
+		if err := h.snapshotStore.SaveSnapshot(snap); err != nil {
+			slog.Warn("save cluster snapshot failed", "error", err)
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "cluster": c.Name})
+}
+
+// HandleSnapshots returns point-in-time health trend data for a cluster.
+// GET /api/snapshots?cluster=NAME&hours=24&limit=288
+func (h *Handler) HandleSnapshots(w http.ResponseWriter, r *http.Request) {
+	h.cors(w)
+	if h.preflight(w, r) {
+		return
+	}
+	if h.snapshotStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	cluster := r.URL.Query().Get("cluster")
+	if cluster == "" {
+		http.Error(w, "cluster param required", http.StatusBadRequest)
+		return
+	}
+	hours := 24
+	limit := 288
+	fmt.Sscanf(r.URL.Query().Get("hours"), "%d", &hours)
+	fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
+
+	snaps, err := h.snapshotStore.GetSnapshots(cluster, hours, limit)
+	if err != nil {
+		slog.Error("get snapshots", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if snaps == nil {
+		snaps = []models.ClusterSnapshot{}
+	}
+	writeJSON(w, http.StatusOK, snaps)
 }
 
 // HandleRemediationLog handles GET and POST for remediation step audit log.
