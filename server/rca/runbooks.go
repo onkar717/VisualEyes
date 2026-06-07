@@ -24,6 +24,8 @@ type Runbook struct {
 	Description string        `yaml:"description"`
 	Triggers    []string      `yaml:"triggers"`
 	Categories  []string      `yaml:"categories"`
+	// Diagnosis hints guide the LLM on what signals to look for.
+	Diagnosis   []string      `yaml:"diagnosis"`
 	Remediation []RunbookStep `yaml:"remediation"`
 }
 
@@ -74,6 +76,13 @@ func RunbookSummary(rb *Runbook) string {
 	}
 	var sb strings.Builder
 	sb.WriteString("Runbook: " + rb.Name + " — " + rb.Description + "\n")
+	if len(rb.Diagnosis) > 0 {
+		sb.WriteString("Diagnosis hints:\n")
+		for _, hint := range rb.Diagnosis {
+			sb.WriteString("  - " + hint + "\n")
+		}
+	}
+	sb.WriteString("Remediation steps:\n")
 	for _, step := range rb.Remediation {
 		safe := "manual"
 		if step.IsAutoSafe {

@@ -5,6 +5,13 @@ triggers:
   - kubernetes.node.condition = DiskPressure
 categories:
   - disk
+diagnosis:
+  - Check which path is full: root (/), /var/lib/docker, /var/lib/kubelet, or application PVC
+  - Look for DiskPressure taint or NodeCondition in node events
+  - Identify large log files, core dumps, or accumulated container layers
+  - Check if PVCs are filling — application writing unbounded data
+  - Look for pods in Evicted state — disk pressure causes automatic eviction
+  - Verify imagefs vs. nodefs are on separate partitions and which is full
 remediation:
   - step: 1
     description: Prune unused Docker images to free disk space immediately
