@@ -21,11 +21,11 @@ LDFLAGS_DEV=-ldflags "-X main.Version=$(VERSION)"
 # Install dir
 INSTALL_DIR ?= /usr/local/bin
 
-# Main paths
-SYSTEM_AGENT_PATH=./agents/system
-KUBE_AGENT_PATH=./agents/kubernetes
-SERVER_PATH=./backend
-CLI_PATH=./cli
+# Main paths (multi-module layout)
+SYSTEM_AGENT_PATH=./system-agent
+KUBE_AGENT_PATH=./k8s-agent
+SERVER_PATH=./server
+CLI_PATH=./veye
 
 # Build all
 build: build-system-agent build-kube-agent build-server build-cli
@@ -110,7 +110,7 @@ build-and-push:
 
 # Build Docker image for backend server
 build-docker-server:
-	docker build -f backend/Dockerfile -t visual-eyes-server:latest .
+	docker build -f server/Dockerfile -t visual-eyes-server:latest .
 
 # Run backend server in Docker
 run-docker-server:
@@ -136,7 +136,7 @@ push-docker-ui:
 
 # Build Docker image for system agent
 build-docker-system-agent:
-	docker build -f agents/system/Dockerfile -t visual-eyes-system-agent:latest .
+	docker build -f system-agent/Dockerfile -t visual-eyes-system-agent:latest .
 
 # Run system agent in Docker
 run-docker-system-agent:
@@ -178,13 +178,13 @@ status-k8s:
 # Run all components (server + system agent + UI)
 run-all: run-server run-system-agent run-ui
 
-# Run tests
+# Run tests across all modules
 test:
-	$(GOTEST) -v ./...
+	$(GOTEST) -v ./server/... ./veye/... ./system-agent/... ./k8s-agent/...
 
-# Run tests with race detector (use in CI and before release)
+# Run tests with race detector
 test-race:
-	$(GOTEST) -v -race -count=1 ./...
+	$(GOTEST) -v -race -count=1 ./server/... ./veye/... ./system-agent/... ./k8s-agent/...
 
 # Install veye CLI to INSTALL_DIR (default: /usr/local/bin)
 install-cli: build-cli
