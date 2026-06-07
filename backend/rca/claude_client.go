@@ -73,10 +73,10 @@ type ClaudeClient struct {
 func NewClaudeClient(apiKey, model string, maxTokens int) *ClaudeClient {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 	if model == "" {
-		model = "claude-sonnet-4-5"
+		model = "claude-sonnet-4-6"
 	}
 	if maxTokens <= 0 {
-		maxTokens = 2048
+		maxTokens = 4096
 	}
 	return &ClaudeClient{client: &client, model: model, maxTokens: maxTokens}
 }
