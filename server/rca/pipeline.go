@@ -100,6 +100,8 @@ Output ONLY valid JSON:
   "category": "crashloop|oom|high_cpu|high_memory|disk|image_pull|node_not_ready|pending|network|other",
   "contributing_factors": ["factor1", "factor2"],
   "affected_services": ["svc1"],
+  "affected_namespaces": ["ns1", "ns2"],
+  "affected_pod_count": 0,
   "service_impacts": [
     {
       "service": "actual-service-name",
@@ -108,6 +110,26 @@ Output ONLY valid JSON:
       "affected_pods": ["pod-name"],
       "error_rate_pct": 0.0,
       "p99_latency_ms": 0.0
+    }
+  ],
+  "evidence": [
+    {
+      "type": "metric|log|event|node|runbook",
+      "source": "prometheus|kubectl logs|k8s events|node exporter",
+      "description": "one-line human-readable summary",
+      "metric_name": "optional metric name",
+      "metric_value": 0.0,
+      "pod_name": "optional pod name",
+      "namespace": "optional namespace"
+    }
+  ],
+  "remediation_plan": [
+    {
+      "step_number": 1,
+      "description": "what this step does and why",
+      "command": "kubectl ...",
+      "is_destructive": false,
+      "is_automated": true
     }
   ],
   "confidence": 0-100,

@@ -87,9 +87,10 @@ func main() {
 		baseNotifier = notifications.NewMultiNotifier(activeNotifiers...)
 	}
 
-	// Wrap with SeverityFilter so only configured severities trigger external delivery.
-	var notifier notifications.Notifier = notifications.NewSeverityFilter(
-		baseNotifier, cfg.Notifications.AlertSeverities,
+	// Wrap with SeverityFilter then DedupNotifier (30-min per-alert window).
+	var notifier notifications.Notifier = notifications.NewDedupNotifier(
+		notifications.NewSeverityFilter(baseNotifier, cfg.Notifications.AlertSeverities),
+		30*time.Minute,
 	)
 	if ns, ok := store.(storage.NotificationStore); ok {
 		channel := "noop"

@@ -24,6 +24,14 @@ var safeCommandPrefixes = []string{
 	// Self-healing — auto-execute for common recoverable failures
 	"kubectl delete pod ",
 	"kubectl rollout restart ",
+	// Scaling and scheduling
+	"kubectl scale deployment/",
+	"kubectl cordon ",
+	"kubectl uncordon ",
+	// Image update and metadata
+	"kubectl set image ",
+	"kubectl annotate ",
+	"kubectl label ",
 }
 
 // shellMetachars are characters that indicate an attempt to chain or redirect

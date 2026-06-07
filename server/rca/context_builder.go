@@ -2,12 +2,43 @@ package rca
 
 import (
 	"fmt"
+	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onkar717/visual-eyes/server/models"
 	"github.com/onkar717/visual-eyes/server/storage"
 )
+
+// OOMKillInfo holds info about an OOM-killed container detected via Prometheus.
+type OOMKillInfo struct{ Pod, Namespace, Container string }
+
+// DeploymentIssue holds a deployment where ready replicas < desired.
+type DeploymentIssue struct {
+	Namespace string
+	Name      string
+	Desired   float64
+	Ready     float64
+}
+
+// HPAAtMaxInfo holds an HPA that is at its maximum replica count.
+type HPAAtMaxInfo struct {
+	Namespace string
+	Name      string
+	Current   float64
+	Max       float64
+}
+
+// UnboundPVCInfo holds a PVC that is not in Bound phase.
+type UnboundPVCInfo struct{ Namespace, Name, Phase string }
+
+// NodePressureInfo holds per-node CPU and memory usage percentages.
+type NodePressureInfo struct {
+	Node   string
+	CPUPct float64
+	MemPct float64
+}
 
 // AlertContext bundles everything the LLM pipeline needs for high-quality RCA.
 type AlertContext struct {
@@ -25,6 +56,18 @@ type AlertContext struct {
 	LogClassification ClassifiedLogs
 	// Detected metric anomalies (Z-score ≥ 2.5σ over recent samples).
 	Anomalies []AnomalyResult
+	// OOM-killed containers detected via Prometheus.
+	OOMKills []OOMKillInfo
+	// Deployments with ready replicas < desired (replica mismatches).
+	DeploymentIssues []DeploymentIssue
+	// HPAs currently at max replica count (can't scale out).
+	HPAAtMax []HPAAtMaxInfo
+	// PVCs not in Bound phase (may block pod scheduling).
+	UnboundPVCs []UnboundPVCInfo
+	// Per-node CPU/memory pressure.
+	NodePressures []NodePressureInfo
+	// NamespaceLogSummary is per-pod error category counts from parallel log scan.
+	NamespaceLogSummary map[string]map[string]int
 	// Observability stack availability — hints for the LLM agents.
 	PrometheusURL     string
 	PrometheusEnabled bool
@@ -142,6 +185,151 @@ func (b *ContextBuilder) Build(alert models.Alert) AlertContext {
 			30*time.Minute, 30*time.Second,
 		); err == nil {
 			ctx.RelatedMetrics = append(ctx.RelatedMetrics, promSamples...)
+		}
+	}
+
+	// Prometheus instant queries — OOM kills, deployment mismatches, HPA, PVC, node pressure.
+	if b.prometheusClient != nil {
+		// OOM kills
+		if oomRes, err := b.prometheusClient.QueryInstant(oomKillQuery()); err == nil {
+			for _, r := range oomRes {
+				if ctx.Alert.Namespace == "" || r.Labels["namespace"] == ctx.Alert.Namespace {
+					ctx.OOMKills = append(ctx.OOMKills, OOMKillInfo{
+						Pod:       r.Labels["pod"],
+						Namespace: r.Labels["namespace"],
+						Container: r.Labels["container"],
+					})
+				}
+			}
+		}
+
+		// Deployment replica mismatches
+		desiredMap := make(map[string]float64)
+		if desRes, err := b.prometheusClient.QueryInstant(deploymentSpecReplicasQuery(ctx.Alert.Namespace)); err == nil {
+			for _, r := range desRes {
+				key := r.Labels["namespace"] + "/" + r.Labels["deployment"]
+				desiredMap[key] = r.Value
+			}
+		}
+		if rdyRes, err := b.prometheusClient.QueryInstant(deploymentReadyReplicasQuery(ctx.Alert.Namespace)); err == nil {
+			for _, r := range rdyRes {
+				key := r.Labels["namespace"] + "/" + r.Labels["deployment"]
+				desired := desiredMap[key]
+				if desired > 0 && r.Value < desired {
+					ctx.DeploymentIssues = append(ctx.DeploymentIssues, DeploymentIssue{
+						Namespace: r.Labels["namespace"],
+						Name:      r.Labels["deployment"],
+						Desired:   desired,
+						Ready:     r.Value,
+					})
+				}
+			}
+		}
+
+		// HPA at max
+		hpaCurrentMap := make(map[string]float64)
+		hpaNameMap := make(map[string]string)
+		if hpaRes, err := b.prometheusClient.QueryInstant(hpaCurrentReplicasQuery(ctx.Alert.Namespace)); err == nil {
+			for _, r := range hpaRes {
+				key := r.Labels["namespace"] + "/" + r.Labels["horizontalpodautoscaler"]
+				hpaCurrentMap[key] = r.Value
+				hpaNameMap[key] = r.Labels["horizontalpodautoscaler"]
+			}
+		}
+		if maxRes, err := b.prometheusClient.QueryInstant(hpaMaxReplicasQuery(ctx.Alert.Namespace)); err == nil {
+			for _, r := range maxRes {
+				key := r.Labels["namespace"] + "/" + r.Labels["horizontalpodautoscaler"]
+				current := hpaCurrentMap[key]
+				if current > 0 && current >= r.Value {
+					ctx.HPAAtMax = append(ctx.HPAAtMax, HPAAtMaxInfo{
+						Namespace: r.Labels["namespace"],
+						Name:      r.Labels["horizontalpodautoscaler"],
+						Current:   current,
+						Max:       r.Value,
+					})
+				}
+			}
+		}
+
+		// Unbound PVCs
+		if pvcRes, err := b.prometheusClient.QueryInstant(pvcUnboundQuery(ctx.Alert.Namespace)); err == nil {
+			for _, r := range pvcRes {
+				ctx.UnboundPVCs = append(ctx.UnboundPVCs, UnboundPVCInfo{
+					Namespace: r.Labels["namespace"],
+					Name:      r.Labels["persistentvolumeclaim"],
+					Phase:     r.Labels["phase"],
+				})
+			}
+		}
+
+		// Per-node resource pressure
+		nodeMap := make(map[string]*NodePressureInfo)
+		if cpuRes, err := b.prometheusClient.QueryInstant(nodeCPUPressureQuery()); err == nil {
+			for _, r := range cpuRes {
+				node := r.Labels["instance"]
+				if node == "" {
+					node = r.Labels["node"]
+				}
+				if node != "" {
+					if _, ok := nodeMap[node]; !ok {
+						nodeMap[node] = &NodePressureInfo{Node: node}
+					}
+					nodeMap[node].CPUPct = math.Round(r.Value*10) / 10
+				}
+			}
+		}
+		if memRes, err := b.prometheusClient.QueryInstant(nodeMemPressureQuery()); err == nil {
+			for _, r := range memRes {
+				node := r.Labels["instance"]
+				if node == "" {
+					node = r.Labels["node"]
+				}
+				if node != "" {
+					if _, ok := nodeMap[node]; !ok {
+						nodeMap[node] = &NodePressureInfo{Node: node}
+					}
+					nodeMap[node].MemPct = math.Round(r.Value*10) / 10
+				}
+			}
+		}
+		for _, np := range nodeMap {
+			ctx.NodePressures = append(ctx.NodePressures, *np)
+		}
+	}
+
+	// Parallel namespace log analysis — fetch top pods concurrently (G11).
+	if b.logStore != nil && ctx.Alert.Namespace != "" {
+		pods := uniquePodsInNamespace(ctx.RelatedMetrics, ctx.Alert.Namespace, 5)
+		if len(pods) > 0 {
+			type podLogResult struct {
+				pod  string
+				cats map[string]int
+			}
+			ch := make(chan podLogResult, len(pods))
+			var wg sync.WaitGroup
+			for _, pod := range pods {
+				wg.Add(1)
+				go func(p string) {
+					defer wg.Done()
+					logs, err := b.logStore.GetLogs(p, ctx.Alert.Namespace, 30)
+					if err != nil || len(logs) == 0 {
+						ch <- podLogResult{p, nil}
+						return
+					}
+					cls := ClassifyLogs(logs, nil)
+					ch <- podLogResult{p, cls.CategoryCounts}
+				}(pod)
+			}
+			go func() { wg.Wait(); close(ch) }()
+			summary := make(map[string]map[string]int)
+			for r := range ch {
+				if r.cats != nil && len(r.cats) > 0 {
+					summary[r.pod] = r.cats
+				}
+			}
+			if len(summary) > 0 {
+				ctx.NamespaceLogSummary = summary
+			}
 		}
 	}
 
@@ -280,6 +468,95 @@ func (c AlertContext) Format() string {
 		b.WriteString("\n")
 	}
 
+	// Init container failures — filter K8s events with Init: reasons (G16).
+	var initEvents []storage.K8sEvent
+	for _, ev := range c.K8sEvents {
+		if strings.HasPrefix(ev.Reason, "Init:") || strings.Contains(ev.Message, "init container") {
+			initEvents = append(initEvents, ev)
+		}
+	}
+	if len(initEvents) > 0 {
+		b.WriteString("=== INIT CONTAINER ISSUES ===\n")
+		for _, ev := range initEvents {
+			b.WriteString(fmt.Sprintf("  [%s] %s/%s  reason=%s  msg=%s\n",
+				ev.LastSeen.Format("15:04:05"), ev.Kind, ev.Object, ev.Reason, ev.Message))
+		}
+		b.WriteString("\n")
+	}
+
+	// OOM kills detected via Prometheus.
+	if len(c.OOMKills) > 0 {
+		b.WriteString("=== OOM KILLED CONTAINERS ===\n")
+		for _, o := range c.OOMKills {
+			b.WriteString(fmt.Sprintf("  %s/%s  container=%s\n", o.Namespace, o.Pod, o.Container))
+		}
+		b.WriteString("\n")
+	}
+
+	// Deployment replica mismatches.
+	if len(c.DeploymentIssues) > 0 {
+		b.WriteString("=== DEPLOYMENT REPLICA MISMATCHES ===\n")
+		for _, d := range c.DeploymentIssues {
+			b.WriteString(fmt.Sprintf("  %s/%s  desired=%.0f  ready=%.0f\n",
+				d.Namespace, d.Name, d.Desired, d.Ready))
+		}
+		b.WriteString("\n")
+	}
+
+	// HPAs at maximum replicas (cannot scale out).
+	if len(c.HPAAtMax) > 0 {
+		b.WriteString("=== HPA AT MAX REPLICAS ===\n")
+		for _, h := range c.HPAAtMax {
+			b.WriteString(fmt.Sprintf("  %s/%s  current=%.0f  max=%.0f  (CANNOT SCALE OUT)\n",
+				h.Namespace, h.Name, h.Current, h.Max))
+		}
+		b.WriteString("\n")
+	}
+
+	// Unbound PVCs (may block pod scheduling).
+	if len(c.UnboundPVCs) > 0 {
+		b.WriteString("=== UNBOUND PVCs ===\n")
+		for _, pvc := range c.UnboundPVCs {
+			b.WriteString(fmt.Sprintf("  %s/%s  phase=%s\n", pvc.Namespace, pvc.Name, pvc.Phase))
+		}
+		b.WriteString("\n")
+	}
+
+	// Per-node resource pressure.
+	if len(c.NodePressures) > 0 {
+		b.WriteString("=== NODE RESOURCE PRESSURE ===\n")
+		for _, np := range c.NodePressures {
+			cpuFlag := ""
+			if np.CPUPct > 85 {
+				cpuFlag = " [CRITICAL]"
+			} else if np.CPUPct > 70 {
+				cpuFlag = " [HIGH]"
+			}
+			memFlag := ""
+			if np.MemPct > 90 {
+				memFlag = " [CRITICAL]"
+			} else if np.MemPct > 80 {
+				memFlag = " [HIGH]"
+			}
+			b.WriteString(fmt.Sprintf("  %s  cpu=%.1f%%%s  mem=%.1f%%%s\n",
+				np.Node, np.CPUPct, cpuFlag, np.MemPct, memFlag))
+		}
+		b.WriteString("\n")
+	}
+
+	// Namespace-wide log error summary (parallel scan).
+	if len(c.NamespaceLogSummary) > 0 {
+		b.WriteString("=== NAMESPACE LOG ERROR SUMMARY ===\n")
+		for pod, cats := range c.NamespaceLogSummary {
+			parts := make([]string, 0, len(cats))
+			for cat, cnt := range cats {
+				parts = append(parts, fmt.Sprintf("%s:%d", cat, cnt))
+			}
+			b.WriteString(fmt.Sprintf("  %s  errors=[%s]\n", pod, strings.Join(parts, " ")))
+		}
+		b.WriteString("\n")
+	}
+
 	b.WriteString("=== ALERT ===\n")
 	b.WriteString(fmt.Sprintf("Rule: %s | Severity: %s | Status: %s\n", c.Alert.RuleName, c.Alert.Severity, c.Alert.Status))
 	b.WriteString(fmt.Sprintf("Resource: %s (namespace: %s)\n", c.Alert.ResourceID, c.Alert.Namespace))
@@ -357,4 +634,25 @@ func relatedMetrics(ruleName string) []string {
 func looksLikePod(resourceID string) bool {
 	// Pod names typically contain at least two "-" segments (deployment-replicaset-pod).
 	return strings.Count(resourceID, "-") >= 2
+}
+
+// uniquePodsInNamespace returns up to max unique pod names in namespace from metrics.
+func uniquePodsInNamespace(metrics []models.Metric, namespace string, max int) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, m := range metrics {
+		if m.Tags["namespace"] != namespace {
+			continue
+		}
+		pod := m.Tags["pod"]
+		if pod == "" || seen[pod] {
+			continue
+		}
+		seen[pod] = true
+		out = append(out, pod)
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
 }

@@ -368,8 +368,9 @@ func (s *PostgresStore) GetStats() (IncidentStats, error) {
 	avg, count, err := s.MTTRStats()
 	st.AvgMTTRSeconds = avg
 	st.MTTRCount = count
-	if m, merr := s.MTTRStatsBySeverity(); merr == nil {
-		st.MTTRBySeverity = m
+	if avgs, counts, merr := s.mttrBySeverityFull(); merr == nil {
+		st.MTTRBySeverity = avgs
+		st.MTTRCountBySeverity = counts
 	}
 	return st, err
 }
@@ -390,26 +391,35 @@ func (s *PostgresStore) MTTRStats() (float64, int, error) {
 	return result.Avg, result.Count, nil
 }
 
-func (s *PostgresStore) MTTRStatsBySeverity() (map[string]float64, error) {
+// mttrBySeverityFull returns both avg MTTR and incident count per severity.
+func (s *PostgresStore) mttrBySeverityFull() (map[string]float64, map[string]int, error) {
 	type row struct {
 		Severity string  `gorm:"column:severity"`
 		Avg      float64 `gorm:"column:avg"`
+		Count    int     `gorm:"column:cnt"`
 	}
 	var rows []row
 	err := s.db.Raw(`
-		SELECT severity, AVG(mttr_seconds) AS avg
+		SELECT severity, AVG(mttr_seconds) AS avg, COUNT(*) AS cnt
 		FROM incidents
 		WHERE mttr_seconds IS NOT NULL
 		GROUP BY severity
 	`).Scan(&rows).Error
 	if err != nil {
-		return nil, fmt.Errorf("mttr by severity: %w", err)
+		return nil, nil, fmt.Errorf("mttr by severity: %w", err)
 	}
-	out := make(map[string]float64, len(rows))
+	avgs := make(map[string]float64, len(rows))
+	counts := make(map[string]int, len(rows))
 	for _, r := range rows {
-		out[r.Severity] = r.Avg
+		avgs[r.Severity] = r.Avg
+		counts[r.Severity] = r.Count
 	}
-	return out, nil
+	return avgs, counts, nil
+}
+
+func (s *PostgresStore) MTTRStatsBySeverity() (map[string]float64, error) {
+	avgs, _, err := s.mttrBySeverityFull()
+	return avgs, err
 }
 
 func (s *PostgresStore) FindOpenByCategory(category, namespace string, windowHours int) (*models.Incident, error) {

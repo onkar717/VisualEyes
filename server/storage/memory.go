@@ -523,8 +523,10 @@ func (s *MemoryStore) GetStats() (IncidentStats, error) {
 	}
 	if len(sevTotals) > 0 {
 		st.MTTRBySeverity = make(map[string]float64, len(sevTotals))
+		st.MTTRCountBySeverity = make(map[string]int, len(sevCounts))
 		for sev, total := range sevTotals {
 			st.MTTRBySeverity[sev] = total / float64(sevCounts[sev])
+			st.MTTRCountBySeverity[sev] = sevCounts[sev]
 		}
 	}
 	return st, nil

@@ -70,7 +70,11 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 			bySev := "  by severity:"
 			for _, sev := range []string{"SEV1", "SEV2", "SEV3", "SEV4"} {
 				if v, ok := resp.MTTRBySeverity[sev]; ok {
-					bySev += fmt.Sprintf("  %s %s", styles.KeyStyle.Render(sev), styles.ValStyle.Render(formatMTTR(v)))
+					entry := fmt.Sprintf("  %s %s", styles.KeyStyle.Render(sev), styles.ValStyle.Render(formatMTTR(v)))
+					if cnt, ok2 := resp.MTTRCountBySeverity[sev]; ok2 && cnt > 0 {
+						entry += styles.Mute.Render(fmt.Sprintf("(%d)", cnt))
+					}
+					bySev += entry
 				}
 			}
 			mttrLine += "\n" + bySev

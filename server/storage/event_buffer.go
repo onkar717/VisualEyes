@@ -46,10 +46,13 @@ func (b *EventBuffer) Store(events []K8sEvent) {
 }
 
 // GetRecent returns up to limit Warning events for the given namespace,
-// scanning from newest to oldest. Pass namespace="" to get all namespaces.
+// scanning from newest to oldest. Deduplicates by (Reason, Object) — only
+// the most recent occurrence of each pair is returned.
+// Pass namespace="" to get all namespaces.
 func (b *EventBuffer) GetRecent(namespace string, limit int) []K8sEvent {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	seen := make(map[string]bool)
 	var out []K8sEvent
 	for i := len(b.events) - 1; i >= 0 && len(out) < limit; i-- {
 		ev := b.events[i]
@@ -59,6 +62,11 @@ func (b *EventBuffer) GetRecent(namespace string, limit int) []K8sEvent {
 		if namespace != "" && ev.Namespace != namespace {
 			continue
 		}
+		key := ev.Reason + "/" + ev.Object
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		out = append(out, ev)
 	}
 	return out
