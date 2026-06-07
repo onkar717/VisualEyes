@@ -89,6 +89,7 @@ type ScanIssue struct {
 	Resource string `json:"resource"`
 	Message  string `json:"message"`
 	Value    string `json:"value,omitempty"`
+	AlertID  uint   `json:"alertID,omitempty"`
 }
 
 // ScanSummary is the high-level metrics from /api/scan.

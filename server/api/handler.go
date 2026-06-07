@@ -802,6 +802,7 @@ type ScanIssue struct {
 	Resource string `json:"resource"`
 	Message  string `json:"message"`
 	Value    string `json:"value,omitempty"`
+	AlertID  uint   `json:"alertID,omitempty"` // set when finding is derived from an alert
 }
 
 // ScanResult is the full /api/scan response.
@@ -858,6 +859,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 					Resource: a.ResourceID + "/" + a.Namespace,
 					Message:  a.Message,
 					Value:    fmt.Sprintf("%.2f (threshold %.2f)", a.Value, a.Threshold),
+					AlertID:  a.ID,
 				})
 			}
 		}
