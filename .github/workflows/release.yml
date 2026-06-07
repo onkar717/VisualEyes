@@ -6,8 +6,9 @@ on:
       - "v*"
 
 jobs:
-  release:
-    name: Build & Release
+  # ── Binary release ──────────────────────────────────────────────────────────
+  binaries:
+    name: Build & Release Binaries
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,11 +21,21 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify module checksums
+        run: go mod verify
+
       - name: Run tests
-        run: go test ./...
+        run: go test -race -count=1 ./...
 
       - name: Cross-compile binaries
         run: make cross
@@ -50,3 +61,65 @@ jobs:
             dist/veye-windows-amd64.exe
             dist/checksums.txt
           generate_release_notes: true
+
+  # ── Container images ─────────────────────────────────────────────────────────
+  docker:
+    name: Build & Push Container Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - name: server
+            file: backend/Dockerfile
+            context: .
+            image: visual-eyes-server
+          - name: system-agent
+            file: agents/system/Dockerfile
+            context: .
+            image: visual-eyes-agent
+          - name: ui
+            file: ui/Dockerfile
+            context: ./ui
+            image: visual-eyes-ui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU (enables ARM64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
