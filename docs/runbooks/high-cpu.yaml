@@ -1,0 +1,74 @@
+name: HighCPUThrottle
+description: Container CPU usage consistently near or exceeding its limit, causing throttling
+severity: SEV3
+tags: [resource-pressure, cpu, throttling, performance]
+
+symptoms:
+  - High latency on pod endpoints
+  - CPU throttling visible in metrics
+  - Alert fired: reason=HighCPUThrottle
+  - Response times degraded but pod is not crashing
+
+triage_steps:
+  - step: 1
+    description: Check current CPU usage across pods in namespace
+    command: "kubectl top pods -n {namespace}"
+    safe: true
+
+  - step: 2
+    description: Check CPU limits for the affected deployment
+    command: "kubectl get deployment {deployment} -n {namespace} -o jsonpath='{.spec.template.spec.containers[*].resources}'"
+    safe: true
+
+  - step: 3
+    description: Check node CPU pressure
+    command: "kubectl top nodes"
+    safe: true
+
+  - step: 4
+    description: Describe pod to check throttle events
+    command: "kubectl describe pod -n {namespace} {pod}"
+    safe: true
+
+  - step: 5
+    description: Check horizontal pod autoscaler if configured
+    command: "kubectl get hpa -n {namespace}"
+    safe: true
+
+common_causes:
+  - cause: CPU limit too low for workload spike
+    signal: "Usage at 100% of limit during normal traffic"
+    fix: "Increase CPU limit; or scale out replicas"
+
+  - cause: No CPU limit set, noisy neighbor on node
+    signal: "Other pods on same node consuming excessive CPU"
+    fix: "Set explicit CPU requests and limits to guarantee scheduling"
+
+  - cause: Inefficient hot path (O(n²) loop, sync I/O blocking goroutines)
+    signal: "CPU high only on specific request types"
+    fix: "Profile with pprof; optimize hot path; add async processing"
+
+  - cause: Traffic spike without autoscaling
+    signal: "CPU correlates directly with request rate"
+    fix: "Configure HPA on CPU metric; or pre-warm extra replicas"
+
+remediation:
+  - scenario: Horizontal scale-out for immediate relief
+    command: "kubectl scale deployment {deployment} -n {namespace} --replicas=5"
+    destructive: false
+    confirm_required: true
+
+  - scenario: Increase CPU limit
+    command: "kubectl set resources deployment {deployment} -n {namespace} --limits=cpu=1000m --requests=cpu=250m"
+    destructive: false
+    confirm_required: true
+
+  - scenario: Configure HPA (if not already set)
+    command: "kubectl autoscale deployment {deployment} -n {namespace} --cpu-percent=70 --min=2 --max=10"
+    destructive: false
+    confirm_required: true
+
+monitoring:
+  - metric: container_cpu_cfs_throttled_periods_total
+    threshold: "> 25% throttled periods over 5m window"
+    action: "Fire SEV3 HighCPUThrottle alert"

@@ -1,0 +1,62 @@
+name: CrashLoopBackOff
+description: Pod repeatedly crashes and Kubernetes backs off restart attempts
+severity: SEV1
+tags: [pod-lifecycle, crashing, restart-loop]
+
+symptoms:
+  - Pod status shows CrashLoopBackOff
+  - High restart count in kubectl get pods
+  - Alert fired: reason=CrashLoopBackOff
+
+triage_steps:
+  - step: 1
+    description: Get pod status and restart count
+    command: "kubectl get pods -n {namespace} {pod} -o wide"
+    safe: true
+
+  - step: 2
+    description: Read last crash logs (last 100 lines before exit)
+    command: "kubectl logs -n {namespace} {pod} --previous --tail=100"
+    safe: true
+
+  - step: 3
+    description: Describe pod — check Events section for root cause
+    command: "kubectl describe pod -n {namespace} {pod}"
+    safe: true
+
+  - step: 4
+    description: Check if ConfigMap or Secret referenced by pod exists
+    command: "kubectl get configmap,secret -n {namespace}"
+    safe: true
+
+common_causes:
+  - cause: Missing environment variable or secret
+    signal: "logs show 'required env var not set' or panic on startup"
+    fix: "kubectl create secret generic ... or add env var to deployment"
+
+  - cause: Cannot connect to dependency (DB, cache, upstream service)
+    signal: "logs show ECONNREFUSED or connection timeout"
+    fix: "Check if dependency pod/service is running and endpoints are ready"
+
+  - cause: OOMKilled immediately (memory limit too low)
+    signal: "kubectl describe shows Last State: OOMKilled"
+    fix: "Increase memory limits in deployment spec"
+
+  - cause: Bad image (missing binary, wrong entrypoint)
+    signal: "exit code 127 or 'exec: not found'"
+    fix: "Check Dockerfile CMD/ENTRYPOINT, verify image tag is correct"
+
+  - cause: Liveness probe too aggressive
+    signal: "pod killed before app finishes starting"
+    fix: "Increase initialDelaySeconds on livenessProbe"
+
+remediation:
+  - scenario: OOMKilled
+    command: "kubectl set resources deployment {deployment} -n {namespace} --limits=memory=512Mi"
+    destructive: true
+    confirm_required: true
+
+  - scenario: Restart to pick up new secret
+    command: "kubectl rollout restart deployment/{deployment} -n {namespace}"
+    destructive: false
+    confirm_required: true
