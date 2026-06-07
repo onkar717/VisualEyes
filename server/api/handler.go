@@ -1041,11 +1041,13 @@ func (h *Handler) HandleIncidentsFull(w http.ResponseWriter, r *http.Request) {
 	}
 
 	avg, count, _ := h.incidentStore.MTTRStats()
+	mttrBySev, _ := h.incidentStore.MTTRStatsBySeverity()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"incidents":        incidents,
 		"count":            len(incidents),
 		"mttr_avg_seconds": avg,
 		"mttr_count":       count,
+		"mttr_by_severity": mttrBySev,
 	})
 }
 
