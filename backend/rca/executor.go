@@ -11,15 +11,35 @@ import (
 )
 
 // safeCommandPrefixes is the strict allowlist for auto-execution.
-// Any command not matching one of these prefixes requires manual approval.
+// Read-only diagnostic commands run automatically.
+// State-changing commands (delete/restart) also run automatically for
+// common self-healing operations. Anything else is rejected.
 var safeCommandPrefixes = []string{
+	// Read-only diagnostics — always safe
+	"kubectl get ",
+	"kubectl describe ",
+	"kubectl logs ",
+	"kubectl top ",
+	"kubectl rollout status ",
+	// Self-healing — auto-execute for common recoverable failures
 	"kubectl delete pod ",
 	"kubectl rollout restart ",
 }
 
-// isSafe returns true only if the command starts with an allowlisted prefix.
+// shellMetachars are characters that indicate an attempt to chain or redirect
+// commands. Even though Execute does not use a shell, we reject them as a
+// defence-in-depth measure against unexpected allowlist bypasses.
+var shellMetachars = []string{"&&", "||", ";", "|", ">", "<", "`", "$("}
+
+// isSafe returns true only if the command starts with an allowlisted prefix
+// AND contains no shell metacharacters.
 func isSafe(cmd string) bool {
 	trimmed := strings.TrimSpace(cmd)
+	for _, meta := range shellMetachars {
+		if strings.Contains(trimmed, meta) {
+			return false
+		}
+	}
 	for _, prefix := range safeCommandPrefixes {
 		if strings.HasPrefix(trimmed, prefix) {
 			return true
@@ -41,15 +61,15 @@ func NewExecutor(timeout time.Duration) *Executor {
 	return &Executor{timeout: timeout}
 }
 
-// Execute runs cmd in a shell subprocess.
+// Execute runs cmd in a shell subprocess under the given parent context.
 // It validates against the auto-safe allowlist before executing.
 // Returns (stdout+stderr, error).
-func (e *Executor) Execute(cmd string) (string, error) {
+func (e *Executor) Execute(ctx context.Context, cmd string) (string, error) {
 	if !isSafe(cmd) {
 		return "", fmt.Errorf("command not in auto-safe allowlist: %q", cmd)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
+	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
 	// Split command into binary + args — avoid shell injection by not using sh -c.
