@@ -119,10 +119,6 @@ Or download directly from [Releases](https://github.com/onkar717/VisualEyes/rele
 
 ![VisualEyes dashboard system overview](docs/images/veye-dashboard.png)
 
-### Web Dashboard — Active Alerts
-
-![VisualEyes alerts page](docs/images/veye-alerts.png)
-
 ---
 
 ## 🛠️ Getting Started (Build from Source)
