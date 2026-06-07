@@ -34,6 +34,9 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	// ── RCA ───────────────────────────────────────────────────────────────────
 	mux.HandleFunc("/api/rca/", h.HandleRCA) // /api/rca/{id} and /api/rca/{id}/execute
 
+	// ── Cluster health scan ───────────────────────────────────────────────────
+	mux.HandleFunc("/api/scan", h.HandleScan)
+
 	// ── WebSocket real-time stream ────────────────────────────────────────────
 	mux.HandleFunc("/ws", h.WebSocketStream)
 

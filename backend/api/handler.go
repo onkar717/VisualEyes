@@ -727,3 +727,159 @@ func (h *Handler) refreshAlertGauges() {
 		appmetrics.ActiveAlerts.WithLabelValues(sev).Set(n)
 	}
 }
+
+// -------------------------------------------------------------------
+// Cluster health scan
+// -------------------------------------------------------------------
+
+// ScanIssue is a single finding from a cluster scan.
+type ScanIssue struct {
+	Severity string `json:"severity"` // critical | warning | info
+	Category string `json:"category"` // cpu | memory | disk | alerts | k8s
+	Resource string `json:"resource"`
+	Message  string `json:"message"`
+	Value    string `json:"value,omitempty"`
+}
+
+// ScanResult is the full /api/scan response.
+type ScanResult struct {
+	Timestamp   string      `json:"timestamp"`
+	Overall     string      `json:"overall"` // healthy | degraded | critical
+	IssueCount  int         `json:"issueCount"`
+	Issues      []ScanIssue `json:"issues"`
+	Summary     ScanSummary `json:"summary"`
+}
+
+// ScanSummary provides high-level metrics for the scan output.
+type ScanSummary struct {
+	ActiveAlerts    int     `json:"activeAlerts"`
+	CriticalAlerts  int     `json:"criticalAlerts"`
+	WarningAlerts   int     `json:"warningAlerts"`
+	CPUPercent      float64 `json:"cpuPercent"`
+	MemoryPercent   float64 `json:"memoryPercent"`
+	DiskPercent     float64 `json:"diskPercent"`
+}
+
+// HandleScan performs a point-in-time health assessment using stored metric
+// and alert data, and returns a structured list of findings.
+func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	result := ScanResult{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Issues:    []ScanIssue{},
+	}
+
+	// ── Active alerts ────────────────────────────────────────────────────────
+	if h.alertStore != nil {
+		active, err := h.alertStore.GetActiveAlerts()
+		if err == nil {
+			result.Summary.ActiveAlerts = len(active)
+			for _, a := range active {
+				sev := string(a.Severity)
+				switch a.Severity {
+				case "critical":
+					result.Summary.CriticalAlerts++
+				case "warning":
+					result.Summary.WarningAlerts++
+				}
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: sev,
+					Category: "alerts",
+					Resource: a.ResourceID + "/" + a.Namespace,
+					Message:  a.Message,
+					Value:    fmt.Sprintf("%.2f (threshold %.2f)", a.Value, a.Threshold),
+				})
+			}
+		}
+	}
+
+	// ── System metrics ────────────────────────────────────────────────────────
+	metrics := h.systemStore.GetAllMetrics()
+	for _, m := range metrics {
+		switch m.Name {
+		case "cpu.usage":
+			result.Summary.CPUPercent = m.Value
+			if m.Value >= 90 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "critical", Category: "cpu",
+					Resource: "host", Message: "CPU usage critical",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			} else if m.Value >= 75 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "warning", Category: "cpu",
+					Resource: "host", Message: "CPU usage elevated",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			}
+		case "memory.usage_percent":
+			result.Summary.MemoryPercent = m.Value
+			if m.Value >= 90 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "critical", Category: "memory",
+					Resource: "host", Message: "Memory usage critical",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			} else if m.Value >= 80 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "warning", Category: "memory",
+					Resource: "host", Message: "Memory usage elevated",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			}
+		case "disk.usage_percent":
+			result.Summary.DiskPercent = m.Value
+			if m.Value >= 95 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "critical", Category: "disk",
+					Resource: "host", Message: "Disk usage critical — eviction risk",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			} else if m.Value >= 85 {
+				result.Issues = append(result.Issues, ScanIssue{
+					Severity: "warning", Category: "disk",
+					Resource: "host", Message: "Disk usage high",
+					Value: fmt.Sprintf("%.1f%%", m.Value),
+				})
+			}
+		}
+	}
+
+	// ── K8s metrics ───────────────────────────────────────────────────────────
+	k8sMetrics := h.kubernetesStore.GetAllMetrics()
+	for _, m := range k8sMetrics {
+		if m.Name == "kubernetes.pod.cpu.usage" && m.Value > 0.9 {
+			pod := m.Tags["pod"]
+			if pod == "" {
+				pod = "unknown"
+			}
+			result.Issues = append(result.Issues, ScanIssue{
+				Severity: "warning", Category: "k8s",
+				Resource: pod, Message: "Pod CPU usage near limit",
+				Value: fmt.Sprintf("%.3f cores", m.Value),
+			})
+		}
+	}
+
+	// ── Overall status ────────────────────────────────────────────────────────
+	result.IssueCount = len(result.Issues)
+	result.Overall = "healthy"
+	for _, issue := range result.Issues {
+		if issue.Severity == "critical" {
+			result.Overall = "critical"
+			break
+		}
+		if issue.Severity == "warning" {
+			result.Overall = "degraded"
+		}
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
