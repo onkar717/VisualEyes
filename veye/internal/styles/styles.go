@@ -26,10 +26,24 @@ var (
 			Bold(true).
 			MarginTop(1)
 
+	BannerBox = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(Cyan).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#005F87")).
+			Padding(0, 2)
+
 	Box = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#303060")).
 		Padding(0, 1)
+
+	InnerBox = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#404080")).
+			Padding(0, 1)
+
+	DestructiveBadge = lipgloss.NewStyle().Foreground(Red).Bold(true)
 
 	KeyStyle = lipgloss.NewStyle().Foreground(Gray)
 	ValStyle = lipgloss.NewStyle().Foreground(White)

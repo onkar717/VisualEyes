@@ -46,7 +46,7 @@ func printAlertsTable() {
 	}
 
 	fmt.Println()
-	header := fmt.Sprintf("  ALERTS  (%d %s)", len(alerts), alertsStatus)
+	header := fmt.Sprintf("  🚨  ALERTS  (%d %s)", len(alerts), alertsStatus)
 	fmt.Println(styles.SectionHeader.Render(header))
 	fmt.Println()
 
