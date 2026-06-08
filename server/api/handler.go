@@ -15,6 +15,7 @@ import (
 	sharedhttp "github.com/onkar717/visual-eyes/server/http"
 	appmetrics "github.com/onkar717/visual-eyes/server/metrics"
 	"github.com/onkar717/visual-eyes/server/models"
+	"github.com/onkar717/visual-eyes/server/rca"
 	"github.com/onkar717/visual-eyes/server/storage"
 	"github.com/onkar717/visual-eyes/server/ws"
 )
@@ -559,12 +560,63 @@ func (h *Handler) HandleRCA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.HasSuffix(path, "/progress") && r.Method == http.MethodGet {
+		h.streamRCAProgress(w, r, strings.TrimSuffix(path, "/progress"))
+		return
+	}
+
 	if r.Method == http.MethodGet {
 		h.getRCAResult(w, r, path)
 		return
 	}
 
 	writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+}
+
+// streamRCAProgress streams Server-Sent Events with live stage progress for an RCA run.
+func (h *Handler) streamRCAProgress(w http.ResponseWriter, r *http.Request, alertIDStr string) {
+	var alertID uint
+	if _, err := fmt.Sscanf(alertIDStr, "%d", &alertID); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid alert id")
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	h.cors(w, r)
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Replay history so late subscribers see completed stages immediately.
+	for _, ev := range rca.StageHistory(alertID) {
+		b, _ := json.Marshal(ev)
+		fmt.Fprintf(w, "data: %s\n\n", b)
+	}
+	flusher.Flush()
+
+	// Subscribe to live events.
+	ch, cancel := rca.SubscribeStage(alertID)
+	defer cancel()
+
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			b, _ := json.Marshal(ev)
+			fmt.Fprintf(w, "data: %s\n\n", b)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func (h *Handler) getRCAResult(w http.ResponseWriter, r *http.Request, alertIDStr string) {

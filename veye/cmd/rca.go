@@ -46,11 +46,14 @@ func runRCA(_ *cobra.Command, args []string) error {
 	))
 	fmt.Println()
 
-	// Spin until RCA is no longer running/pending
+	// Show live pipeline progress while RCA is running
 	switch alert.RCAStatus {
 	case "running", "pending":
-		if err := waitForRCA(id, alert); err != nil {
-			return err
+		if err := liveStageProgress(id, alert); err != nil {
+			// SSE not available — fallback to polling spinner
+			if err2 := waitForRCA(id, alert); err2 != nil {
+				return err2
+			}
 		}
 	}
 
@@ -132,10 +135,115 @@ func runRCA(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-// waitForRCA shows a braille spinner and polls until RCA is done or failed.
+// stageEmojis maps stage label → emoji for live progress display.
+var stageEmojis = map[string]string{
+	"Triage":     "🔍",
+	"Metrics":    "📈",
+	"Logs":       "📋",
+	"Infra":      "🏗",
+	"Remediation": "📖",
+	"Commander":  "⚡",
+}
+
+// liveStageProgress opens an SSE stream and renders live stage progress.
+// Returns an error if the stream cannot be established (caller falls back to polling).
+func liveStageProgress(alertID uint, alert *client.Alert) error {
+	ch, err := api.StreamRCAProgress(alertID)
+	if err != nil {
+		return err
+	}
+
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+	fmt.Println(styles.SectionHeader.Render("  🤖  AI PIPELINE  —  6-STAGE ANALYSIS"))
+	fmt.Println()
+
+	currentLabel := ""
+	currentRunning := false
+	frame := 0
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	renderRunning := func() {
+		if !currentRunning || currentLabel == "" {
+			return
+		}
+		emoji := stageEmojis[currentLabel]
+		fmt.Printf("\r  %s  %s %-12s  %s     ",
+			styles.SevWarning.Render(frames[frame%len(frames)]),
+			emoji,
+			styles.SectionHeader.Render(currentLabel),
+			styles.Mute.Render("running…"),
+		)
+	}
+
+	done := false
+	for !done {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				done = true
+				break
+			}
+			emoji := stageEmojis[ev.Label]
+			if emoji == "" {
+				emoji = "●"
+			}
+			switch ev.Status {
+			case "running":
+				if currentRunning {
+					fmt.Println()
+				}
+				currentLabel = ev.Label
+				currentRunning = true
+				renderRunning()
+			case "done":
+				currentRunning = false
+				currentLabel = ""
+				detail := ""
+				if ev.Detail != "" {
+					detail = "   " + styles.Mute.Render(ev.Detail)
+				}
+				fmt.Printf("\r  %s  %s %-12s  %s%s\n",
+					styles.Good.Render("✓"),
+					emoji,
+					styles.Good.Render(ev.Label),
+					styles.Mute.Render(fmt.Sprintf("%.1fs", ev.Elapsed)),
+					detail,
+				)
+			case "failed":
+				currentRunning = false
+				currentLabel = ""
+				fmt.Printf("\r  %s  %s %-12s  %s\n",
+					styles.Bad.Render("✗"),
+					emoji,
+					styles.Bad.Render(ev.Label),
+					styles.Mute.Render(fmt.Sprintf("%.1fs", ev.Elapsed)),
+				)
+			}
+		case <-ticker.C:
+			frame++
+			renderRunning()
+		}
+	}
+
+	if currentRunning {
+		fmt.Println()
+	}
+	fmt.Println()
+
+	// Refresh alert status after stream closes
+	updated, err := api.AlertByID(alertID)
+	if err == nil {
+		*alert = *updated
+	}
+	return nil
+}
+
+// waitForRCA is a braille-spinner fallback when SSE stream is unavailable.
 func waitForRCA(id uint, alert *client.Alert) error {
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	pollEvery := 20 // ~3s at 150ms per frame
+	pollEvery := 20
 	for i := 0; ; i++ {
 		label := "RCA queued"
 		if alert.RCAStatus == "running" {

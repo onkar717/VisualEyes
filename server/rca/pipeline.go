@@ -179,9 +179,11 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	// Stage 1: Triage
 	slog.Info("rca stage 1/6: triage", "alert_id", ac.Alert.ID)
+	PublishStageStart(ac.Alert.ID, 1, "Triage")
 	triageRaw, tok, err := p.llm.Complete(ctx, triageSystemPrompt,
 		"Alert context:\n\n"+ac.Format(), p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 1, "Triage")
 		return nil, 0, fmt.Errorf("stage 1 triage: %w", err)
 	}
 	total += tok
@@ -191,10 +193,16 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 		slog.Warn("triage parse failed   defaults", "err", err)
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
+	PublishStageDone(ac.Alert.ID, 1, "Triage", fmt.Sprintf("%s · %s", triage.Severity, triage.Category))
 
 	// Healthy-cluster fast exit   skip 5 LLM calls when triage says no issue.
 	if !triage.HasIssue {
 		slog.Info("rca triage: no issue detected   healthy cluster short-circuit", "alert_id", ac.Alert.ID)
+		for i := 2; i <= 6; i++ {
+			labels := []string{"", "Triage", "Metrics", "Logs", "Infra", "Remediation", "Commander"}
+			PublishStageStart(ac.Alert.ID, i, labels[i])
+			PublishStageDone(ac.Alert.ID, i, labels[i], "skipped · cluster healthy")
+		}
 		return &RCAResponse{
 			HasIssue:    false,
 			Severity:    "SEV4",
@@ -208,37 +216,47 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	// Stage 2: Metrics Analysis
 	slog.Info("rca stage 2/6: metrics analysis", "alert_id", ac.Alert.ID)
+	PublishStageStart(ac.Alert.ID, 2, "Metrics")
 	metricsUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRIC DATA:\n%s",
 		truncStage(triageRaw), ac.Format())
 	metricsRaw, tok, err := p.llm.Complete(ctx, metricsSystemPrompt, metricsUser, p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 2, "Metrics")
 		return nil, total, fmt.Errorf("stage 2 metrics: %w", err)
 	}
 	total += tok
+	PublishStageDone(ac.Alert.ID, 2, "Metrics", "")
 
 	// Stage 3: Log Analysis   prepend pre-classified log patterns for signal clarity.
 	slog.Info("rca stage 3/6: log analysis", "alert_id", ac.Alert.ID)
+	PublishStageStart(ac.Alert.ID, 3, "Logs")
 	logUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nPRE-CLASSIFIED LOG PATTERNS:\n%s\n\nALERT+LOGS:\n%s",
 		truncStage(triageRaw), truncStage(metricsRaw),
 		ac.LogClassification.Summary, ac.Format())
 	logRaw, tok, err := p.llm.Complete(ctx, logSystemPrompt, logUser, p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 3, "Logs")
 		return nil, total, fmt.Errorf("stage 3 logs: %w", err)
 	}
 	total += tok
+	PublishStageDone(ac.Alert.ID, 3, "Logs", "")
 
 	// Stage 4: Infra Diagnosis
 	slog.Info("rca stage 4/6: infra diagnosis", "alert_id", ac.Alert.ID)
+	PublishStageStart(ac.Alert.ID, 4, "Infra")
 	infraUser := fmt.Sprintf("TRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nALERT:\n%s",
 		truncStage(triageRaw), truncStage(metricsRaw), truncStage(logRaw), ac.Format())
 	infraRaw, tok, err := p.llm.Complete(ctx, infraSystemPrompt, infraUser, p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 4, "Infra")
 		return nil, total, fmt.Errorf("stage 4 infra: %w", err)
 	}
 	total += tok
+	PublishStageDone(ac.Alert.ID, 4, "Infra", "")
 
 	// Stage 5: Remediation (with runbook injection)
 	slog.Info("rca stage 5/6: remediation", "alert_id", ac.Alert.ID, "category", triage.Category)
+	PublishStageStart(ac.Alert.ID, 5, "Remediation")
 	rb := SelectRunbook(triage.Category)
 	runbookContext := RunbookSummary(rb)
 	remUser := fmt.Sprintf(
@@ -248,6 +266,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	)
 	remRaw, tok, err := p.llm.Complete(ctx, remediationSystemPrompt, remUser, p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 5, "Remediation")
 		return nil, total, fmt.Errorf("stage 5 remediation: %w", err)
 	}
 	total += tok
@@ -256,9 +275,11 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	if err := json.Unmarshal([]byte(stripFences(remRaw)), &rem); err != nil {
 		slog.Warn("remediation parse failed", "err", err)
 	}
+	PublishStageDone(ac.Alert.ID, 5, "Remediation", fmt.Sprintf("%d commands", len(rem.Commands)))
 
 	// Stage 6: Commander   synthesise all stages
 	slog.Info("rca stage 6/6: commander", "alert_id", ac.Alert.ID)
+	PublishStageStart(ac.Alert.ID, 6, "Commander")
 	cmdUser := fmt.Sprintf(
 		"ACTUAL RESOURCE NAMES (use these verbatim in commands):\n  pod/resource: %s\n  namespace: %s\n\nTRIAGE:\n%s\n\nMETRICS:\n%s\n\nLOGS:\n%s\n\nINFRA:\n%s\n\nREMEDIATION:\n%s\n\nORIGINAL ALERT:\n%s",
 		ac.Alert.ResourceID, ac.Alert.Namespace,
@@ -267,6 +288,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	)
 	finalRaw, tok, err := p.llm.Complete(ctx, commanderSystemPrompt, cmdUser, p.maxTokens)
 	if err != nil {
+		PublishStageFailed(ac.Alert.ID, 6, "Commander")
 		return nil, total, fmt.Errorf("stage 6 commander: %w", err)
 	}
 	total += tok
@@ -313,6 +335,9 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	for i := range resp.Commands {
 		resp.Commands[i].IsAutoSafe = isSafe(resp.Commands[i].Command)
 	}
+
+	PublishStageDone(ac.Alert.ID, 6, "Commander",
+		fmt.Sprintf("confidence: %d%%", resp.Confidence))
 
 	slog.Info("rca pipeline complete",
 		"alert_id", ac.Alert.ID,

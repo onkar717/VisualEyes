@@ -2,6 +2,7 @@
 package client
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -329,6 +330,51 @@ func (c *Client) Incidents(limit int, alertID uint) ([]NotificationEvent, error)
 		q += fmt.Sprintf("&alert_id=%d", alertID)
 	}
 	return r, c.get(q, &r)
+}
+
+// StageEvent mirrors server/rca.StageEvent for live pipeline progress.
+type StageEvent struct {
+	AlertID   uint    `json:"alertId"`
+	Stage     int     `json:"stage"`
+	Label     string  `json:"label"`
+	Status    string  `json:"status"`
+	Detail    string  `json:"detail,omitempty"`
+	Elapsed   float64 `json:"elapsed,omitempty"`
+	Timestamp string  `json:"timestamp"`
+}
+
+// StreamRCAProgress opens an SSE connection to /api/rca/{id}/progress and returns
+// a channel of StageEvents. The channel is closed when the stream ends.
+func (c *Client) StreamRCAProgress(alertID uint) (<-chan StageEvent, error) {
+	url := fmt.Sprintf("%s/api/rca/%d/progress", c.base, alertID)
+	// Use a long-lived client with no timeout for streaming.
+	streamClient := &http.Client{}
+	resp, err := streamClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("progress stream: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("progress stream: status %d", resp.StatusCode)
+	}
+
+	ch := make(chan StageEvent, 16)
+	go func() {
+		defer close(ch)
+		defer resp.Body.Close()
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			var ev StageEvent
+			if err := json.Unmarshal([]byte(line[6:]), &ev); err == nil {
+				ch <- ev
+			}
+		}
+	}()
+	return ch, nil
 }
 
 // Logs calls /api/pod-logs with optional filters.
