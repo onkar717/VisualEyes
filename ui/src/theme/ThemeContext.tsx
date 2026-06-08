@@ -1,50 +1,63 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { ThemeProvider as MuiThemeProvider, createTheme, responsiveFontSizes } from '@mui/material';
 
-// Define the light and dark themes
-const lightTheme = createTheme({
+// Define the light and dark themes with premium aesthetics
+let lightTheme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#2196f3',
-      light: '#64b5f6',
-      dark: '#1976d2',
+      main: '#3b82f6',
+      light: '#60a5fa',
+      dark: '#2563eb',
     },
     secondary: {
-      main: '#ff4081',
-      light: '#ff79b0',
-      dark: '#c60055',
+      main: '#8b5cf6',
+      light: '#a78bfa',
+      dark: '#7c3aed',
     },
     background: {
-      default: '#f8f9fc',
-      paper: '#ffffff',
+      default: '#f8f9fa',
+      paper: 'rgba(255, 255, 255, 0.7)', // Glassmorphism base
     },
     text: {
-      primary: '#2c3e50',
-      secondary: '#7f8c8d',
+      primary: '#1e293b',
+      secondary: '#64748b',
     },
+    divider: 'rgba(0, 0, 0, 0.08)',
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h1: { fontWeight: 600 },
-    h2: { fontWeight: 600 },
-    h3: { fontWeight: 600 },
-    h4: { fontWeight: 600 },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
+    fontFamily: '"Inter", "Outfit", system-ui, sans-serif',
+    h1: { fontFamily: '"Outfit", sans-serif', fontWeight: 700, letterSpacing: '-0.02em' },
+    h2: { fontFamily: '"Outfit", sans-serif', fontWeight: 700, letterSpacing: '-0.02em' },
+    h3: { fontFamily: '"Outfit", sans-serif', fontWeight: 600, letterSpacing: '-0.01em' },
+    h4: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    h5: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    h6: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    button: { fontWeight: 600, textTransform: 'none' },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 16,
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          transition: 'background-color 0.5s ease',
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: '0 2px 12px 0 rgba(0,0,0,0.05)',
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+          background: 'rgba(255, 255, 255, 0.7)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          boxShadow: '0 4px 24px -4px rgba(0,0,0,0.05)',
+          transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           '&:hover': {
             transform: 'translateY(-4px)',
-            boxShadow: '0 4px 20px 0 rgba(0,0,0,0.1)',
+            boxShadow: '0 12px 32px -4px rgba(0,0,0,0.1)',
           },
         },
       },
@@ -52,58 +65,87 @@ const lightTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none',
-          fontWeight: 500,
-          borderRadius: 8,
+          borderRadius: 12,
+          padding: '8px 20px',
+          boxShadow: 'none',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+            transform: 'translateY(-1px)',
+          },
+        },
+        contained: {
+          background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
         },
       },
     },
   },
 });
 
-const darkTheme = createTheme({
+let darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#2196f3',
-      light: '#64b5f6',
-      dark: '#1976d2',
+      main: '#60a5fa',
+      light: '#93c5fd',
+      dark: '#3b82f6',
     },
     secondary: {
-      main: '#ff4081',
-      light: '#ff79b0',
-      dark: '#c60055',
+      main: '#a78bfa',
+      light: '#c4b5fd',
+      dark: '#8b5cf6',
     },
     background: {
-      default: '#1a1a2e',
-      paper: '#16162a',
+      default: '#0f172a',
+      paper: 'rgba(30, 41, 59, 0.6)', // Deep glassmorphism
     },
     text: {
-      primary: '#ffffff',
-      secondary: '#b3b3b3',
+      primary: '#f8fafc',
+      secondary: '#94a3b8',
     },
+    divider: 'rgba(255, 255, 255, 0.08)',
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h1: { fontWeight: 600 },
-    h2: { fontWeight: 600 },
-    h3: { fontWeight: 600 },
-    h4: { fontWeight: 600 },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
+    fontFamily: '"Inter", "Outfit", system-ui, sans-serif',
+    h1: { fontFamily: '"Outfit", sans-serif', fontWeight: 700, letterSpacing: '-0.02em' },
+    h2: { fontFamily: '"Outfit", sans-serif', fontWeight: 700, letterSpacing: '-0.02em' },
+    h3: { fontFamily: '"Outfit", sans-serif', fontWeight: 600, letterSpacing: '-0.01em' },
+    h4: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    h5: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    h6: { fontFamily: '"Outfit", sans-serif', fontWeight: 600 },
+    button: { fontWeight: 600, textTransform: 'none' },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 16,
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          transition: 'background-color 0.5s ease',
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: '0 2px 12px 0 rgba(0,0,0,0.2)',
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+          background: 'rgba(30, 41, 59, 0.5)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+          transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease',
           '&:hover': {
             transform: 'translateY(-4px)',
-            boxShadow: '0 4px 20px 0 rgba(0,0,0,0.3)',
+            boxShadow: '0 12px 40px 0 rgba(0, 0, 0, 0.4)',
+            borderColor: 'rgba(255, 255, 255, 0.15)',
           },
         },
       },
@@ -111,14 +153,32 @@ const darkTheme = createTheme({
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none',
-          fontWeight: 500,
-          borderRadius: 8,
+          borderRadius: 12,
+          padding: '8px 20px',
+          boxShadow: 'none',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            boxShadow: '0 4px 16px rgba(96, 165, 250, 0.3)',
+            transform: 'translateY(-1px)',
+          },
+        },
+        contained: {
+          background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
         },
       },
     },
   },
 });
+
+lightTheme = responsiveFontSizes(lightTheme);
+darkTheme = responsiveFontSizes(darkTheme);
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -134,7 +194,20 @@ const ThemeContext = createContext<ThemeContextType>({
 export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Respect OS preference initially, then store in localStorage if desired.
+  // For now, default to dark mode for that premium SRE tool feel.
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Sync with body class for non-MUI css overrides
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
+    } else {
+      document.body.classList.add('light');
+      document.body.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
   const toggleTheme = useCallback(() => {
     setIsDarkMode((prev) => !prev);
