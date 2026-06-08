@@ -140,44 +140,54 @@ func interactiveRemediate(issues []client.ScanIssue) error {
 		))
 		fmt.Println()
 
+		fmt.Println()
+		fmt.Println("   🔧 " + styles.KeyStyle.Render("PROPOSED REMEDIATION:"))
+
+		applied, skipped, failed := 0, 0, 0
 		for i, c := range cmds {
 			safety := styles.Good.Render("auto-safe")
 			if !c.IsAutoSafe {
 				safety = styles.DestructiveBadge.Render("DESTRUCTIVE")
 			}
-			fmt.Printf("   %d. [%s] %s\n", i+1, safety, c.Command)
-		}
-		fmt.Println()
-		fmt.Printf("   Apply remediation? [y/N] ")
-		line, _ := reader.ReadString('\n')
-		line = strings.TrimSpace(strings.ToLower(line))
-		if line != "y" && line != "yes" {
-			fmt.Println("   Skipped.")
-			continue
-		}
-
-		applied, skipped, failed := 0, 0, 0
-		for i, c := range cmds {
-			if !c.IsAutoSafe && !scanForce {
-				fmt.Printf("   Step %d: %s\n", i+1, styles.Mute.Render("skipped   not auto-safe. Use --force to execute."))
-				skipped++
-				continue
-			}
-			start := time.Now()
-			out, err := runCommand(c.Command)
-			dur := time.Since(start).Round(time.Millisecond)
-			if err != nil {
-				fmt.Printf("   Step %d: %s %s\n", i+1, styles.Bad.Render("✗"), styles.Mute.Render(err.Error()))
-				failed++
-			} else {
-				fmt.Printf("   Step %d: %s (%s)\n", i+1, styles.Good.Render("✓"), dur)
-				if strings.TrimSpace(out) != "" {
-					fmt.Printf("          %s\n", styles.Mute.Render(strings.TrimSpace(out)))
+			fmt.Printf("\n   Step %d: [%s]\n   Command: %s\n", i+1, safety, styles.ValStyle.Render(c.Command))
+			
+			for {
+				fmt.Printf("   Execute? [y/N/dry]: ")
+				line, _ := reader.ReadString('\n')
+				line = strings.TrimSpace(strings.ToLower(line))
+				
+				if line == "dry" || line == "d" {
+					fmt.Printf("   %s [DRY RUN] Would execute: %s\n", styles.SevWarning.Render("~"), c.Command)
+					continue
+				} else if line == "y" || line == "yes" {
+					if !c.IsAutoSafe && !scanForce {
+						fmt.Printf("   %s %s\n", styles.Bad.Render("✗"), styles.Mute.Render("skipped   not auto-safe. Use --force to execute."))
+						skipped++
+						break
+					}
+					
+					start := time.Now()
+					out, err := runCommand(c.Command)
+					dur := time.Since(start).Round(time.Millisecond)
+					if err != nil {
+						fmt.Printf("   %s %s\n", styles.Bad.Render("✗"), styles.Mute.Render(err.Error()))
+						failed++
+					} else {
+						fmt.Printf("   %s (%s)\n", styles.Good.Render("✓"), dur)
+						if strings.TrimSpace(out) != "" {
+							fmt.Printf("          %s\n", styles.Mute.Render(strings.TrimSpace(out)))
+						}
+						applied++
+					}
+					break
+				} else {
+					fmt.Printf("   %s %s\n", styles.Mute.Render("-"), styles.Mute.Render("skipped."))
+					skipped++
+					break
 				}
-				applied++
 			}
 		}
-		fmt.Printf("   Applied: %s  Skipped: %s  Failed: %s\n",
+		fmt.Printf("\n   Applied: %s  Skipped: %s  Failed: %s\n",
 			styles.Good.Render(fmt.Sprintf("%d", applied)),
 			styles.Mute.Render(fmt.Sprintf("%d", skipped)),
 			styles.Bad.Render(fmt.Sprintf("%d", failed)),
