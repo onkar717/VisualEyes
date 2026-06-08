@@ -46,15 +46,18 @@ func runRCA(_ *cobra.Command, args []string) error {
 	))
 	fmt.Println()
 
-	// Show live pipeline progress while RCA is running
+	// Show live pipeline progress while RCA is running/pending
 	switch alert.RCAStatus {
-	case "running", "pending":
+	case "running":
+		// Definitely started — stream stages, fallback to spinner if SSE unavailable.
 		if err := liveStageProgress(id, alert); err != nil {
-			// SSE not available — fallback to polling spinner
 			if err2 := waitForRCA(id, alert); err2 != nil {
 				return err2
 			}
 		}
+	case "pending":
+		// May just be queued — try stream briefly; timeout → show pending msg.
+		liveStageProgress(id, alert) //nolint:errcheck — idle timeout unblocks naturally
 	}
 
 	switch alert.RCAStatus {
@@ -164,6 +167,29 @@ func liveStageProgress(alertID uint, alert *client.Alert) error {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
+	// If no stage events arrive within 10s, SSE server closed (RCA disabled/idle).
+	idleReset := make(chan struct{}, 1)
+	idleExpired := make(chan struct{})
+	go func() {
+		timer := time.NewTimer(10 * time.Second)
+		defer timer.Stop()
+		for {
+			select {
+			case <-idleReset:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(10 * time.Second)
+			case <-timer.C:
+				close(idleExpired)
+				return
+			}
+		}
+	}()
+
 	renderRunning := func() {
 		if !currentRunning || currentLabel == "" {
 			return
@@ -184,6 +210,10 @@ func liveStageProgress(alertID uint, alert *client.Alert) error {
 			if !ok {
 				done = true
 				break
+			}
+			select {
+			case idleReset <- struct{}{}:
+			default:
 			}
 			emoji := stageEmojis[ev.Label]
 			if emoji == "" {
@@ -224,6 +254,8 @@ func liveStageProgress(alertID uint, alert *client.Alert) error {
 		case <-ticker.C:
 			frame++
 			renderRunning()
+		case <-idleExpired:
+			done = true
 		}
 	}
 
