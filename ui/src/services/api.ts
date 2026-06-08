@@ -129,11 +129,57 @@ const getPodLogs = async (params?: {
   return response.data.logs ?? [];
 };
 
+// ── Kubernetes clusters & events ──────────────────────────────────────────────
+
+export interface ClusterHealth {
+  id: number;
+  name: string;
+  namespace: string;
+  last_seen: string;
+  health_score: number;
+  total_nodes: number;
+  ready_nodes: number;
+  total_pods: number;
+  running_pods: number;
+  pending_pods: number;
+  failed_pods: number;
+  crashloop_pods: number;
+  open_incidents: number;
+  cpu_usage_pct: number;
+  mem_usage_pct: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface K8sEvent {
+  namespace: string;
+  kind: string;
+  object: string;
+  reason: string;
+  message: string;
+  type: string;
+  count: number;
+  lastSeen: string;
+  sourceNode: string;
+}
+
+const getClusters = async (): Promise<ClusterHealth[]> => {
+  const response = await axios.get<ClusterHealth[]>(`${API_BASE_URL}/clusters`);
+  return response.data ?? [];
+};
+
+const getK8sEvents = async (): Promise<K8sEvent[]> => {
+  const response = await axios.get<{ events: K8sEvent[] }>(`${API_BASE_URL}/events`);
+  return response.data.events ?? [];
+};
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 export const api = {
   getMetricsSnapshot: getMetrics,
   getKubernetesMetrics,
+  getClusters,
+  getK8sEvents,
   getAlerts,
   getAlertById,
   getRCA,
