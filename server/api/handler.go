@@ -594,15 +594,34 @@ func (h *Handler) streamRCAProgress(w http.ResponseWriter, r *http.Request, aler
 	w.Header().Set("X-Accel-Buffering", "no")
 
 	// Replay history so late subscribers see completed stages immediately.
-	for _, ev := range rca.StageHistory(alertID) {
+	history := rca.StageHistory(alertID)
+	for _, ev := range history {
 		b, _ := json.Marshal(ev)
 		fmt.Fprintf(w, "data: %s\n\n", b)
 	}
 	flusher.Flush()
 
+	// If RCA is already fully done/failed (all 6 stages replayed), close immediately.
+	if rca.IsDone(alertID) {
+		return
+	}
+
+	// Also close immediately if alert status shows RCA will never run.
+	if h.alertStore != nil {
+		if a, err := h.alertStore.GetAlertByID(alertID); err == nil {
+			if a.RCAStatus == "done" || a.RCAStatus == "failed" {
+				return
+			}
+		}
+	}
+
 	// Subscribe to live events.
 	ch, cancel := rca.SubscribeStage(alertID)
 	defer cancel()
+
+	// idleTimer fires if no stages arrive for 10s (RCA disabled or not started).
+	idleTimer := time.NewTimer(10 * time.Second)
+	defer idleTimer.Stop()
 
 	for {
 		select {
@@ -610,9 +629,15 @@ func (h *Handler) streamRCAProgress(w http.ResponseWriter, r *http.Request, aler
 			if !ok {
 				return
 			}
+			idleTimer.Reset(10 * time.Second)
 			b, _ := json.Marshal(ev)
 			fmt.Fprintf(w, "data: %s\n\n", b)
 			flusher.Flush()
+			if rca.IsDone(alertID) {
+				return
+			}
+		case <-idleTimer.C:
+			return
 		case <-r.Context().Done():
 			return
 		}

@@ -139,3 +139,17 @@ func SubscribeStage(alertID uint) (<-chan StageEvent, func()) {
 func StageHistory(alertID uint) []StageEvent {
 	return globalHub.getHistory(alertID)
 }
+
+// IsDone returns true when stage 6 (Commander) has a done or failed event,
+// meaning the pipeline finished and no further events will be published.
+func IsDone(alertID uint) bool {
+	for _, ev := range globalHub.getHistory(alertID) {
+		if ev.Stage == 6 && (ev.Status == "done" || ev.Status == "failed") {
+			return true
+		}
+		if ev.Status == "failed" {
+			return true
+		}
+	}
+	return false
+}
