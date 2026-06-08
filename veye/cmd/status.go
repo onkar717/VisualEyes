@@ -16,6 +16,8 @@ var statusCmd = &cobra.Command{
 }
 
 func runStatus(_ *cobra.Command, _ []string) error {
+	PrintBanner()
+
 	health, err := api.Health()
 	if err != nil {
 		return err
@@ -24,50 +26,64 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	k8s, _ := api.K8s()
 	alerts, _ := api.Alerts("firing")
 
-	fmt.Println()
-
-	// Header
+	// Backend status bar
 	statusStyle := styles.Good
 	if health.Status != "healthy" {
 		statusStyle = styles.Bad
 	}
-	header := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.Title.Render("VisualEyes"),
-		styles.Mute.Render("  ·  backend "),
-		statusStyle.Render(health.Status),
-		styles.Mute.Render("  ·  uptime "),
+	backendLine := lipgloss.JoinHorizontal(lipgloss.Left,
+		styles.KeyStyle.Render("backend  "),
+		statusStyle.Render("● "+health.Status),
+		styles.Mute.Render("   uptime "),
 		styles.ValStyle.Render(health.Uptime),
+		styles.Mute.Render("   alerts "),
+		alertCountLabel(len(alerts)),
 	)
-	fmt.Println(styles.Box.Render(header))
+	fmt.Println(styles.Box.Render(backendLine))
 	fmt.Println()
 
 	// System metrics
-	fmt.Println(styles.SectionHeader.Render("  SYSTEM METRICS"))
+	fmt.Println(styles.SectionHeader.Render("  🖥️  SYSTEM METRICS"))
+	fmt.Println()
 	if snap != nil {
-		printMetricRow("CPU usage",    snap.Metrics["cpu"]["usage"], "%")
-		printMetricRow("Memory used",  snap.Metrics["memory"]["usage_percent"], "%")
-		printMetricRow("Disk used",    snap.Metrics["disk"]["usage_percent"], "%")
-		printMetricRow("Load (1m)",    snap.Metrics["load"]["1min"], "")
-		printMetricRow("Net recv/s",   snap.Metrics["network"]["bytes_recv_per_sec"], " B/s")
+		printMetricRow("CPU usage",   snap.Metrics["cpu"]["usage"], "%", 90, 75)
+		printMetricRow("Memory used", snap.Metrics["memory"]["usage_percent"], "%", 90, 75)
+		printMetricRow("Disk used",   snap.Metrics["disk"]["usage_percent"], "%", 90, 75)
+		printMetricRow("Load (1m)",   snap.Metrics["load"]["1min"], "", 8, 4)
+		printMetricRow("Net recv/s",  snap.Metrics["network"]["bytes_recv_per_sec"], " B/s", 0, 0)
 	} else {
 		fmt.Println(styles.Mute.Render("  no system metrics yet"))
 	}
 
 	// Kubernetes
 	fmt.Println()
-	fmt.Println(styles.SectionHeader.Render("  KUBERNETES"))
+	fmt.Println(styles.SectionHeader.Render("  ☸️  KUBERNETES"))
+	fmt.Println()
 	if k8s != nil {
 		m := k8s.Metrics
-		krows := []struct{ k, v string }{
-			{"Nodes ready",  fmt.Sprintf("%d / %d", m.Nodes.Ready, m.Nodes.Total)},
-			{"Pods running", fmt.Sprintf("%d / %d", m.Pods.Running, m.Pods.Total)},
-			{"Node CPU",     fmt.Sprintf("%.3f cores", m.Resources.CPU.Usage)},
-			{"Node Memory",  fmt.Sprintf("%.1f GB", m.Resources.Memory.Usage/1e9)},
+		nodeStyle := styles.Good
+		if m.Nodes.Ready < m.Nodes.Total {
+			nodeStyle = styles.Bad
 		}
-		for _, r := range krows {
+		podStyle := styles.Good
+		if m.Pods.Running < m.Pods.Total {
+			podStyle = styles.SevWarning
+		}
+		type krow struct {
+			k string
+			v string
+			s lipgloss.Style
+		}
+		rows := []krow{
+			{"Nodes ready",  fmt.Sprintf("%d / %d", m.Nodes.Ready, m.Nodes.Total), nodeStyle},
+			{"Pods running", fmt.Sprintf("%d / %d", m.Pods.Running, m.Pods.Total), podStyle},
+			{"Node CPU",     fmt.Sprintf("%.3f cores", m.Resources.CPU.Usage), styles.ValStyle},
+			{"Node Memory",  fmt.Sprintf("%.1f GB", m.Resources.Memory.Usage/1e9), styles.ValStyle},
+		}
+		for _, r := range rows {
 			fmt.Printf("  %s  %s\n",
 				styles.KeyStyle.Width(18).Render(r.k),
-				styles.ValStyle.Render(r.v),
+				r.s.Render(r.v),
 			)
 		}
 	} else {
@@ -76,7 +92,8 @@ func runStatus(_ *cobra.Command, _ []string) error {
 
 	// Alerts
 	fmt.Println()
-	fmt.Println(styles.SectionHeader.Render("  ALERTS"))
+	fmt.Println(styles.SectionHeader.Render("  🚨  ALERTS"))
+	fmt.Println()
 	if len(alerts) == 0 {
 		fmt.Println(styles.Good.Render("  ✓ No firing alerts   system is healthy"))
 	} else {
@@ -88,18 +105,31 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println(styles.HelpBar.Render("  veye alerts · veye logs · veye rca <id> · veye watch"))
+	fmt.Println(styles.HelpBar.Render("  veye alerts · veye logs · veye rca <id> · veye watch · veye scan"))
 	fmt.Println()
 	return nil
 }
 
-func printMetricRow(label string, mv client.MetricValue, unit string) {
+func alertCountLabel(n int) string {
+	if n == 0 {
+		return styles.Good.Render("none")
+	}
+	return styles.Bad.Render(fmt.Sprintf("%d firing", n))
+}
+
+func printMetricRow(label string, mv client.MetricValue, unit string, critThreshold, warnThreshold float64) {
 	if mv.Timestamp == "" {
 		return
 	}
 	val := fmt.Sprintf("%.2f%s", mv.Value, unit)
+	valStyle := styles.ValStyle
+	if critThreshold > 0 && mv.Value >= critThreshold {
+		valStyle = styles.Bad
+	} else if warnThreshold > 0 && mv.Value >= warnThreshold {
+		valStyle = styles.SevWarning
+	}
 	fmt.Printf("  %s  %s\n",
 		styles.KeyStyle.Width(18).Render(label),
-		styles.ValStyle.Render(val),
+		valStyle.Render(val),
 	)
 }

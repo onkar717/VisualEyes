@@ -19,6 +19,18 @@ var (
 	scanForce bool
 )
 
+var scanStages = []struct {
+	emoji string
+	label string
+}{
+	{"🔍", "Triage"},
+	{"📈", "Metrics"},
+	{"📋", "Logs"},
+	{"🏗", "Infra"},
+	{"📖", "Runbook"},
+	{"⚡", "Commander"},
+}
+
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Proactive cluster health check   surfaces issues before they page you",
@@ -29,10 +41,22 @@ With --apply: for each critical finding that has an RCA result, prompt
 interactively to execute the remediation plan. Use --force to execute all
 commands including non-auto-safe ones.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		PrintBanner()
+
+		// Show 6-stage progress animation while fetching
+		done := make(chan struct{})
+		go showScanAnimation(done)
+
 		result, err := api.Scan()
+		close(done)
+		time.Sleep(50 * time.Millisecond) // let goroutine flush last frame
+
 		if err != nil {
+			fmt.Println()
 			return fmt.Errorf("scan failed: %w", err)
 		}
+
+		fmt.Print("\r" + strings.Repeat(" ", 72) + "\r") // clear spinner line
 		printScanResult(result)
 
 		if scanApply && len(result.Issues) > 0 {
@@ -52,6 +76,40 @@ commands including non-auto-safe ones.`,
 func init() {
 	scanCmd.Flags().BoolVar(&scanApply, "apply", false, "Interactively prompt to apply remediation for each critical finding")
 	scanCmd.Flags().BoolVar(&scanForce, "force", false, "Execute all commands including non-auto-safe ones (use with --apply)")
+}
+
+// showScanAnimation renders a 6-stage pipeline progress line until done is closed.
+func showScanAnimation(done <-chan struct{}) {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	stageIdx := 0
+	tick := 0
+	advanceEvery := 12 // rotate stage every ~1.8s
+
+	for {
+		select {
+		case <-done:
+			return
+		default:
+		}
+
+		if tick > 0 && tick%advanceEvery == 0 && stageIdx < len(scanStages)-1 {
+			stageIdx++
+		}
+
+		line := "  " + styles.SevWarning.Render(frames[tick%len(frames)]) + "  "
+		for i, s := range scanStages {
+			if i < stageIdx {
+				line += styles.Good.Render(s.emoji+" "+s.label+"  ")
+			} else if i == stageIdx {
+				line += styles.SectionHeader.Render(s.emoji+" "+s.label) + styles.Mute.Render("…  ")
+			} else {
+				line += styles.Mute.Render(s.emoji+" "+s.label+"  ")
+			}
+		}
+		fmt.Printf("\r%s", line)
+		time.Sleep(150 * time.Millisecond)
+		tick++
+	}
 }
 
 // interactiveRemediate walks through critical findings that have an RCA result
@@ -76,18 +134,16 @@ func interactiveRemediate(issues []client.ScanIssue) error {
 		}
 
 		fmt.Println()
-		fmt.Printf("%s  Alert %d: %s\n",
-			styles.Bad.Render("[critical]"),
-			issue.AlertID,
-			styles.ValStyle.Render(issue.Message),
-		)
-		fmt.Printf("   Root cause: %s\n", styles.Mute.Render(rca.RootCause))
+		fmt.Println(styles.InnerBox.Render(
+			styles.Bad.Render("[CRITICAL]") + "  " + styles.ValStyle.Render(issue.Message) + "\n" +
+				styles.Mute.Render("  Root cause: "+rca.RootCause),
+		))
 		fmt.Println()
 
 		for i, c := range cmds {
 			safety := styles.Good.Render("auto-safe")
 			if !c.IsAutoSafe {
-				safety = styles.SevWarning.Render("manual")
+				safety = styles.DestructiveBadge.Render("DESTRUCTIVE")
 			}
 			fmt.Printf("   %d. [%s] %s\n", i+1, safety, c.Command)
 		}
@@ -137,7 +193,6 @@ func interactiveRemediate(issues []client.ScanIssue) error {
 }
 
 func printScanResult(r *client.ScanResult) {
-	// Header
 	overallStyle := styles.Good
 	overallIcon := "✓"
 	switch r.Overall {
@@ -149,8 +204,6 @@ func printScanResult(r *client.ScanResult) {
 		overallIcon = "!"
 	}
 
-	fmt.Println()
-	fmt.Println(styles.Title.Render("  VisualEyes Cluster Scan"))
 	fmt.Printf("  %s  %s\n\n",
 		overallStyle.Render(overallIcon),
 		overallStyle.Bold(true).Render(strings.ToUpper(r.Overall)),
@@ -179,15 +232,14 @@ func printScanResult(r *client.ScanResult) {
 
 	// Issues
 	if len(r.Issues) == 0 {
-		fmt.Println(styles.Good.Render("  No issues found. Everything looks healthy."))
+		fmt.Println(styles.Good.Render("  ✓ No issues found. Everything looks healthy."))
 		fmt.Println()
 		return
 	}
 
-	fmt.Println(styles.SectionHeader.Render(fmt.Sprintf("  Findings (%d)", r.IssueCount)))
+	fmt.Println(styles.SectionHeader.Render(fmt.Sprintf("  🔍  Findings (%d)", r.IssueCount)))
 	fmt.Println()
 
-	// Sort: critical first (they're already ordered by active alerts, then metrics).
 	for _, issue := range r.Issues {
 		badge := styles.SeverityBadge(issue.Severity)
 		cat := styles.KeyStyle.Render(fmt.Sprintf("%-8s", issue.Category))

@@ -33,7 +33,7 @@ func runRCA(_ *cobra.Command, args []string) error {
 
 	fmt.Println()
 
-	// Alert summary
+	// Alert incident card
 	t, _ := time.Parse(time.RFC3339Nano, alert.FiredAt)
 	fired := humanDuration(time.Since(t))
 
@@ -46,78 +46,81 @@ func runRCA(_ *cobra.Command, args []string) error {
 	))
 	fmt.Println()
 
-	// RCA status
+	// Spin until RCA is no longer running/pending
 	switch alert.RCAStatus {
-	case "", "pending":
-		fmt.Println(styles.Mute.Render("  RCA not yet triggered or pending."))
-		fmt.Println(styles.Mute.Render("  Set ANTHROPIC_API_KEY and rca.enabled=true to enable Claude analysis."))
-		fmt.Println()
-		return nil
-	case "running":
-		fmt.Println(styles.SevWarning.Render("  ⟳ Claude is analysing this alert…"))
-		fmt.Println()
-		return nil
+	case "running", "pending":
+		if err := waitForRCA(id, alert); err != nil {
+			return err
+		}
+	}
+
+	switch alert.RCAStatus {
 	case "failed":
 		fmt.Println(styles.Bad.Render("  ✗ RCA analysis failed."))
 		fmt.Println()
 		return nil
+	case "", "pending":
+		fmt.Println(styles.Mute.Render("  RCA not yet triggered."))
+		fmt.Println(styles.Mute.Render("  Set ANTHROPIC_API_KEY and rca.enabled=true to enable Claude analysis."))
+		fmt.Println()
+		return nil
 	}
 
-	// Fetch RCA result
+	// Fetch full RCA result
 	rca, err := api.RCA(id)
 	if err != nil {
 		return fmt.Errorf("could not fetch RCA for alert %d: %w", id, err)
 	}
 
-	// Root cause
-	fmt.Println(styles.SectionHeader.Render("  ROOT CAUSE"))
-	fmt.Println()
-	for _, line := range wrap(rca.RootCause, 80) {
-		fmt.Println("  " + styles.ValStyle.Render(line))
+	// Root cause box
+	rootContent := styles.SectionHeader.Render("🔍  ROOT CAUSE") + "\n\n"
+	for _, line := range wrap(rca.RootCause, 76) {
+		rootContent += "  " + styles.ValStyle.Render(line) + "\n"
 	}
+	fmt.Println(styles.InnerBox.Render(strings.TrimRight(rootContent, "\n")))
 	fmt.Println()
 
-	// Explanation
-	fmt.Println(styles.SectionHeader.Render("  ANALYSIS"))
-	fmt.Println()
-	for _, line := range wrap(rca.Explanation, 80) {
-		fmt.Println("  " + line)
+	// Analysis box
+	analysisContent := styles.SectionHeader.Render("📋  ANALYSIS") + "\n\n"
+	for _, line := range wrap(rca.Explanation, 76) {
+		analysisContent += "  " + line + "\n"
 	}
+	fmt.Println(styles.InnerBox.Render(strings.TrimRight(analysisContent, "\n")))
 	fmt.Println()
 
-	// Remediation commands
+	// Remediation commands box
 	var cmds []client.FixCommand
 	if rca.Commands != "" {
 		_ = json.Unmarshal([]byte(rca.Commands), &cmds)
 	}
 
 	if len(cmds) > 0 {
-		fmt.Println(styles.SectionHeader.Render("  REMEDIATION COMMANDS"))
-		fmt.Println()
+		cmdContent := styles.SectionHeader.Render("⚡  REMEDIATION COMMANDS") + "\n\n"
 		for i, cmd := range cmds {
-			autoLabel := ""
+			safetyLabel := ""
 			if cmd.IsAutoSafe {
-				autoLabel = styles.Good.Render(" [auto-safe]")
+				safetyLabel = styles.Good.Render(" [auto-safe]")
 			} else {
-				autoLabel = styles.SevWarning.Render(" [manual]")
+				safetyLabel = styles.DestructiveBadge.Render(" [DESTRUCTIVE]")
 			}
 			statusLabel := cmdStatusLabel(cmd.Status)
 
-			fmt.Printf("  %s  %s%s  %s\n",
+			cmdContent += fmt.Sprintf("  %s  %s%s  %s\n",
 				styles.Mute.Render(fmt.Sprintf("[%d]", i+1)),
 				styles.ValStyle.Render(cmd.Command),
-				autoLabel,
+				safetyLabel,
 				statusLabel,
 			)
 			if cmd.Output != "" {
 				for _, l := range strings.Split(cmd.Output, "\n") {
-					fmt.Println("      " + styles.Good.Render(l))
+					cmdContent += "      " + styles.Good.Render(l) + "\n"
 				}
 			}
 			if cmd.Error != "" {
-				fmt.Println("      " + styles.Bad.Render("error: "+cmd.Error))
+				cmdContent += "      " + styles.Bad.Render("error: "+cmd.Error) + "\n"
 			}
 		}
+		fmt.Println(styles.InnerBox.Render(strings.TrimRight(cmdContent, "\n")))
 		fmt.Println()
 	}
 
@@ -127,6 +130,33 @@ func runRCA(_ *cobra.Command, args []string) error {
 		rca.Model, rca.InputTokens, humanDuration(time.Since(updAt)))))
 	fmt.Println()
 	return nil
+}
+
+// waitForRCA shows a braille spinner and polls until RCA is done or failed.
+func waitForRCA(id uint, alert *client.Alert) error {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	pollEvery := 20 // ~3s at 150ms per frame
+	for i := 0; ; i++ {
+		label := "RCA queued"
+		if alert.RCAStatus == "running" {
+			label = "Claude AI analysing"
+		}
+		fmt.Printf("\r  %s  %s  ",
+			styles.SevWarning.Render(frames[i%len(frames)]),
+			styles.Mute.Render(label+"…"),
+		)
+		time.Sleep(150 * time.Millisecond)
+		if i%pollEvery == 0 && i > 0 {
+			updated, err := api.AlertByID(id)
+			if err == nil {
+				*alert = *updated
+			}
+			if alert.RCAStatus == "done" || alert.RCAStatus == "failed" {
+				fmt.Println()
+				return nil
+			}
+		}
+	}
 }
 
 func cmdStatusLabel(s string) string {
