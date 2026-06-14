@@ -104,10 +104,37 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		fmt.Println(styles.Mute.Render(fmt.Sprintf("  %d alert(s) firing  ·  run 'veye alerts' for details", len(alerts))))
 	}
 
+	// Open incidents
 	fmt.Println()
-	fmt.Println(styles.HelpBar.Render("  veye alerts · veye logs · veye rca <id> · veye watch · veye scan"))
+	fmt.Println(styles.SectionHeader.Render("  📋  OPEN INCIDENTS"))
+	fmt.Println()
+	inc, err := api.FullIncidents(5, "", "OPEN", 0)
+	if err != nil || inc == nil || len(inc.Incidents) == 0 {
+		fmt.Println(styles.Good.Render("  ✓ No open incidents"))
+	} else {
+		for _, i := range inc.Incidents {
+			fmt.Printf("  %s  %s  %s\n",
+				sevStyle(i.Severity).Render(i.Severity),
+				styles.ValStyle.Render(i.IncidentCode),
+				styles.Mute.Render(truncStr(i.RootCause, 60)),
+			)
+		}
+		if inc.Count > 5 {
+			fmt.Printf("  %s\n", styles.Mute.Render(fmt.Sprintf("  … and %d more  ·  run 'veye incidents' for full list", inc.Count-5)))
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(styles.HelpBar.Render("  veye alerts · veye incidents · veye logs · veye rca <id> · veye watch · veye scan --ai"))
 	fmt.Println()
 	return nil
+}
+
+func truncStr(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n-1] + "…"
 }
 
 func alertCountLabel(n int) string {

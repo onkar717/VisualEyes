@@ -299,6 +299,21 @@ func (c *Client) GetIncident(id uint) (*Incident, error) {
 	return &inc, c.get(fmt.Sprintf("/api/incidents/full/%d", id), &inc)
 }
 
+// GetIncidentByCode finds an incident by its INC-XXXX code.
+// Fetches the most recent incidents and searches client-side.
+func (c *Client) GetIncidentByCode(code string) (*Incident, error) {
+	resp, err := c.FullIncidents(500, "", "", 0)
+	if err != nil {
+		return nil, fmt.Errorf("fetch incidents: %w", err)
+	}
+	for _, inc := range resp.Incidents {
+		if inc.IncidentCode == code {
+			return &inc, nil
+		}
+	}
+	return nil, fmt.Errorf("incident %q not found", code)
+}
+
 // ClusterHealth mirrors models.ClusterHealth.
 type ClusterHealth struct {
 	ID            uint      `json:"id"`
@@ -375,6 +390,60 @@ func (c *Client) StreamRCAProgress(alertID uint) (<-chan StageEvent, error) {
 		}
 	}()
 	return ch, nil
+}
+
+// ScanAllItem is a single alert triggered by POST /api/rca/scan-all.
+type ScanAllItem struct {
+	ID       uint   `json:"id"`
+	Message  string `json:"message"`
+	Severity string `json:"severity"`
+	Resource string `json:"resource"`
+}
+
+// ScanAllResult is the POST /api/rca/scan-all response.
+type ScanAllResult struct {
+	Triggered         int           `json:"triggered"`
+	AlreadyProcessing int           `json:"already_processing"`
+	Alerts            []ScanAllItem `json:"alerts"`
+	// Dry-run fields (populated when ?dry_run=true).
+	DryRun       bool `json:"dry_run,omitempty"`
+	WouldTrigger int  `json:"would_trigger,omitempty"`
+}
+
+// ScanAll POSTs to /api/rca/scan-all, triggering AI RCA for all firing alerts.
+// When dryRun=true, returns what would be triggered without starting analysis.
+func (c *Client) ScanAll(dryRun bool) (*ScanAllResult, error) {
+	url := c.base + "/api/rca/scan-all"
+	if dryRun {
+		url += "?dry_run=true"
+	}
+	resp, err := c.http.Post(url, "application/json", nil)
+	if err != nil {
+		return nil, fmt.Errorf("POST /api/rca/scan-all: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, fmt.Errorf("rca engine not enabled on server (set rca.enabled=true + provider API key)")
+	}
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("POST /api/rca/scan-all: HTTP %d", resp.StatusCode)
+	}
+	var r ScanAllResult
+	return &r, json.NewDecoder(resp.Body).Decode(&r)
+}
+
+// AISREInfo mirrors the Python /config response for the active AI-SRE service.
+type AISREInfo struct {
+	LLMModel    string `json:"llm_model"`
+	LLMProvider string `json:"llm_provider"`
+	DryRun      bool   `json:"dry_run"`
+	Namespaces  []string `json:"namespaces"`
+}
+
+// AIInfo calls /api/ai-sre/info. Returns nil when ai-sre is not configured.
+func (c *Client) AIInfo() (*AISREInfo, error) {
+	var r AISREInfo
+	return &r, c.get("/api/ai-sre/info", &r)
 }
 
 // Logs calls /api/pod-logs with optional filters.

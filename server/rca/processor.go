@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +31,14 @@ func isRateLimitError(err error) bool {
 
 // Processor orchestrates the full RCA pipeline for a single alert:
 //  1. Build AlertContext (metrics + logs + sibling alerts)
-//  2. Run multi-stage LLM pipeline (triage → diagnosis → remediation → commander)
-//  3. Auto-execute safe commands (kubectl delete pod, kubectl rollout restart)
-//  4. Persist RCAResult; update Alert.RCAStatus
+//  2. Run CrewAI Python pipeline if AI_SRE_URL is set and service is reachable
+//  3. Fall back to Go multi-stage LLM pipeline if Python service unavailable
+//  4. Auto-execute safe commands (kubectl delete pod, kubectl rollout restart)
+//  5. Persist RCAResult; update Alert.RCAStatus
 type Processor struct {
 	contextBuilder      *ContextBuilder
 	pipeline            *Pipeline
+	pythonClient        *PythonClient  // optional — nil when AI_SRE_URL not set
 	executor            *Executor
 	rcaStore            storage.RCAStore
 	alertStore          storage.AlertStore
@@ -62,6 +65,8 @@ func (p *Processor) SetAutoRemediate(v bool) { p.autoRemediate = v }
 func (p *Processor) SetDryRun(v bool) { p.dryRun = v }
 
 // NewProcessor builds a Processor from its dependencies.
+// If AI_SRE_URL is set the processor will call the Python CrewAI service first,
+// falling back to the Go pipeline when the service is unreachable.
 func NewProcessor(
 	cb *ContextBuilder,
 	llm LLMProvider,
@@ -74,9 +79,22 @@ func NewProcessor(
 	if claude, ok := llm.(*ClaudeClient); ok {
 		maxTokens = claude.maxTokens / 2 // per stage budget
 	}
+
+	var pyClient *PythonClient
+	if os.Getenv("AI_SRE_URL") != "" {
+		// Build callback URL pointing at our own /internal/rca/stage-event endpoint.
+		selfURL := os.Getenv("VISUAL_EYES_SELF_URL")
+		if selfURL == "" {
+			selfURL = "http://localhost:8080"
+		}
+		pyClient = NewPythonClient(selfURL + "/internal/rca/stage-event")
+		slog.Info("python AI-SRE client enabled", "url", os.Getenv("AI_SRE_URL"))
+	}
+
 	return &Processor{
 		contextBuilder:      cb,
 		pipeline:            NewPipeline(llm, maxTokens),
+		pythonClient:        pyClient,
 		executor:            ex,
 		rcaStore:            rcaStore,
 		alertStore:          alertStore,
@@ -133,42 +151,65 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	}
 	p.linkRCAToAlert(alert.ID, result.ID)
 
-	// 3. Run multi-stage pipeline with optional timeout (6 stages × per-stage timeout).
+	// 3. Run RCA pipeline — try Python CrewAI service first, fall back to Go pipeline.
 	scanStart := time.Now()
 	pipelineCtx := ctx
 	if p.agentTimeoutSeconds > 0 {
 		var cancel context.CancelFunc
+		// Python service has its own per-agent timeout; multiply by 2 for safety margin.
+		multiplier := 6
+		if p.pythonClient != nil {
+			multiplier = 12
+		}
 		pipelineCtx, cancel = context.WithTimeout(ctx,
-			time.Duration(p.agentTimeoutSeconds*6)*time.Second)
+			time.Duration(p.agentTimeoutSeconds*multiplier)*time.Second)
 		defer cancel()
 	}
 
-	// Retry on LLM rate-limit errors (3 attempts: 15 / 30 / 60 s backoff).
 	var resp *RCAResponse
 	var inputTokens int
-	for attempt := 0; attempt < 3; attempt++ {
-		var rcaErr error
-		resp, inputTokens, rcaErr = p.pipeline.RunPipeline(pipelineCtx, ac)
-		if rcaErr == nil {
-			break
-		}
-		if isRateLimitError(rcaErr) && attempt < 2 {
-			wait := retryWaits[attempt]
-			log.Warn("rca rate-limit   retrying", "attempt", attempt+1, "wait", wait)
-			select {
-			case <-time.After(wait):
-				continue
-			case <-pipelineCtx.Done():
-				rcaErr = pipelineCtx.Err()
+
+	// Try Python CrewAI pipeline first when available.
+	if p.pythonClient != nil {
+		if p.pythonClient.IsAvailable(pipelineCtx) {
+			log.Info("rca: using Python CrewAI pipeline")
+			var pyErr error
+			resp, inputTokens, pyErr = p.pythonClient.RunPipeline(pipelineCtx, ac)
+			if pyErr != nil {
+				log.Warn("rca: Python pipeline failed, falling back to Go pipeline", "error", pyErr)
+				resp = nil
 			}
+		} else {
+			log.Warn("rca: Python AI-SRE service unavailable, using Go pipeline")
 		}
-		log.Error("rca pipeline failed", "error", rcaErr, "attempt", attempt+1)
-		result.Status = "failed"
-		result.Explanation = "RCA failed: " + rcaErr.Error()
-		result.UpdatedAt = time.Now()
-		p.rcaStore.UpdateRCAResult(result)
-		p.updateAlertRCAStatus(alert.ID, "failed")
-		return
+	}
+
+	// Go pipeline fallback (or primary when Python not configured).
+	if resp == nil {
+		for attempt := 0; attempt < 3; attempt++ {
+			var rcaErr error
+			resp, inputTokens, rcaErr = p.pipeline.RunPipeline(pipelineCtx, ac)
+			if rcaErr == nil {
+				break
+			}
+			if isRateLimitError(rcaErr) && attempt < 2 {
+				wait := retryWaits[attempt]
+				log.Warn("rca rate-limit   retrying", "attempt", attempt+1, "wait", wait)
+				select {
+				case <-time.After(wait):
+					continue
+				case <-pipelineCtx.Done():
+					rcaErr = pipelineCtx.Err()
+				}
+			}
+			log.Error("rca pipeline failed", "error", rcaErr, "attempt", attempt+1)
+			result.Status = "failed"
+			result.Explanation = "RCA failed: " + rcaErr.Error()
+			result.UpdatedAt = time.Now()
+			p.rcaStore.UpdateRCAResult(result)
+			p.updateAlertRCAStatus(alert.ID, "failed")
+			return
+		}
 	}
 	scanDuration := time.Since(scanStart).Seconds()
 

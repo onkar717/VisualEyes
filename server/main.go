@@ -215,6 +215,7 @@ func main() {
 			}
 
 			go processor.RunWorker(appCtx, rcaTrigger, 2)
+			handler.SetRCATrigger(rcaTrigger)
 			slog.Info("rca engine started", "provider", cfg.RCA.Provider, "model", cfg.RCA.Model)
 		}
 	} else {

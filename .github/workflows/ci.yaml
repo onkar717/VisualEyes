@@ -92,6 +92,29 @@ jobs:
       - name: Lint YAML
         run: yamllint . || true
 
+  lint-python:
+    name: Python Lint & Type Check (ai-sre)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: ai-sre/requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r ai-sre/requirements-dev.txt
+
+      - name: ruff check
+        run: ruff check ai-sre/
+
+      - name: mypy type check
+        run: mypy ai-sre/ --ignore-missing-imports --no-error-summary
+        continue-on-error: true
+
   lint-shell:
     name: Shell Lint
     runs-on: ubuntu-latest

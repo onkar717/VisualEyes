@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,6 +35,7 @@ type Handler struct {
 	snapshotStore       storage.ClusterSnapshotStore
 	eventBuffer         *storage.EventBuffer // ring buffer for K8s Warning events
 	broadcaster         *ws.Broadcaster
+	rcaTrigger          chan<- models.Alert  // feed to RCA worker pool for on-demand scans
 	hostname          string
 	corsOrigins       map[string]bool
 	startedAt         time.Time
@@ -50,6 +52,7 @@ func (h *Handler) SetRemediationLogStore(s storage.RemediationLogStore) { h.reme
 func (h *Handler) SetClusterStore(s storage.ClusterStore)               { h.clusterStore = s }
 func (h *Handler) SetSnapshotStore(s storage.ClusterSnapshotStore)      { h.snapshotStore = s }
 func (h *Handler) SetBroadcaster(b *ws.Broadcaster)                     { h.broadcaster = b }
+func (h *Handler) SetRCATrigger(ch chan<- models.Alert)                  { h.rcaTrigger = ch }
 
 // StopRateLimiter cleans up the rate limiter's background cleanup goroutine.
 func (h *Handler) StopRateLimiter() {
@@ -1044,6 +1047,100 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// HandleScanAll triggers on-demand AI RCA for every firing alert that has not
+// yet completed analysis. POST /api/rca/scan-all
+//
+// Query param: dry_run=true — lists which alerts WOULD be triggered without
+// actually queueing them. Returns HTTP 200 with dry_run=true in body.
+func (h *Handler) HandleScanAll(w http.ResponseWriter, r *http.Request) {
+	if h.preflight(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	if h.alertStore == nil || h.rcaTrigger == nil {
+		writeError(w, http.StatusServiceUnavailable, "rca engine not enabled or not wired")
+		return
+	}
+
+	dryRun := r.URL.Query().Get("dry_run") == "true"
+
+	active, err := h.alertStore.GetActiveAlerts()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "fetch active alerts: "+err.Error())
+		return
+	}
+
+	type candidateItem struct {
+		ID       uint   `json:"id"`
+		Message  string `json:"message"`
+		Severity string `json:"severity"`
+		Resource string `json:"resource"`
+	}
+
+	var candidates []candidateItem
+	skipped := 0
+
+	for _, a := range active {
+		if a.RCAStatus == "running" || a.RCAStatus == "done" {
+			skipped++
+			continue
+		}
+		candidates = append(candidates, candidateItem{
+			ID:       a.ID,
+			Message:  a.Message,
+			Severity: string(a.Severity),
+			Resource: a.ResourceID,
+		})
+	}
+
+	if candidates == nil {
+		candidates = []candidateItem{}
+	}
+
+	if dryRun {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"dry_run":            true,
+			"would_trigger":      len(candidates),
+			"already_processing": skipped,
+			"alerts":             candidates,
+		})
+		return
+	}
+
+	// Actually queue eligible alerts into the RCA worker pool.
+	var queued []candidateItem
+	for _, a := range active {
+		if a.RCAStatus == "running" || a.RCAStatus == "done" {
+			continue
+		}
+		select {
+		case h.rcaTrigger <- a:
+			queued = append(queued, candidateItem{
+				ID:       a.ID,
+				Message:  a.Message,
+				Severity: string(a.Severity),
+				Resource: a.ResourceID,
+			})
+		default:
+			// Worker queue full — count as already processing.
+			skipped++
+		}
+	}
+
+	if queued == nil {
+		queued = []candidateItem{}
+	}
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"triggered":          len(queued),
+		"already_processing": skipped,
+		"alerts":             queued,
+	})
+}
+
 // HandleIncidents returns recent notification delivery events.
 // GET /api/incidents?limit=50&alert_id=<id>
 func (h *Handler) HandleIncidents(w http.ResponseWriter, r *http.Request) {
@@ -1491,4 +1588,75 @@ func (h *Handler) HandleGetIncident(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, inc)
+}
+
+// HandleAISREInfo proxies GET /api/ai-sre/info → Python service /config.
+// Returns active LLM model, provider, and feature flags. 404 when ai-sre not configured.
+func (h *Handler) HandleAISREInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	aiSREURL := os.Getenv("AI_SRE_URL")
+	if aiSREURL == "" {
+		writeError(w, http.StatusNotFound, "ai-sre service not configured")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, aiSREURL+"/config", nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "build request: "+err.Error())
+		return
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "ai-sre unavailable")
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
+}
+
+// HandleInternalStageEvent receives stage-completion callbacks from the Python
+// AI-SRE service and publishes them to the Go SSE hub so veye CLI gets live progress.
+// This endpoint is internal — not exposed on the public API.
+// POST /internal/rca/stage-event
+func (h *Handler) HandleInternalStageEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var ev struct {
+		AlertID uint   `json:"alert_id"`
+		Stage   int    `json:"stage"`
+		Label   string `json:"label"`
+		Status  string `json:"status"`
+		Detail  string `json:"detail"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if ev.AlertID == 0 || ev.Stage < 1 || ev.Stage > 6 {
+		writeError(w, http.StatusBadRequest, "invalid alert_id or stage")
+		return
+	}
+
+	switch ev.Status {
+	case "start":
+		rca.PublishStageStart(ev.AlertID, ev.Stage, ev.Label)
+	case "done":
+		rca.PublishStageDone(ev.AlertID, ev.Stage, ev.Label, ev.Detail)
+	case "failed":
+		rca.PublishStageFailed(ev.AlertID, ev.Stage, ev.Label)
+	default:
+		writeError(w, http.StatusBadRequest, "unknown status")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

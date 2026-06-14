@@ -46,6 +46,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       VISUAL_EYES_RCA_ENABLED: ${VISUAL_EYES_RCA_ENABLED:-false}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      AI_SRE_URL: http://visual-eyes-ai-sre:8001
+      VISUAL_EYES_SELF_URL: http://visual-eyes-server:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +74,49 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - visual-eyes-network
+
+  # -- AI-SRE Python CrewAI Service -----------------------------------------
+  visual-eyes-ai-sre:
+    build:
+      context: ./ai-sre
+      dockerfile: Dockerfile
+    container_name: visual-eyes-ai-sre
+    ports:
+      - "8001:8001"
+    environment:
+      AI_SRE_HOST: "0.0.0.0"
+      AI_SRE_PORT: "8001"
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      LLM_MODEL: ${LLM_MODEL:-groq/llama-3.3-70b-versatile}
+      LLM_TEMPERATURE: "0.1"
+      LLM_MAX_TOKENS: "2048"
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      PROMETHEUS_URL: http://prometheus:9090
+      PROMETHEUS_ENABLED: "true"
+      LOKI_URL: http://loki:3100
+      LOKI_ENABLED: ${LOKI_ENABLED:-false}
+      K8S_NAMESPACES: ${K8S_NAMESPACES:-default}
+      DRY_RUN: ${DRY_RUN:-true}
+      AUTO_REMEDIATE: ${AUTO_REMEDIATE:-false}
+      RUNBOOKS_DIR: /app/runbooks
+    volumes:
+      - ${HOME}/.kube:/root/.kube:ro   # kubeconfig for in-cluster access
+    depends_on:
+      visual-eyes-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

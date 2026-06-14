@@ -15,8 +15,10 @@ import (
 )
 
 var (
-	scanApply bool
-	scanForce bool
+	scanApply  bool
+	scanForce  bool
+	scanAI     bool
+	scanDryRun bool
 )
 
 var scanStages = []struct {
@@ -37,11 +39,18 @@ var scanCmd = &cobra.Command{
 	Long: `Queries the VisualEyes backend for active alerts and metric thresholds,
 then prints a prioritised list of findings.
 
+With --ai: triggers a full 6-stage AI RCA scan for every firing alert that
+doesn't already have a completed analysis. Streams live pipeline progress.
+
 With --apply: for each critical finding that has an RCA result, prompt
 interactively to execute the remediation plan. Use --force to execute all
 commands including non-auto-safe ones.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		PrintBanner()
+
+		if scanAI {
+			return runAIScan()
+		}
 
 		// Show 6-stage progress animation while fetching
 		done := make(chan struct{})
@@ -73,7 +82,145 @@ commands including non-auto-safe ones.`,
 	},
 }
 
+// runAIScan triggers full 6-stage LLM analysis for all firing alerts.
+func runAIScan() error {
+	fmt.Println()
+
+	// Show active LLM model if ai-sre service is reachable.
+	if info, err := api.AIInfo(); err == nil && info.LLMModel != "" {
+		fmt.Printf("  %s  %s\n",
+			styles.KeyStyle.Render("AI Model"),
+			styles.ValStyle.Render(info.LLMModel),
+		)
+	}
+
+	if scanDryRun {
+		fmt.Println(styles.SectionHeader.Render("  [DRY RUN] Checking which alerts would be scanned..."))
+	} else {
+		fmt.Println(styles.SectionHeader.Render("  Triggering AI scan for all firing alerts..."))
+	}
+	fmt.Println()
+
+	r, err := api.ScanAll(scanDryRun)
+	if err != nil {
+		return err
+	}
+
+	countField := r.Triggered
+	if scanDryRun {
+		countField = r.WouldTrigger
+	}
+
+	if countField == 0 {
+		if r.AlreadyProcessing > 0 {
+			fmt.Printf("  %s  %d alert(s) already have completed or in-progress RCA.\n",
+				styles.Good.Render("✓"), r.AlreadyProcessing)
+		} else {
+			fmt.Println(styles.Good.Render("  ✓ No firing alerts — cluster is healthy."))
+		}
+		fmt.Println()
+		return nil
+	}
+
+	verb := "Triggered"
+	if scanDryRun {
+		verb = "Would trigger"
+	}
+	fmt.Printf("  %s  %s AI analysis for %d alert(s)",
+		styles.SevWarning.Render("→"), verb, countField)
+	if r.AlreadyProcessing > 0 {
+		fmt.Printf("  %s", styles.Mute.Render(fmt.Sprintf("(%d already processing)", r.AlreadyProcessing)))
+	}
+	fmt.Println()
+	fmt.Println()
+
+	if scanDryRun {
+		fmt.Println(styles.Mute.Render("  (dry-run — no analysis started)"))
+		fmt.Println()
+		for _, a := range r.Alerts {
+			fmt.Printf("  %s  %s  %s\n",
+				styles.SeverityBadge(a.Severity),
+				styles.ValStyle.Render(a.Message),
+				styles.Mute.Render(fmt.Sprintf("alert #%d · %s", a.ID, a.Resource)),
+			)
+		}
+		fmt.Println()
+		return nil
+	}
+
+	stageLabels := []string{"", "Triage", "Metrics", "Logs", "Infra", "Remediation", "Commander"}
+
+	for _, a := range r.Alerts {
+		sevBadge := styles.SeverityBadge(a.Severity)
+		fmt.Printf("  %s  %s\n  %s\n\n",
+			sevBadge,
+			styles.ValStyle.Render(a.Message),
+			styles.Mute.Render(fmt.Sprintf("alert #%d · %s", a.ID, a.Resource)),
+		)
+
+		ch, err := api.StreamRCAProgress(a.ID)
+		if err != nil {
+			fmt.Printf("  %s\n\n", styles.Mute.Render("(could not stream progress — RCA running in background)"))
+			continue
+		}
+
+		stageStatus := make([]string, 7) // index 1-6
+		for ev := range ch {
+			if ev.Stage < 1 || ev.Stage > 6 {
+				continue
+			}
+			label := stageLabels[ev.Stage]
+			switch ev.Status {
+			case "start":
+				stageStatus[ev.Stage] = styles.SevWarning.Render("…")
+			case "done":
+				detail := ""
+				if ev.Detail != "" {
+					detail = "  " + styles.Mute.Render(ev.Detail)
+				}
+				stageStatus[ev.Stage] = styles.Good.Render("✓")
+				fmt.Printf("    %s  %s%s\n",
+					stageStatus[ev.Stage],
+					styles.KeyStyle.Render(label),
+					detail,
+				)
+			case "failed":
+				stageStatus[ev.Stage] = styles.Bad.Render("✗")
+				fmt.Printf("    %s  %s\n", stageStatus[ev.Stage], styles.Bad.Render(label+" failed"))
+			}
+		}
+
+		// Show RCA result summary.
+		rca, err := api.RCA(a.ID)
+		if err == nil && rca.Status == "done" && rca.RootCause != "" {
+			fmt.Println()
+			fmt.Printf("    %s  %s\n", styles.KeyStyle.Render("Root cause"), wordWrap(rca.RootCause, 64))
+		}
+		fmt.Println()
+	}
+
+	if scanApply {
+		issues := make([]client.ScanIssue, 0, len(r.Alerts))
+		for _, a := range r.Alerts {
+			issues = append(issues, client.ScanIssue{
+				Severity: a.Severity,
+				Category: "ai-scan",
+				Resource: a.Resource,
+				Message:  a.Message,
+				AlertID:  a.ID,
+			})
+		}
+		if err := interactiveRemediate(issues); err != nil {
+			fmt.Fprintf(os.Stderr, "remediation error: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
 func init() {
+	scanCmd.Flags().BoolVar(&scanAI, "ai", false, "Trigger full 6-stage AI RCA scan for all firing alerts")
+	scanCmd.Flags().BoolVar(&scanDryRun, "dry-run", false, "Show which alerts would be scanned without starting analysis (use with --ai)")
 	scanCmd.Flags().BoolVar(&scanApply, "apply", false, "Interactively prompt to apply remediation for each critical finding")
 	scanCmd.Flags().BoolVar(&scanForce, "force", false, "Execute all commands including non-auto-safe ones (use with --apply)")
 }

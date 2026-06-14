@@ -32,7 +32,8 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 	mux.HandleFunc("/api/alerts/", h.HandleAlertByID) // /api/alerts/{id}
 
 	// RCA
-	mux.HandleFunc("/api/rca/", h.HandleRCA) // /api/rca/{id} and /api/rca/{id}/execute
+	mux.HandleFunc("/api/rca/scan-all", h.HandleScanAll) // POST — trigger AI scan for all firing alerts
+	mux.HandleFunc("/api/rca/", h.HandleRCA)             // /api/rca/{id} and /api/rca/{id}/execute
 
 	// Cluster health scan
 	mux.HandleFunc("/api/scan", h.HandleScan)
@@ -57,6 +58,12 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler, cfg *config.Config) http.Han
 
 	// Remediation audit log
 	mux.HandleFunc("/api/remediation-log", h.HandleRemediationLog)
+
+	// AI-SRE info (active model, provider, feature flags)
+	mux.HandleFunc("/api/ai-sre/info", h.HandleAISREInfo)
+
+	// Internal — Python AI-SRE service stage callbacks (not exposed externally)
+	mux.HandleFunc("/internal/rca/stage-event", h.HandleInternalStageEvent)
 
 	// WebSocket real-time stream
 	mux.HandleFunc("/ws", h.WebSocketStream)

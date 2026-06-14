@@ -1,0 +1,205 @@
+# VisualEyes K8s Failure Scenarios
+# Apply with: kubectl apply -f tests/k8s-scenarios.yaml
+# Remove with: kubectl delete -f tests/k8s-scenarios.yaml
+#
+# Each scenario triggers a specific RCA category.
+# Expected SEV level and category are in the labels.
+
+# ── 1. CrashLoopBackOff ───────────────────────────────────────────────────────
+# Triggers: crashloop category, SEV2
+# Pod exits with error immediately → K8s restarts → crash loop
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-crashloop
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: crash-loop
+    expected-sev: SEV2
+    expected-category: crashloop
+spec:
+  containers:
+  - name: crasher
+    image: busybox:1.35
+    command: ["/bin/sh", "-c"]
+    args:
+    - |
+      echo "ERROR: Database connection refused: connection timeout after 30s"
+      echo "FATAL: Cannot connect to postgres://db:5432/myapp after 3 retries"
+      echo "Traceback: ConnectionRefusedError: [Errno 111] Connection refused"
+      exit 1
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "10m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+  restartPolicy: Always
+
+---
+# ── 2. OOMKilled ──────────────────────────────────────────────────────────────
+# Triggers: oom category, SEV2
+# Pod allocates memory beyond limit → OOMKilled → restart loop
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-oom
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: oom-kill
+    expected-sev: SEV2
+    expected-category: oom
+spec:
+  containers:
+  - name: memory-hog
+    image: polinux/stress:latest
+    command: ["stress"]
+    args: ["--vm", "1", "--vm-bytes", "200M", "--vm-hang", "0"]
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "10m"
+      limits:
+        memory: "100Mi"   # stress will exceed this → OOMKilled
+        cpu: "100m"
+  restartPolicy: Always
+
+---
+# ── 3. High CPU ───────────────────────────────────────────────────────────────
+# Triggers: high_cpu category, SEV3
+# Pod pegs CPU → CPU alert fires → RCA diagnoses CPU saturation
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-high-cpu
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: high-cpu
+    expected-sev: SEV3
+    expected-category: high_cpu
+spec:
+  containers:
+  - name: cpu-burner
+    image: polinux/stress:latest
+    command: ["stress"]
+    args: ["--cpu", "2", "--timeout", "600s"]
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "500m"
+      limits:
+        memory: "64Mi"
+        cpu: "1000m"
+  restartPolicy: Never
+
+---
+# ── 4. High Memory (no OOM — under limit but high) ────────────────────────────
+# Triggers: high_memory category, SEV3
+# Pod holds memory near limit → memory alert fires → no OOM, just pressure
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-high-mem
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: high-memory
+    expected-sev: SEV3
+    expected-category: high_memory
+spec:
+  containers:
+  - name: mem-holder
+    image: polinux/stress:latest
+    command: ["stress"]
+    args: ["--vm", "1", "--vm-bytes", "150M", "--vm-keep", "--timeout", "600s"]
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "10m"
+      limits:
+        memory: "256Mi"   # high but not exceeded → alert but no OOMKill
+        cpu: "100m"
+  restartPolicy: Never
+
+---
+# ── 5. Pending (unschedulable) ────────────────────────────────────────────────
+# Triggers: pending category, SEV3
+# Pod requests resources that no node can satisfy → stuck Pending
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-pending
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: pending-unschedulable
+    expected-sev: SEV3
+    expected-category: pending
+spec:
+  containers:
+  - name: waiter
+    image: busybox:1.35
+    command: ["sleep", "3600"]
+    resources:
+      requests:
+        memory: "999Gi"    # impossible on any minikube node
+        cpu: "999"
+      limits:
+        memory: "999Gi"
+        cpu: "999"
+  restartPolicy: Never
+
+---
+# ── 6. ImagePullBackOff ───────────────────────────────────────────────────────
+# Triggers: image_pull category, SEV3
+# Pod references non-existent image → ErrImagePull → ImagePullBackOff
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ve-scenario-imagepull
+  namespace: default
+  labels:
+    app: ve-scenario
+    scenario: image-pull-backoff
+    expected-sev: SEV3
+    expected-category: image_pull
+spec:
+  containers:
+  - name: missing-image
+    image: visualeyes-nonexistent-image:v99.99.99
+    command: ["sleep", "3600"]
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "10m"
+      limits:
+        memory: "64Mi"
+        cpu: "50m"
+  restartPolicy: Always
+
+---
+# ── Usage Notes ───────────────────────────────────────────────────────────────
+# 1. Start VisualEyes with k8s-agent running:
+#      kubectl apply -f deployments/kubernetes/
+#
+# 2. Apply scenarios:
+#      kubectl apply -f tests/k8s-scenarios.yaml
+#
+# 3. Watch alerts fire (30-60s):
+#      veye watch
+#   or
+#      veye alerts
+#
+# 4. Trigger AI analysis:
+#      veye scan --ai
+#
+# 5. View RCA results:
+#      veye incidents
+#      veye show <incident-id>
+#
+# 6. Cleanup:
+#      kubectl delete -f tests/k8s-scenarios.yaml

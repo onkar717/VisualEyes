@@ -217,6 +217,31 @@ init:
 	mkdir -p bin
 	mkdir -p configs
 
+## ── AI-SRE Python service ────────────────────────────────────────────────────
+
+AI_SRE_DIR=./ai-sre
+
+ai-sre-install:
+	pip install -r $(AI_SRE_DIR)/requirements.txt
+
+ai-sre-dev:
+	pip install -r $(AI_SRE_DIR)/requirements.txt -r $(AI_SRE_DIR)/requirements-dev.txt
+
+ai-sre-lint:
+	ruff check $(AI_SRE_DIR)/
+	mypy $(AI_SRE_DIR)/ --ignore-missing-imports --no-error-summary || true
+
+ai-sre-serve:
+	cd $(AI_SRE_DIR) && uvicorn main:app --reload --host 0.0.0.0 --port 8001
+
+ai-sre-scan:
+	cd $(AI_SRE_DIR) && python -m cli scan
+
+ai-sre-build:
+	docker build -t visual-eyes-ai-sre:latest $(AI_SRE_DIR)
+
+## ─────────────────────────────────────────────────────────────────────────────
+
 fmt:
 	$(GOFMT) ./...
 
@@ -256,6 +281,14 @@ help:
 	@echo "  fmt                  - Format code"
 	@echo "  lint                 - Run linter"
 	@echo "  deps                 - Download and tidy dependencies"
+	@echo ""
+	@echo "AI-SRE (Python CrewAI service):"
+	@echo "  ai-sre-install       - Install Python runtime dependencies"
+	@echo "  ai-sre-dev           - Install runtime + dev dependencies"
+	@echo "  ai-sre-lint          - Run ruff + mypy over ai-sre/"
+	@echo "  ai-sre-serve         - Start FastAPI service (hot-reload, port 8001)"
+	@echo "  ai-sre-scan          - Run standalone AI-SRE scan (no Go server needed)"
+	@echo "  ai-sre-build         - Build ai-sre Docker image"
 	@echo ""
 	@echo "Quick Start:"
 	@echo "  1. make build        - Build all components"

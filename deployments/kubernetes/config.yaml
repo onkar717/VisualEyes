@@ -13,4 +13,4 @@ data:
     output:
       remote:
         enabled: true
-        endpoint: "http://visual-eyes-backend:8080/api/kubernetes-metrics" 
+        endpoint: "http://host.minikube.internal:8080/api/kubernetes-metrics" 
