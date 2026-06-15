@@ -262,11 +262,9 @@ def detect_metric_anomaly(pod_name: str, namespace: str = "default",
     if metric == "memory":
         q = f'container_memory_working_set_bytes{{pod="{pod_name}",namespace="{namespace}",container!=""}}'
         unit = "memory_mb"
-        divisor = 1024 * 1024
     else:
         q = f'rate(container_cpu_usage_seconds_total{{pod="{pod_name}",namespace="{namespace}",container!=""}}[2m])'
         unit = "cpu_millicores"
-        divisor = 1.0 / 1000.0  # invert: multiply val * 1000
 
     data = _prom_range(q, start, end, step="120s")
     items = _results(data)

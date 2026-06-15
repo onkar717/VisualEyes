@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 def _parse_requirements(path: str) -> list[str]:
     with open(path) as f:
-        return [l.strip() for l in f if l.strip() and not l.startswith("#")]
+        return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
 
 setup(

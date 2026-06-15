@@ -4,7 +4,6 @@ Runbook tools: load YAML runbooks and execute kubectl commands via the safe allo
 import json
 import logging
 import os
-import re
 import shlex
 import subprocess
 from typing import List

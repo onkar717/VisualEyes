@@ -18,7 +18,6 @@ import signal
 import sys
 import time
 from datetime import datetime
-from typing import Optional
 
 import click
 from rich.console import Console
@@ -32,7 +31,6 @@ from .pipeline import run_pipeline
 from .tools.k8s_tools import (
     list_pods_all_namespaces,
     get_cluster_events,
-    get_node_health,
     get_namespace_summary,
 )
 
@@ -101,7 +99,7 @@ def _render_report(report: dict) -> None:
         body.append("Namespaces:    ", style="bold bright_white")
         body.append(", ".join(namespaces) + "\n")
 
-    body.append(f"Category:      ", style="bold bright_white")
+    body.append("Category:      ", style="bold bright_white")
     body.append(f"{category}   ")
     body.append("Confidence:    ", style="bold bright_white")
     body.append(f"{confidence}%   ")
@@ -148,7 +146,7 @@ def _apply_remediation(report: dict, dry_run: bool = True) -> None:
     applied, skipped, failed = 0, 0, 0
     for cmd in commands:
         command = cmd.get("command", "")
-        is_safe = cmd.get("is_auto_safe", False)
+        cmd.get("is_auto_safe", False)
         console.print(f"\n  [bold]Step {cmd.get('step','?')}:[/bold] {cmd.get('description','')}")
         console.print(f"  Command: [cyan]{command}[/cyan]")
 
@@ -161,19 +159,19 @@ def _apply_remediation(report: dict, dry_run: bool = True) -> None:
             result_json = execute_safe_command.func(command=command, dry_run=dry_run)
             result = json.loads(result_json)
             if result.get("status") == "executed" and result.get("success"):
-                console.print(f"  [green]✓[/green] Done")
+                console.print("  [green]✓[/green] Done")
                 applied += 1
             elif result.get("status") == "blocked":
                 console.print(f"  [red]✗[/red] Blocked: {result.get('reason')}")
                 skipped += 1
             elif result.get("status") == "dry_run":
-                console.print(f"  [yellow]~[/yellow] Dry run (DRY_RUN=true in config)")
+                console.print("  [yellow]~[/yellow] Dry run (DRY_RUN=true in config)")
                 skipped += 1
             else:
                 console.print(f"  [red]✗[/red] Failed: {result.get('stderr') or result.get('reason')}")
                 failed += 1
         else:
-            console.print(f"  [dim]-[/dim] Skipped.")
+            console.print("  [dim]-[/dim] Skipped.")
             skipped += 1
 
     console.print(
@@ -331,7 +329,7 @@ def watch(interval: int, apply: bool, namespace: str):
                 if apply:
                     _apply_remediation(report, dry_run=config.dry_run)
                 else:
-                    console.print(f"\n[yellow]Use --apply to interactively remediate.[/yellow]")
+                    console.print("\n[yellow]Use --apply to interactively remediate.[/yellow]")
 
         except Exception as e:
             console.print(f"[red]Scan #{scan_count} error: {e}[/red]")
