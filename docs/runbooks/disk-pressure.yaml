@@ -1,3 +1,4 @@
+---
 name: DiskPressure
 description: Node disk usage is critically high   kubelet may evict pods to reclaim space
 severity: SEV1
@@ -26,7 +27,7 @@ triage_steps:
 
   - step: 4
     description: Check for pods with excessive ephemeral storage usage
-    command: "kubectl get pods -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,NODE:.spec.nodeName' | grep {node}"
+    command: "kubectl get pods -A -o wide | grep {node}"
     safe: true
 
   - step: 5
