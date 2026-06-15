@@ -168,7 +168,7 @@ func TestHandleScanAll_FullChannelCountsAsSkipped(t *testing.T) {
 	ms.SaveAlert(firingAlert(1, "pending"))
 	ms.SaveAlert(firingAlert(2, "pending"))
 
-	// Channel capacity 1 — second alert will be dropped to skipped.
+	// Channel capacity 1 second alert will be dropped to skipped.
 	ch := make(chan models.Alert, 1)
 	h.rcaTrigger = ch
 

@@ -395,7 +395,7 @@ def get_pvc_status(namespace: str = "") -> str:
 def get_hpa_status(namespace: str = "") -> str:
     """
     Get HorizontalPodAutoscaler status: current vs desired replicas, min/max bounds.
-    An HPA at max replicas means scaling is blocked — often a root cause.
+    An HPA at max replicas means scaling is blocked often a root cause.
     """
     try:
         auto = _get_autoscaling()

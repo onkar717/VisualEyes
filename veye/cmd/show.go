@@ -30,7 +30,7 @@ var showCmd = &cobra.Command{
 		} else {
 			var id uint
 			if _, scanErr := fmt.Sscanf(arg, "%d", &id); scanErr != nil {
-				return fmt.Errorf("invalid argument %q — use a numeric ID or INC-XXXX code", arg)
+				return fmt.Errorf("invalid argument %q use a numeric ID or INC-XXXX code", arg)
 			}
 			inc, err = api.GetIncident(id)
 			if err != nil {

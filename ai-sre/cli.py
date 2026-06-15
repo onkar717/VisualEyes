@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 VisualEyes AI-SRE standalone CLI.
-Runs CrewAI pipeline directly — no Go server required.
+Runs CrewAI pipeline directly no Go server required.
 
 Usage:
   python -m ai_sre.cli scan               Run one AI-SRE scan
@@ -74,7 +74,7 @@ def _render_report(report: dict) -> None:
 
     if not has_issue:
         console.print(Panel(
-            "[bold green]✓ Cluster is healthy — no issues detected[/bold green]",
+            "[bold green]✓ Cluster is healthy no issues detected[/bold green]",
             border_style="green",
             title="[bold green]VisualEyes RCA Result[/bold green]",
         ))
@@ -220,7 +220,7 @@ def _quick_cluster_status() -> dict:
               help="Override LLM model (e.g. groq/llama-3.3-70b-versatile)")
 @click.pass_context
 def cli(ctx: click.Context, debug: bool, model: str):
-    """VisualEyes AI-SRE — CrewAI-powered Kubernetes RCA engine."""
+    """VisualEyes AI-SRE CrewAI-powered Kubernetes RCA engine."""
     ctx.ensure_object(dict)
     if debug:
         logging.getLogger("visualeyes").setLevel(logging.DEBUG)
@@ -240,7 +240,7 @@ def cli(ctx: click.Context, debug: bool, model: str):
 @cli.command()
 @click.option("--apply", is_flag=True, help="Interactively apply remediation after scan")
 @click.option("--dry-run/--no-dry-run", default=True, show_default=True,
-              help="Dry run — preview commands without executing")
+              help="Dry run preview commands without executing")
 @click.option("--namespace", "-n", default="", help="Target namespace (default: all from config)")
 def scan(apply: bool, dry_run: bool, namespace: str):
     """Run a single 6-agent AI-SRE scan across the cluster."""
@@ -259,7 +259,7 @@ def scan(apply: bool, dry_run: bool, namespace: str):
         border_style="bright_black",
     ))
     console.print()
-    console.print("[cyan bold]Starting AI-SRE scan — 6 agents deploying...[/cyan bold]")
+    console.print("[cyan bold]Starting AI-SRE scan 6 agents deploying...[/cyan bold]")
     console.print("[bright_black]Triage → Metrics → Logs → Infra → Remediation → Commander[/bright_black]")
     console.print()
 
@@ -336,15 +336,15 @@ def watch(interval: int, apply: bool, namespace: str):
         except Exception as e:
             console.print(f"[red]Scan #{scan_count} error: {e}[/red]")
 
-        console.print(f"\n[dim]Next scan in {interval}s — press Ctrl+C to stop[/dim]\n")
+        console.print(f"\n[dim]Next scan in {interval}s press Ctrl+C to stop[/dim]\n")
         time.sleep(interval)
 
 
 @cli.command()
 def status():
-    """Show cluster health snapshot (no LLM — instant, from K8s API directly)."""
+    """Show cluster health snapshot (no LLM instant, from K8s API directly)."""
     print_banner()
-    console.print("[cyan]Collecting cluster status (no LLM — direct K8s API)...[/cyan]\n")
+    console.print("[cyan]Collecting cluster status (no LLM direct K8s API)...[/cyan]\n")
 
     data = _quick_cluster_status()
 

@@ -115,7 +115,7 @@ func TestPipeline_HealthyFastExit(t *testing.T) {
 	if tokens <= 0 {
 		t.Error("expected positive token count")
 	}
-	// Only one LLM call — triage short-circuits.
+	// Only one LLM call triage short-circuits.
 	if llm.idx != 1 {
 		t.Errorf("expected 1 LLM call, got %d", llm.idx)
 	}
@@ -186,7 +186,7 @@ func TestPipeline_InvalidTriageJSON_DoesNotAbort(t *testing.T) {
 
 	resp, _, err := p.RunPipeline(context.Background(), testContext(4))
 	if err != nil {
-		t.Fatalf("unexpected error — pipeline must not abort on bad JSON: %v", err)
+		t.Fatalf("unexpected error pipeline must not abort on bad JSON: %v", err)
 	}
 	if resp == nil {
 		t.Fatal("expected non-nil response")
@@ -285,8 +285,8 @@ func TestPipeline_CancelledContext_ReturnsError(t *testing.T) {
 	_, _, err := p.RunPipeline(ctx, testContext(8))
 	// Cancelled context should propagate as an error from the LLM call.
 	if err == nil {
-		// Some mock implementations ignore context — only fail if LLM respects it.
+		// Some mock implementations ignore context only fail if LLM respects it.
 		// This test verifies the call returns, not necessarily with an error.
-		t.Log("note: mock LLM ignores context cancellation — pipeline completed")
+		t.Log("note: mock LLM ignores context cancellation pipeline completed")
 	}
 }

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Per-stage token budgets — specialist stages need more room than triage.
+// Per-stage token budgets specialist stages need more room than triage.
 const (
 	tokTriage      = 1024
 	tokMetrics     = 1600
@@ -57,7 +57,7 @@ Quantify resource pressure. Confirm or refute the triage classification with met
 
 ## EXPERTISE
 - Memory leaks: gradual rise over hours. OOM: sudden spike then drop/restart.
-- CPU throttling vs actual usage vs load average — they tell different stories.
+- CPU throttling vs actual usage vs load average they tell different stories.
 - Disk: inode exhaustion vs byte exhaustion behave differently.
 - Restart count spikes = CrashLoop signal even without explicit event.
 
@@ -90,7 +90,7 @@ Extract actionable root-cause signal from log lines. Identify the FIRST failure,
 
 ## EXPERTISE
 - OOMKilled: look for "Killed process", "Out of memory", kernel OOM messages in previous container logs.
-- CrashLoop: PREVIOUS container logs contain the crash reason — always check prev logs first.
+- CrashLoop: PREVIOUS container logs contain the crash reason always check prev logs first.
 - Connection errors: distinguish transient (retry succeeded) from persistent (repeated, escalating).
 - Config errors: "no such file", "permission denied", "invalid config", env var missing.
 - Application panics: Go "panic:", Java stack traces, Python tracebacks.
@@ -99,7 +99,7 @@ Extract actionable root-cause signal from log lines. Identify the FIRST failure,
 1. Scan pre-classified log patterns first (highest signal).
 2. Check PREVIOUS container logs for crash evidence.
 3. Identify the EARLIEST error timestamp (first failure, not latest).
-4. Classify error type — is this app bug, config error, resource exhaustion, or network?
+4. Classify error type is this app bug, config error, resource exhaustion, or network?
 5. Extract top 3-5 specific error messages (exact strings, not paraphrased).
 
 Output ONLY valid JSON:
@@ -131,9 +131,9 @@ Identify infrastructure-level blockers that caused or contributed to the inciden
 
 ## TASK
 1. Check resource quota and PVC status from context.
-2. Check node pressure — any node > 85% CPU or > 90% memory is a risk.
-3. Check HPA — if at max replicas, scaling cannot rescue the service.
-4. Check deployment replica mismatches — indicates ongoing crash or bad rollout.
+2. Check node pressure any node > 85% CPU or > 90% memory is a risk.
+3. Check HPA if at max replicas, scaling cannot rescue the service.
+4. Check deployment replica mismatches indicates ongoing crash or bad rollout.
 5. Decide: is this primarily an INFRA problem (cluster can't support workload) or APP problem (workload is misbehaving)?
 
 Output ONLY valid JSON:
@@ -156,8 +156,8 @@ Senior SRE Remediation Engineer. Expert in ordered, safe Kubernetes remediation.
 ## GOAL
 Produce an ordered, IMMEDIATELY EXECUTABLE remediation plan. Every command must change cluster state.
 
-## RULES — NON-NEGOTIABLE
-- NEVER use kubectl describe / get / logs / explain — these are diagnostic, not remediation.
+## RULES NON-NEGOTIABLE
+- NEVER use kubectl describe / get / logs / explain these are diagnostic, not remediation.
 - Use ACTUAL resource names from the alert context. NEVER use placeholders like {pod}, {namespace}, <name>.
 - If you don't know the exact name, omit that command entirely rather than guess.
 - Order matters: stabilise first (delete crashlooping pod), then fix root cause (adjust limits/config), then verify.
@@ -171,7 +171,7 @@ Output ONLY valid JSON:
   "commands": [
     {
       "command": "kubectl ...",
-      "description": "what this fixes and why — 1 sentence",
+      "description": "what this fixes and why 1 sentence",
       "is_auto_safe": true|false,
       "risk": "low|medium|high",
       "step": 1
@@ -187,13 +187,13 @@ const commanderSystemPrompt = `## ROLE
 Incident Commander. You synthesise all six specialist agent reports into the definitive incident brief that goes to the on-call engineer.
 
 ## GOAL
-Produce a single, authoritative incident report. The on-call engineer reads this first — it must be precise, actionable, and free of contradictions.
+Produce a single, authoritative incident report. The on-call engineer reads this first it must be precise, actionable, and free of contradictions.
 
 ## SYNTHESIS RULES
-- Root cause must be ONE sentence — the precise technical cause, not a restatement of the symptom.
+- Root cause must be ONE sentence the precise technical cause, not a restatement of the symptom.
 - Explanation must be 2-3 sentences: what happened, why, and what the impact is.
-- If metrics agent and log agent disagree on root cause — log agent wins (logs are ground truth).
-- If infra agent found is_infra_root_cause=true — infra block goes into root_cause, app is contributing_factor.
+- If metrics agent and log agent disagree on root cause log agent wins (logs are ground truth).
+- If infra agent found is_infra_root_cause=true infra block goes into root_cause, app is contributing_factor.
 - Commands: use ONLY from the remediation agent output. Use ACTUAL names. NEVER use placeholders.
 - Confidence: weight triage(20%) + metrics(25%) + logs(30%) + infra(15%) + remediation(10%).
 
@@ -301,7 +301,7 @@ type remediationStage struct {
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 // Pipeline runs a 6-stage sequential RCA analysis.
-// Each stage is a specialist agent — receives structured output from all prior
+// Each stage is a specialist agent receives structured output from all prior
 // stages, producing higher-fidelity signal than single-stage or raw-text chaining.
 type Pipeline struct {
 	llm       LLMProvider
@@ -334,14 +334,14 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var triage triageStage
 	if err := json.Unmarshal([]byte(stripFences(triageRaw)), &triage); err != nil {
-		slog.Warn("triage parse failed — using defaults", "err", err)
+		slog.Warn("triage parse failed using defaults", "err", err)
 		triage = triageStage{Severity: "SEV3", Category: "other", HasIssue: true, Confidence: 40}
 	}
 	PublishStageDone(ac.Alert.ID, 1, "Triage", fmt.Sprintf("%s · %s", triage.Severity, triage.Category))
 
-	// Healthy fast-exit — skip 5 LLM calls when triage says no issue.
+	// Healthy fast-exit skip 5 LLM calls when triage says no issue.
 	if !triage.HasIssue {
-		slog.Info("rca triage: no issue — healthy cluster short-circuit", "alert_id", ac.Alert.ID)
+		slog.Info("rca triage: no issue healthy cluster short-circuit", "alert_id", ac.Alert.ID)
 		for i := 2; i <= 6; i++ {
 			labels := []string{"", "Triage", "Metrics", "Logs", "Infra", "Remediation", "Commander"}
 			PublishStageStart(ac.Alert.ID, i, labels[i])
@@ -375,7 +375,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var metrics metricsStage
 	if err := json.Unmarshal([]byte(stripFences(metricsRaw)), &metrics); err != nil {
-		slog.Warn("metrics parse failed — continuing with raw", "err", err)
+		slog.Warn("metrics parse failed continuing with raw", "err", err)
 	}
 	metricsDetail := metrics.PressureLevel
 	if metrics.PrimaryPressure != "" {
@@ -403,7 +403,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var logs logStage
 	if err := json.Unmarshal([]byte(stripFences(logRaw)), &logs); err != nil {
-		slog.Warn("log analysis parse failed — continuing with raw", "err", err)
+		slog.Warn("log analysis parse failed continuing with raw", "err", err)
 	}
 	logDetail := logs.ErrorClass
 	if logs.Confidence > 0 {
@@ -431,7 +431,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var infra infraStage
 	if err := json.Unmarshal([]byte(stripFences(infraRaw)), &infra); err != nil {
-		slog.Warn("infra parse failed — continuing with raw", "err", err)
+		slog.Warn("infra parse failed continuing with raw", "err", err)
 	}
 	infraDetail := "app-driven"
 	if infra.IsInfraRootCause {
@@ -471,9 +471,9 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 	slog.Info("rca stage 6/6: commander", "alert_id", ac.Alert.ID)
 	PublishStageStart(ac.Alert.ID, 6, "Commander")
 
-	// Commander receives structured summaries from all 5 agents — clean signal, not raw truncated text.
+	// Commander receives structured summaries from all 5 agents clean signal, not raw truncated text.
 	cmdUser := fmt.Sprintf(
-		"## ACTUAL RESOURCE NAMES\npod/resource: %s\nnamespace: %s\n\n## AGENT 1 — TRIAGE\n%s\n\n## AGENT 2 — METRICS\n%s\n\n## AGENT 3 — LOGS\n%s\n\n## AGENT 4 — INFRA\n%s\n\n## AGENT 5 — REMEDIATION\n%s\n\n## ORIGINAL ALERT\n%s",
+		"## ACTUAL RESOURCE NAMES\npod/resource: %s\nnamespace: %s\n\n## AGENT 1 TRIAGE\n%s\n\n## AGENT 2 METRICS\n%s\n\n## AGENT 3 LOGS\n%s\n\n## AGENT 4 INFRA\n%s\n\n## AGENT 5 REMEDIATION\n%s\n\n## ORIGINAL ALERT\n%s",
 		ac.Alert.ResourceID, ac.Alert.Namespace,
 		truncStage(triageRaw),
 		truncStage(metricsRaw),
@@ -491,7 +491,7 @@ func (p *Pipeline) RunPipeline(ctx context.Context, ac AlertContext) (*RCARespon
 
 	var resp RCAResponse
 	if err := json.Unmarshal([]byte(stripFences(finalRaw)), &resp); err != nil {
-		slog.Warn("commander parse failed — building from sub-stages", "err", err)
+		slog.Warn("commander parse failed building from sub-stages", "err", err)
 		resp = RCAResponse{
 			HasIssue:         true,
 			Explanation:      triage.Summary,

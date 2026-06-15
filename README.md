@@ -24,17 +24,17 @@
 
 ---
 
-**VisualEyes** combines real-time metrics collection, a Bubbletea TUI, a **6-agent CrewAI RCA engine**, and a React web dashboard — giving on-call engineers complete visibility from a single platform.
+**VisualEyes** combines real-time metrics collection, a Bubbletea TUI, a **6-agent CrewAI RCA engine**, and a React web dashboard giving on-call engineers complete visibility from a single platform.
 
 ---
 
 ## Two Ways to Use VisualEyes
 
-### 1. `veye` CLI (Go — server-connected)
+### 1. `veye` CLI (Go server-connected)
 A Bubbletea-powered interactive TUI. Run `veye watch` for live metrics and alerts. Run `veye scan --ai` to trigger a 6-agent AI analysis and stream live stage progress to your terminal. Full incident history, MTTR, multi-cluster view.
 
-### 2. `veye-ai` CLI (Python — standalone)
-Runs the CrewAI pipeline **directly** — no Go server needed. One command:
+### 2. `veye-ai` CLI (Python standalone)
+Runs the CrewAI pipeline **directly** no Go server needed. One command:
 ```bash
 pip install -e ai-sre/   # or: bash ai-sre/install.sh
 veye-ai scan             # 6-agent RCA scan against your cluster
@@ -49,22 +49,22 @@ Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a 
 
 ## Features
 
-- **System metrics** — CPU, memory, disk, network, load average via `gopsutil`
-- **Kubernetes metrics** — pod-level and node-level stats via kubelet summary API
-- **6-agent CrewAI RCA** — Triage → Metrics → Logs → Infra → Runbook → Commander (Python, 24 tools)
-- **Go RCA fallback** — 6-stage sequential pipeline, no Python service required
-- **Multi-LLM support** — Groq, OpenAI, Anthropic, Mistral, Gemini, Ollama (LiteLLM)
-- **SSE live streaming** — `veye scan --ai` streams stage-by-stage RCA progress in real time
-- **Alert engine** — 16+ configurable rules, Z-score anomaly detection, dedup, auto-RCA trigger
-- **WebSocket streaming** — live metric push to React dashboard, no polling
-- **Prometheus `/metrics`** — plug into any Grafana/Prometheus stack
-- **`veye` CLI** — 12 commands: `status`, `alerts`, `logs`, `rca`, `scan --ai`, `watch`, `incidents`, `show`, `apply`, `report`, `clusters`, `logs`
-- **PostgreSQL storage** — persistent incident history, MTTR by severity, evidence trail
-- **Safety-first remediation** — typed `RemediationStep`, dry-run mode, kubectl allowlist (Go + Python re-validation)
-- **Rich notifications** — Slack Block Kit, PagerDuty, custom webhook, 30-min dedup window
-- **Runbook library** — 8 embedded YAML runbooks (`//go:embed`), external override via `VISUAL_EYES_RUNBOOK_DIR`
-- **Multi-cluster registry** — register multiple clusters, health scores, pod breakdown
-- **`~/.veye/.env`** — persist `VEYE_API_URL` and other settings without shell exports
+- **System metrics** CPU, memory, disk, network, load average via `gopsutil`
+- **Kubernetes metrics** pod-level and node-level stats via kubelet summary API
+- **6-agent CrewAI RCA** Triage → Metrics → Logs → Infra → Runbook → Commander (Python, 24 tools)
+- **Go RCA fallback** 6-stage sequential pipeline, no Python service required
+- **Multi-LLM support** Groq, OpenAI, Anthropic, Mistral, Gemini, Ollama (LiteLLM)
+- **SSE live streaming** `veye scan --ai` streams stage-by-stage RCA progress in real time
+- **Alert engine** 16+ configurable rules, Z-score anomaly detection, dedup, auto-RCA trigger
+- **WebSocket streaming** live metric push to React dashboard, no polling
+- **Prometheus `/metrics`** plug into any Grafana/Prometheus stack
+- **`veye` CLI** 12 commands: `status`, `alerts`, `logs`, `rca`, `scan --ai`, `watch`, `incidents`, `show`, `apply`, `report`, `clusters`, `logs`
+- **PostgreSQL storage** persistent incident history, MTTR by severity, evidence trail
+- **Safety-first remediation** typed `RemediationStep`, dry-run mode, kubectl allowlist (Go + Python re-validation)
+- **Rich notifications** Slack Block Kit, PagerDuty, custom webhook, 30-min dedup window
+- **Runbook library** 8 embedded YAML runbooks (`//go:embed`), external override via `VISUAL_EYES_RUNBOOK_DIR`
+- **Multi-cluster registry** register multiple clusters, health scores, pod breakdown
+- **`~/.veye/.env`** persist `VEYE_API_URL` and other settings without shell exports
 
 ---
 
@@ -120,7 +120,7 @@ Deploy agents to your systems and Kubernetes clusters. Agents push metrics to a 
 
 ## Install
 
-### `veye` CLI (Go binary — no Go required)
+### `veye` CLI (Go binary no Go required)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/onkar717/VisualEyes/main/install.sh | bash
@@ -149,19 +149,19 @@ veye-ai scan
 
 ## Screenshots
 
-### veye CLI — Live System Status
+### veye CLI Live System Status
 
 ![veye status output](docs/images/veye-cli.png)
 
-### veye CLI — Alert List
+### veye CLI Alert List
 
 ![veye alerts](docs/images/veye-cli-alerts.png)
 
-### Web Dashboard — Dark Mode
+### Web Dashboard Dark Mode
 
 ![VisualEyes dashboard dark](docs/images/veye-dashboard-dark.png)
 
-### Web Dashboard — System Overview
+### Web Dashboard System Overview
 
 ![VisualEyes dashboard](docs/images/veye-dashboard.png)
 
@@ -175,7 +175,7 @@ veye-ai scan
 - Node.js 18+
 - Python 3.11+ (for AI-SRE service)
 - Docker & Docker Compose
-- PostgreSQL 14+ (or use Docker Compose — no local install needed)
+- PostgreSQL 14+ (or use Docker Compose no local install needed)
 - `kubectl` + cluster (for Kubernetes mode)
 
 ### 1. Clone & Build
@@ -211,7 +211,7 @@ cp ai-sre/.env.example ai-sre/.env
 ./bin/visual-eyes-agent           # System metrics push (separate terminal)
 make run-ui                       # React UI on :5173
 
-# Optional — Python AI-SRE service (enables 6-agent CrewAI RCA)
+# Optional Python AI-SRE service (enables 6-agent CrewAI RCA)
 make ai-sre-serve                 # Starts on :8001; Go server auto-detects it
 ```
 
@@ -285,7 +285,7 @@ Set in `.env` / `ai-sre/.env` / `docker-compose.yml`:
 
 | Provider | Model example | Key |
 |----------|---------------|-----|
-| **Groq** (recommended — fast + free) | `groq/llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| **Groq** (recommended fast + free) | `groq/llama-3.3-70b-versatile` | `GROQ_API_KEY` |
 | OpenAI | `gpt-4o` | `OPENAI_API_KEY` |
 | Anthropic | `claude-sonnet-4-6` | `ANTHROPIC_API_KEY` |
 | Mistral | `mistral/mistral-large-latest` | `MISTRAL_API_KEY` |
@@ -313,11 +313,11 @@ For minikube, kind, and production setup see [INSTALLATION.md](INSTALLATION.md).
 
 VisualEyes detects and automatically triggers RCA for:
 
-- **Pod Lifecycle** — `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Pending`, `CreateContainerConfigError`
-- **Resource Pressure** — CPU throttling, memory saturation, disk pressure, node not-ready
-- **Kubernetes Health** — pod restarts exceeding threshold, deployment replica mismatch, HPA at max replicas
-- **Storage** — unbound PVCs, volume mount failures
-- **Custom Rules** — define threshold-based alert rules in `configs/config.yaml`
+- **Pod Lifecycle** `CrashLoopBackOff`, `OOMKilled`, `ImagePullBackOff`, `Pending`, `CreateContainerConfigError`
+- **Resource Pressure** CPU throttling, memory saturation, disk pressure, node not-ready
+- **Kubernetes Health** pod restarts exceeding threshold, deployment replica mismatch, HPA at max replicas
+- **Storage** unbound PVCs, volume mount failures
+- **Custom Rules** define threshold-based alert rules in `configs/config.yaml`
 
 ---
 
@@ -404,20 +404,20 @@ VisualEyes/
 - [x] Backend with alert engine, RCA processor, WebSocket, Prometheus
 - [x] PostgreSQL persistent storage
 - [x] React glassmorphism dashboard with dark mode, live updates, K8s health ring
-- [x] AI-powered RCA — 6-stage Go pipeline (Triage/Metrics/Logs/Infra/Runbook/Commander)
-- [x] Python CrewAI AI-SRE service — 6 specialist agents, 24 tools, 6 LLM providers
-- [x] SSE live streaming — `veye scan --ai` streams stage progress in real time
-- [x] `veye` CLI — 12 commands, Bubbletea TUI, incident code lookup (`INC-XXXX`)
-- [x] `veye-ai` CLI — standalone Python CLI, no Go server required
-- [x] Multi-cluster registry — health scores, pod breakdown, `veye clusters`
-- [x] `~/.veye/.env` config file — persist API URL without shell exports
-- [x] GitHub Actions CI/CD — Go, UI, Python lint, security, release, stale (6 workflows)
-- [x] Cross-platform release — 10 targets (server + veye, Linux/macOS/Windows, amd64/arm64)
+- [x] AI-powered RCA 6-stage Go pipeline (Triage/Metrics/Logs/Infra/Runbook/Commander)
+- [x] Python CrewAI AI-SRE service 6 specialist agents, 24 tools, 6 LLM providers
+- [x] SSE live streaming `veye scan --ai` streams stage progress in real time
+- [x] `veye` CLI 12 commands, Bubbletea TUI, incident code lookup (`INC-XXXX`)
+- [x] `veye-ai` CLI standalone Python CLI, no Go server required
+- [x] Multi-cluster registry health scores, pod breakdown, `veye clusters`
+- [x] `~/.veye/.env` config file persist API URL without shell exports
+- [x] GitHub Actions CI/CD Go, UI, Python lint, security, release, stale (6 workflows)
+- [x] Cross-platform release 10 targets (server + veye, Linux/macOS/Windows, amd64/arm64)
 - [x] Slack Block Kit + PagerDuty + webhook notifications, 30-min dedup
 - [x] 8 embedded runbooks (`//go:embed`), external override via env var
 - [x] MTTR tracking by severity, incident lifecycle (OPEN→INVESTIGATING→MITIGATED→RESOLVED)
 - [x] Z-score anomaly detection (σ=2.5, 1-hour window, per-pod)
-- [x] Safe remediation — kubectl allowlist in Go + Python re-validation of LLM output
+- [x] Safe remediation kubectl allowlist in Go + Python re-validation of LLM output
 - [ ] Distributed tracing integration (OpenTelemetry)
 - [ ] eBPF network flow visibility
 
@@ -439,4 +439,4 @@ git push origin feature/your-feature
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT see [LICENSE](LICENSE).

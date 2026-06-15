@@ -145,7 +145,7 @@ func runWatchLoop() error {
 							continue
 						case "y", "yes":
 							if !c.IsAutoSafe {
-								fmt.Printf("  %s\n", styles.Mute.Render("Skipped — not auto-safe. Use 'veye apply --force'."))
+								fmt.Printf("  %s\n", styles.Mute.Render("Skipped not auto-safe. Use 'veye apply --force'."))
 								skipped++
 							} else {
 								out, err := runCommand(c.Command)

@@ -1050,7 +1050,7 @@ func (h *Handler) HandleScan(w http.ResponseWriter, r *http.Request) {
 // HandleScanAll triggers on-demand AI RCA for every firing alert that has not
 // yet completed analysis. POST /api/rca/scan-all
 //
-// Query param: dry_run=true — lists which alerts WOULD be triggered without
+// Query param: dry_run=true lists which alerts WOULD be triggered without
 // actually queueing them. Returns HTTP 200 with dry_run=true in body.
 func (h *Handler) HandleScanAll(w http.ResponseWriter, r *http.Request) {
 	if h.preflight(w, r) {
@@ -1125,7 +1125,7 @@ func (h *Handler) HandleScanAll(w http.ResponseWriter, r *http.Request) {
 				Resource: a.ResourceID,
 			})
 		default:
-			// Worker queue full — count as already processing.
+			// Worker queue full count as already processing.
 			skipped++
 		}
 	}
@@ -1622,7 +1622,7 @@ func (h *Handler) HandleAISREInfo(w http.ResponseWriter, r *http.Request) {
 
 // HandleInternalStageEvent receives stage-completion callbacks from the Python
 // AI-SRE service and publishes them to the Go SSE hub so veye CLI gets live progress.
-// This endpoint is internal — not exposed on the public API.
+// This endpoint is internal not exposed on the public API.
 // POST /internal/rca/stage-event
 func (h *Handler) HandleInternalStageEvent(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

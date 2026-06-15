@@ -9,7 +9,7 @@ def _parse_requirements(path: str) -> list[str]:
 setup(
     name="visualeyes_sre",
     version="1.0.0",
-    description="VisualEyes AI-SRE Engine — CrewAI-powered Kubernetes Root Cause Analysis",
+    description="VisualEyes AI-SRE Engine CrewAI-powered Kubernetes Root Cause Analysis",
     author="VisualEyes",
     packages=find_packages(),
     include_package_data=True,

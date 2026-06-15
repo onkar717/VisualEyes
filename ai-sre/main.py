@@ -167,7 +167,7 @@ async def run_rca(req: RCARequest):
         logger.exception("run-rca failed: alert_id=%d", req.alert_id)
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Normalise commands field — may be list of dicts or already CommandItems
+    # Normalise commands field may be list of dicts or already CommandItems
     raw_commands = report.get("commands", [])
     commands = []
     for i, cmd in enumerate(raw_commands, 1):

@@ -60,7 +60,7 @@ if [ ! -f ".env" ]; then
   cp .env.example .env
   warn ".env created from .env.example"
   warn "Edit .env and set ANTHROPIC_API_KEY for AI RCA (optional)"
-  warn "Set DATABASE_URL for PostgreSQL (optional — defaults to in-memory)"
+  warn "Set DATABASE_URL for PostgreSQL (optional defaults to in-memory)"
 else
   info ".env already exists, skipping"
 fi
@@ -72,13 +72,13 @@ info "Checking optional tools..."
 if command -v golangci-lint &>/dev/null; then
   info "golangci-lint found: $(golangci-lint version 2>&1 | head -1)"
 else
-  warn "golangci-lint not found — install for 'make lint': https://golangci-lint.run/usage/install/"
+  warn "golangci-lint not found install for 'make lint': https://golangci-lint.run/usage/install/"
 fi
 
 if command -v kubectl &>/dev/null; then
   info "kubectl found: $(kubectl version --client --short 2>/dev/null || kubectl version --client 2>/dev/null | head -1)"
 else
-  warn "kubectl not found — needed for Kubernetes mode: https://kubernetes.io/docs/tasks/tools/"
+  warn "kubectl not found needed for Kubernetes mode: https://kubernetes.io/docs/tasks/tools/"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────

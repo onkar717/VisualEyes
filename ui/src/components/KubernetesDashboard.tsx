@@ -335,7 +335,7 @@ export const KubernetesDashboard: React.FC = () => {
       </Tabs>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          Tab 0 — Overview
+          Tab 0 Overview
       ════════════════════════════════════════════════════════════════════════ */}
       {tab === 0 && (
         <Box>
@@ -483,7 +483,7 @@ export const KubernetesDashboard: React.FC = () => {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          Tab 1 — Warning Events
+          Tab 1 Warning Events
       ════════════════════════════════════════════════════════════════════════ */}
       {tab === 1 && (
         <Box>
@@ -535,7 +535,7 @@ export const KubernetesDashboard: React.FC = () => {
                           />
                         </TableCell>
                         <TableCell sx={{ fontSize: '0.8rem', fontFamily: 'monospace', py: 1 }}>
-                          {ev.object || '—'}
+                          {ev.object || '-'}
                         </TableCell>
                         <TableCell sx={{ py: 1 }}>
                           <Chip
@@ -567,7 +567,7 @@ export const KubernetesDashboard: React.FC = () => {
                         <TableCell sx={{ fontSize: '0.78rem', color: 'text.secondary', whiteSpace: 'nowrap', py: 1 }}>
                           {ev.lastSeen
                             ? formatDistanceToNow(new Date(ev.lastSeen), { addSuffix: true })
-                            : '—'}
+                            : '-'}
                         </TableCell>
                       </TableRow>
                     );
@@ -580,7 +580,7 @@ export const KubernetesDashboard: React.FC = () => {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          Tab 2 — Firing Alerts
+          Tab 2 Firing Alerts
       ════════════════════════════════════════════════════════════════════════ */}
       {tab === 2 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>

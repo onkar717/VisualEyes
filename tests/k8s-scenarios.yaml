@@ -97,7 +97,7 @@ spec:
   restartPolicy: Never
 
 ---
-# ── 4. High Memory (no OOM — under limit but high) ────────────────────────────
+# ── 4. High Memory (no OOM under limit but high) ────────────────────────────
 # Triggers: high_memory category, SEV3
 # Pod holds memory near limit → memory alert fires → no OOM, just pressure
 apiVersion: v1

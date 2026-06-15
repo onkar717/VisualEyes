@@ -36,7 +36,7 @@ triage_agent = Agent(
         "Perform rapid cluster triage. Collect pod statuses, recent Warning events, "
         "node health, namespace summary. Classify severity (SEV1–SEV4) and identify "
         "which namespaces and services are affected. Use pre-injected alert context "
-        "as the starting point — target the specific failing resource first."
+        "as the starting point target the specific failing resource first."
     ),
     backstory=(
         "10+ years incident response. You know that the first 5 minutes determine MTTR. "
@@ -102,14 +102,14 @@ log_agent = Agent(
         "Analyze logs from the pods identified as problematic. Extract error patterns, "
         "stack traces, and recurring failure messages. Identify the first occurrence "
         "of errors (the 'canary' signal). For crashlooping pods, check PREVIOUS "
-        "container logs — the current container may not have any logs yet."
+        "container logs the current container may not have any logs yet."
     ),
     backstory=(
         "You are the team's log whisperer. You've debugged thousands of incidents "
         "by reading logs. You know the real root cause is usually 3 layers below "
         "the surface error. You look for: stack traces, retry storms, cascading failures, "
         "configuration errors. You always check both current AND previous container logs "
-        "for crashlooping pods. You quote exact error messages — no paraphrasing."
+        "for crashlooping pods. You quote exact error messages no paraphrasing."
     ),
     llm=llm,
     tools=[
@@ -136,7 +136,7 @@ infra_agent = Agent(
     backstory=(
         "Kubernetes expert who has debugged every cluster failure from scheduling "
         "to etcd corruption. You know 40% of incidents are infra-caused. "
-        "Resource quotas, PVC issues, node pressure, misconfigured HPAs — you find them. "
+        "Resource quotas, PVC issues, node pressure, misconfigured HPAs you find them. "
         "You always describe failing pods for specific event messages. "
         "If HPA is at max replicas and CPU is high → scaling is the root constraint."
     ),
@@ -191,7 +191,7 @@ commander_agent = Agent(
     goal=(
         "Synthesize all findings from the triage, metrics, log, infrastructure, "
         "and runbook agents into a single authoritative incident report. "
-        "Output MUST be valid JSON — no markdown fences, no prose explanation, just JSON.\n\n"
+        "Output MUST be valid JSON no markdown fences, no prose explanation, just JSON.\n\n"
         "Schema:\n"
         "{\n"
         '  "has_issue": true/false,\n'
@@ -212,7 +212,7 @@ commander_agent = Agent(
         "}"
     ),
     backstory=(
-        "Incident commander — you run the war room. You synthesize signal from noise. "
+        "Incident commander you run the war room. You synthesize signal from noise. "
         "False positives burn team trust, so you only escalate confirmed issues. "
         "Your output goes to on-call engineers and Slack. It must be accurate and structured. "
         "If the cluster is healthy, set has_issue=false and severity=SEV4. "

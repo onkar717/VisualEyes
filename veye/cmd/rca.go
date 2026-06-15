@@ -49,15 +49,15 @@ func runRCA(_ *cobra.Command, args []string) error {
 	// Show live pipeline progress while RCA is running/pending
 	switch alert.RCAStatus {
 	case "running":
-		// Definitely started — stream stages, fallback to spinner if SSE unavailable.
+		// Definitely started stream stages, fallback to spinner if SSE unavailable.
 		if err := liveStageProgress(id, alert); err != nil {
 			if err2 := waitForRCA(id, alert); err2 != nil {
 				return err2
 			}
 		}
 	case "pending":
-		// May just be queued — try stream briefly; timeout → show pending msg.
-		liveStageProgress(id, alert) //nolint:errcheck — idle timeout unblocks naturally
+		// May just be queued try stream briefly; timeout → show pending msg.
+		liveStageProgress(id, alert) //nolint:errcheck idle timeout unblocks naturally
 	}
 
 	switch alert.RCAStatus {
@@ -158,7 +158,7 @@ func liveStageProgress(alertID uint, alert *client.Alert) error {
 
 	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
-	fmt.Println(styles.SectionHeader.Render("  🤖  AI PIPELINE  —  6-STAGE ANALYSIS"))
+	fmt.Println(styles.SectionHeader.Render("  🤖  AI PIPELINE   6-STAGE ANALYSIS"))
 	fmt.Println()
 
 	currentLabel := ""

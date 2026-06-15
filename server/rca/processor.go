@@ -38,7 +38,7 @@ func isRateLimitError(err error) bool {
 type Processor struct {
 	contextBuilder      *ContextBuilder
 	pipeline            *Pipeline
-	pythonClient        *PythonClient  // optional — nil when AI_SRE_URL not set
+	pythonClient        *PythonClient  // optional nil when AI_SRE_URL not set
 	executor            *Executor
 	rcaStore            storage.RCAStore
 	alertStore          storage.AlertStore
@@ -151,7 +151,7 @@ func (p *Processor) Process(ctx context.Context, alert models.Alert) {
 	}
 	p.linkRCAToAlert(alert.ID, result.ID)
 
-	// 3. Run RCA pipeline — try Python CrewAI service first, fall back to Go pipeline.
+	// 3. Run RCA pipeline try Python CrewAI service first, fall back to Go pipeline.
 	scanStart := time.Now()
 	pipelineCtx := ctx
 	if p.agentTimeoutSeconds > 0 {

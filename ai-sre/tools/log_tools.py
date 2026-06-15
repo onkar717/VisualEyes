@@ -134,19 +134,19 @@ def analyze_pod_logs(pod_name: str, namespace: str = "default",
     # Derive recommendation from patterns
     cats = current_analysis.get("error_categories", {})
     if "oom" in cats:
-        result["recommendation"] = "OOM detected — increase memory limits or fix memory leak"
+        result["recommendation"] = "OOM detected increase memory limits or fix memory leak"
     elif "crashloop" in cats or (prev_analysis and "error" in prev_analysis.get("error_categories", {})):
-        result["recommendation"] = "Crash loop evidence — check previous logs for root error"
+        result["recommendation"] = "Crash loop evidence check previous logs for root error"
     elif "connectivity" in cats:
-        result["recommendation"] = "Connectivity failures — check network policies and service endpoints"
+        result["recommendation"] = "Connectivity failures check network policies and service endpoints"
     elif "auth" in cats:
-        result["recommendation"] = "Auth failures — check RBAC, secrets, and token expiry"
+        result["recommendation"] = "Auth failures check RBAC, secrets, and token expiry"
     elif "disk" in cats:
-        result["recommendation"] = "Disk pressure — check PVC usage and node disk"
+        result["recommendation"] = "Disk pressure check PVC usage and node disk"
     elif "image_pull" in cats:
-        result["recommendation"] = "Image pull failure — verify image name, tag, and registry credentials"
+        result["recommendation"] = "Image pull failure verify image name, tag, and registry credentials"
     elif "scheduling" in cats:
-        result["recommendation"] = "Scheduling failure — check resource quotas and node capacity"
+        result["recommendation"] = "Scheduling failure check resource quotas and node capacity"
 
     return json.dumps(result)
 

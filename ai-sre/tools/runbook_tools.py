@@ -96,7 +96,7 @@ def load_runbook(filename: str) -> str:
     # Security: prevent path traversal
     resolved = os.path.realpath(path)
     if not resolved.startswith(os.path.realpath(rb_dir)):
-        return json.dumps({"error": "Invalid filename — path traversal not allowed"})
+        return json.dumps({"error": "Invalid filename path traversal not allowed"})
 
     if not os.path.exists(resolved):
         # Try without extension

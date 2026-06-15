@@ -101,13 +101,13 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
     task_triage = Task(
         description=(
             f"{focus}\n\n"
-            "PRE-BUILT CONTEXT (from VisualEyes Go agent — use as starting knowledge):\n"
+            "PRE-BUILT CONTEXT (from VisualEyes Go agent use as starting knowledge):\n"
             f"{ctx_str}\n\n"
             "Now verify and expand:\n"
-            "1. list_pods_all_namespaces — confirm which pods are non-Running\n"
-            "2. get_cluster_events — recent Warning events in scope namespace\n"
-            "3. get_node_health — node conditions and taints\n"
-            "4. get_namespace_summary — pod counts by phase\n"
+            "1. list_pods_all_namespaces confirm which pods are non-Running\n"
+            "2. get_cluster_events recent Warning events in scope namespace\n"
+            "3. get_node_health node conditions and taints\n"
+            "4. get_namespace_summary pod counts by phase\n"
             "5. Classify severity SEV1–SEV4 based on all evidence.\n"
             "Output: structured triage summary with severity, affected pods, and scope."
         ),
@@ -127,10 +127,10 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
             f"CPU critical: {config.cpu_critical_pct}%  "
             f"Memory critical: {config.memory_critical_pct}%  "
             f"Restart critical: {config.restart_critical}/30min\n\n"
-            "1. get_cpu_usage_per_pod — top CPU consumers\n"
-            "2. get_memory_usage_per_pod — top memory consumers\n"
-            "3. get_pod_restart_rate — recent restarts\n"
-            "4. get_oom_kill_events — OOM-killed containers\n"
+            "1. get_cpu_usage_per_pod top CPU consumers\n"
+            "2. get_memory_usage_per_pod top memory consumers\n"
+            "3. get_pod_restart_rate recent restarts\n"
+            "4. get_oom_kill_events OOM-killed containers\n"
             "5. If specific pod suspect: detect_metric_anomaly(pod_name, namespace)\n"
             "6. get_http_error_rate and get_request_latency_p99 if service-level impact\n"
             "Report exact numbers with context. State if Prometheus unavailable."
@@ -155,7 +155,7 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
             "4. loki_query if Loki is available (LOKI_ENABLED)\n"
             "5. Identify the FIRST occurrence of errors (failure onset time)\n"
             "6. Extract exact stack traces and error messages\n"
-            "Quote exact error strings — never paraphrase log content."
+            "Quote exact error strings never paraphrase log content."
         ),
         expected_output=(
             "Log analysis: error categories and frequencies, exact stack traces, "
@@ -171,11 +171,11 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
     task_infra = Task(
         description=(
             f"Investigate K8s infrastructure constraints. {focus}\n\n"
-            "1. describe_pod for the primary failing pod — check events and conditions\n"
-            "2. get_resource_quotas — is namespace at/near quota limits?\n"
-            "3. get_pvc_status — any unbound PVCs blocking scheduling?\n"
-            "4. get_hpa_status — any HPA at max replicas?\n"
-            "5. get_node_health — node taints, unschedulable, pressure conditions\n"
+            "1. describe_pod for the primary failing pod check events and conditions\n"
+            "2. get_resource_quotas is namespace at/near quota limits?\n"
+            "3. get_pvc_status any unbound PVCs blocking scheduling?\n"
+            "4. get_hpa_status any HPA at max replicas?\n"
+            "5. get_node_health node taints, unschedulable, pressure conditions\n"
             "Determine: is root cause INFRA (quotas/storage/scheduling) or "
             "APPLICATION (code bug/config error/resource limits)?"
         ),
@@ -193,13 +193,13 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
     task_runbook = Task(
         description=(
             "Select the best runbook and produce the remediation plan.\n\n"
-            "1. list_available_runbooks — see what's available\n"
+            "1. list_available_runbooks see what's available\n"
             "2. load_runbook for the best match\n"
             "3. Adapt steps to the specific pods/deployments affected\n"
             "4. Produce numbered plan with exact commands\n"
             "5. Mark each step: is_auto_safe (allowlist-safe), is_destructive\n"
             "6. Order: rolling restart > force delete > scale > cordon\n"
-            f"DRY_RUN: {'ENABLED — do not execute' if config.dry_run else 'DISABLED — can execute safe commands'}"
+            f"DRY_RUN: {'ENABLED do not execute' if config.dry_run else 'DISABLED can execute safe commands'}"
         ),
         expected_output=(
             "Numbered remediation plan with exact kubectl commands, "
@@ -215,7 +215,7 @@ def _build_crew(alert_ctx: Dict[str, Any], alert_id: int,
     task_command = Task(
         description=(
             "Synthesize ALL findings into a final incident report.\n"
-            "Output EXACTLY this JSON — no markdown, no prose, just the object:\n\n"
+            "Output EXACTLY this JSON no markdown, no prose, just the object:\n\n"
             "{\n"
             '  "has_issue": true/false,\n'
             '  "severity": "SEV1|SEV2|SEV3|SEV4",\n'
@@ -271,7 +271,7 @@ def _parse_commander_output(raw: str, start_time: float) -> dict:
             "has_issue": True,
             "severity": "SEV3",
             "category": "unknown",
-            "title": "Analysis parse error — manual review needed",
+            "title": "Analysis parse error manual review needed",
             "root_cause": f"Agent output could not be parsed: {raw[:500]}",
             "explanation": "AI pipeline completed but output was malformed.",
             "confidence": 10,
@@ -337,7 +337,7 @@ def run_pipeline(
             logger.error("pipeline failed attempt=%d: %s", attempt + 1, e)
             break
 
-    # All retries exhausted — emit failed events and return minimal error report.
+    # All retries exhausted emit failed events and return minimal error report.
     for stage in range(1, 7):
         _post_stage_event(go_callback_url, alert_id, stage, "failed")
 
@@ -347,7 +347,7 @@ def run_pipeline(
         "category": "unknown",
         "title": "AI-SRE Pipeline Error",
         "root_cause": f"Pipeline failed after {MAX_RETRIES} attempts: {last_error}",
-        "explanation": "AI analysis failed — manual investigation required.",
+        "explanation": "AI analysis failed manual investigation required.",
         "contributing_factors": [],
         "confidence": 0,
         "commands": [],

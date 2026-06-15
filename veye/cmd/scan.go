@@ -116,7 +116,7 @@ func runAIScan() error {
 			fmt.Printf("  %s  %d alert(s) already have completed or in-progress RCA.\n",
 				styles.Good.Render("✓"), r.AlreadyProcessing)
 		} else {
-			fmt.Println(styles.Good.Render("  ✓ No firing alerts — cluster is healthy."))
+			fmt.Println(styles.Good.Render("  ✓ No firing alerts cluster is healthy."))
 		}
 		fmt.Println()
 		return nil
@@ -135,7 +135,7 @@ func runAIScan() error {
 	fmt.Println()
 
 	if scanDryRun {
-		fmt.Println(styles.Mute.Render("  (dry-run — no analysis started)"))
+		fmt.Println(styles.Mute.Render("  (dry-run no analysis started)"))
 		fmt.Println()
 		for _, a := range r.Alerts {
 			fmt.Printf("  %s  %s  %s\n",
@@ -160,7 +160,7 @@ func runAIScan() error {
 
 		ch, err := api.StreamRCAProgress(a.ID)
 		if err != nil {
-			fmt.Printf("  %s\n\n", styles.Mute.Render("(could not stream progress — RCA running in background)"))
+			fmt.Printf("  %s\n\n", styles.Mute.Render("(could not stream progress RCA running in background)"))
 			continue
 		}
 

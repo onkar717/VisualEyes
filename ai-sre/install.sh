@@ -9,7 +9,7 @@ BIN_DIR="$HOME/.local/bin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "════════════════════════════════════════"
-echo "  VisualEyes AI-SRE — Python CLI Setup"
+echo "  VisualEyes AI-SRE Python CLI Setup"
 echo "════════════════════════════════════════"
 echo ""
 
