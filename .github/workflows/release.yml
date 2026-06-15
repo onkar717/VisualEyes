@@ -14,7 +14,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -88,7 +88,7 @@ jobs:
             image: visual-eyes-ui
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up QEMU (enables ARM64 emulation)
         uses: docker/setup-qemu-action@v3
