@@ -20,9 +20,10 @@ var (
 )
 
 var incidentsCmd = &cobra.Command{
-	Use:   "incidents",
-	Short: "Show incident history   SEV1-4 lifecycle, MTTR, root cause",
-	Long:  "Displays structured incidents with severity classification, status lifecycle, MTTR, and AI-generated root cause. Use --severity/--status to filter.",
+	Use:     "incidents",
+	Aliases: []string{"inc", "ls"},
+	Short:   "Show incident history   SEV1-4 lifecycle, MTTR, root cause",
+	Long:    "Displays structured incidents with severity classification, status lifecycle, MTTR, and AI-generated root cause. Use --severity/--status to filter.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resp, err := api.FullIncidents(incidentLimit, incidentSeverity, incidentStatus, incidentHours)
 		if err != nil {
@@ -88,19 +89,21 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 	colSev    := lipgloss.NewStyle().Width(6)
 	colStatus := lipgloss.NewStyle().Width(14)
 	colCat    := lipgloss.NewStyle().Width(12).Foreground(styles.Gray)
-	colConf   := lipgloss.NewStyle().Width(7).Foreground(styles.Gray)
-	colTitle  := lipgloss.NewStyle().Width(32).Foreground(styles.White)
+	colConf   := lipgloss.NewStyle().Width(6).Foreground(styles.Gray)
+	colTitle  := lipgloss.NewStyle().Width(28).Foreground(styles.White)
+	colTime   := lipgloss.NewStyle().Width(12).Foreground(styles.Gray)
 
-	header := fmt.Sprintf("  %s %s %s %s %s %s",
+	header := fmt.Sprintf("  %s %s %s %s %s %s %s",
 		colCode.Bold(true).Foreground(styles.White).Render("Code"),
 		colSev.Bold(true).Foreground(styles.White).Render("SEV"),
 		colStatus.Bold(true).Foreground(styles.White).Render("Status"),
 		colCat.Bold(true).Foreground(styles.White).Render("Category"),
 		colConf.Bold(true).Foreground(styles.White).Render("Conf%"),
 		colTitle.Bold(true).Render("Title"),
+		colTime.Bold(true).Render("Detected"),
 	)
 	fmt.Println(header)
-	fmt.Println("  " + strings.Repeat("-", 88))
+	fmt.Println("  " + strings.Repeat("-", 96))
 
 	for _, inc := range resp.Incidents {
 		sevStyle := sevStyle(inc.Severity)
@@ -110,22 +113,28 @@ func printIncidentsFull(resp *client.IncidentListResponse) {
 		if title == "" {
 			title = inc.Category
 		}
-		if len(title) > 30 {
-			title = title[:27] + "..."
+		if len(title) > 26 {
+			title = title[:23] + "..."
+		}
+
+		detectedAt := ""
+		if inc.DetectedAt != "" && len(inc.DetectedAt) >= 16 {
+			detectedAt = inc.DetectedAt[5:16] // "MM-DD HH:MM" from RFC3339
 		}
 
 		mttrStr := ""
 		if inc.MTTRSeconds != nil {
-			mttrStr = "  " + styles.Mute.Render("MTTR: "+formatMTTR(float64(*inc.MTTRSeconds)))
+			mttrStr = "  " + styles.Mute.Render("MTTR:"+formatMTTR(float64(*inc.MTTRSeconds)))
 		}
 
-		row := fmt.Sprintf("  %s %s %s %s %s %s%s",
+		row := fmt.Sprintf("  %s %s %s %s %s %s %s%s",
 			colCode.Render(inc.IncidentCode),
 			colSev.Render(sevStyle.Render(inc.Severity)),
 			colStatus.Render(statusStyle.Render(inc.Status)),
 			colCat.Render(inc.Category),
 			colConf.Render(fmt.Sprintf("%d%%", inc.ConfidenceScore)),
 			colTitle.Render(title),
+			colTime.Render(detectedAt),
 			mttrStr,
 		)
 		fmt.Println(row)

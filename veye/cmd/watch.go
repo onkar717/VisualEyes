@@ -175,7 +175,7 @@ func runWatchLoop() error {
 			}
 		}
 
-		// ── Recent incidents ──────────────────────────────────────────────────
+		// ── Recent incidents + MTTR ──────────────────────────────────────────
 		inc, _ := api.FullIncidents(5, "", "OPEN", 24)
 		if inc != nil && len(inc.Incidents) > 0 {
 			fmt.Printf("\n  %s\n", styles.SectionHeader.Render("  Open Incidents (last 24h)"))
@@ -183,9 +183,17 @@ func runWatchLoop() error {
 				fmt.Printf("  %s  %s  %s\n",
 					sevStyle(i.Severity).Render(i.Severity),
 					styles.ValStyle.Render(i.IncidentCode),
-					styles.Mute.Render(i.RootCause),
+					styles.Mute.Render(truncStr(i.RootCause, 60)),
 				)
 			}
+		}
+		if inc != nil && inc.MTTRCount > 0 {
+			fmt.Printf("\n  %s  %s   %s  %s\n",
+				styles.KeyStyle.Render("Avg MTTR"),
+				styles.ValStyle.Render(formatMTTR(inc.MTTRAvgSeconds)),
+				styles.KeyStyle.Render("mitigated"),
+				styles.ValStyle.Render(fmt.Sprintf("%d incidents", inc.MTTRCount)),
+			)
 		}
 
 		fmt.Printf("\n  %s\n", styles.Mute.Render(fmt.Sprintf("Next scan in %ds...", watchInterval)))

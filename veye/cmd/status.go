@@ -26,18 +26,40 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	k8s, _ := api.K8s()
 	alerts, _ := api.Alerts("firing")
 
-	// Backend status bar
-	statusStyle := styles.Good
-	if health.Status != "healthy" {
-		statusStyle = styles.Bad
+	// Compute health score 0-100
+	score := computeHealthScore(snap, k8s, alerts)
+	scoreStyle := styles.Good
+	scoreLabel := "HEALTHY"
+	if score < 70 {
+		scoreStyle = styles.SevWarning
+		scoreLabel = "DEGRADED"
 	}
-	backendLine := lipgloss.JoinHorizontal(lipgloss.Left,
-		styles.KeyStyle.Render("backend  "),
-		statusStyle.Render("● "+health.Status),
-		styles.Mute.Render("   uptime "),
-		styles.ValStyle.Render(health.Uptime),
-		styles.Mute.Render("   alerts "),
-		alertCountLabel(len(alerts)),
+	if score < 40 {
+		scoreStyle = styles.Bad
+		scoreLabel = "CRITICAL"
+	}
+
+	// Health score header
+	scoreLine := fmt.Sprintf("%s  %s  %s",
+		styles.KeyStyle.Render("Health Score"),
+		scoreStyle.Bold(true).Render(fmt.Sprintf("%d/100", score)),
+		scoreStyle.Render("["+scoreLabel+"]"),
+	)
+	backendLine := fmt.Sprintf("%s\n%s",
+		scoreLine,
+		lipgloss.JoinHorizontal(lipgloss.Left,
+			styles.KeyStyle.Render("Backend      "),
+			func() lipgloss.Style {
+				if health.Status != "healthy" {
+					return styles.Bad
+				}
+				return styles.Good
+			}().Render("● "+health.Status),
+			styles.Mute.Render("   uptime "),
+			styles.ValStyle.Render(health.Uptime),
+			styles.Mute.Render("   alerts "),
+			alertCountLabel(len(alerts)),
+		),
 	)
 	fmt.Println(styles.Box.Render(backendLine))
 	fmt.Println()
@@ -128,6 +150,65 @@ func runStatus(_ *cobra.Command, _ []string) error {
 	fmt.Println(styles.HelpBar.Render("  veye alerts · veye incidents · veye logs · veye rca <id> · veye watch · veye scan --ai"))
 	fmt.Println()
 	return nil
+}
+
+func computeHealthScore(snap *client.Snapshot, k8s *client.K8sMetrics, alerts []client.Alert) int {
+	score := 100
+
+	// CPU penalty: -30 at 100%
+	if snap != nil {
+		cpu := snap.Metrics["cpu"]["usage"].Value
+		mem := snap.Metrics["memory"]["usage_percent"].Value
+		disk := snap.Metrics["disk"]["usage_percent"].Value
+		if cpu >= 90 {
+			score -= 30
+		} else if cpu >= 75 {
+			score -= 15
+		} else if cpu >= 60 {
+			score -= 5
+		}
+		if mem >= 90 {
+			score -= 20
+		} else if mem >= 75 {
+			score -= 10
+		}
+		if disk >= 90 {
+			score -= 15
+		} else if disk >= 80 {
+			score -= 5
+		}
+	}
+
+	// K8s penalty
+	if k8s != nil {
+		nodes := k8s.Metrics.Nodes
+		pods := k8s.Metrics.Pods
+		if nodes.Total > 0 && nodes.Ready < nodes.Total {
+			score -= 20 * (nodes.Total - nodes.Ready) / nodes.Total
+		}
+		if pods.Total > 0 {
+			unhealthy := pods.Total - pods.Running
+			if unhealthy > 0 {
+				pct := unhealthy * 100 / pods.Total
+				score -= pct / 5
+			}
+		}
+	}
+
+	// Alert penalty
+	for _, a := range alerts {
+		switch a.Severity {
+		case "critical":
+			score -= 15
+		case "warning":
+			score -= 5
+		}
+	}
+
+	if score < 0 {
+		score = 0
+	}
+	return score
 }
 
 func truncStr(s string, n int) string {
