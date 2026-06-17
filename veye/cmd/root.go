@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	apiURL string
-	api    *client.Client
+	apiURL   string
+	debugLog bool
+	api      *client.Client
 )
 
 const bannerArt = `
@@ -43,6 +44,9 @@ var rootCmd = &cobra.Command{
 		styles.Mute.Render("  Connect to a running VisualEyes backend and inspect metrics, alerts, logs and RCA results."),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		api = client.New(apiURL)
+		if debugLog {
+			api.SetDebug(true)
+		}
 		if cmd.Name() != "help" {
 			if _, err := api.Health(); err != nil {
 				return fmt.Errorf("cannot reach VisualEyes backend at %s: %w\nHint: is the server running? (./bin/server)", apiURL, err)
@@ -70,6 +74,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&apiURL, "api", defaultURL,
 		"VisualEyes backend URL  (env: VEYE_API_URL, or set in ~/.veye/.env)")
+	rootCmd.PersistentFlags().BoolVar(&debugLog, "debug", false, "Print HTTP request/response details")
 	rootCmd.AddCommand(statusCmd, alertsCmd, logsCmd, rcaCmd, watchCmd, scanCmd, incidentsCmd, applyCmd, showCmd, reportCmd, clustersCmd)
 }
 

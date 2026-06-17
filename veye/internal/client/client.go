@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -177,8 +178,9 @@ type K8sMetrics struct {
 
 // Client is the VisualEyes API client.
 type Client struct {
-	base string
-	http *http.Client
+	base  string
+	http  *http.Client
+	debug bool
 }
 
 // New creates a Client pointed at the given base URL (e.g. "http://localhost:8080").
@@ -189,12 +191,22 @@ func New(base string) *Client {
 	}
 }
 
+// SetDebug enables verbose HTTP request/response logging.
+func (c *Client) SetDebug(on bool) { c.debug = on }
+
+func (c *Client) logDebug(method, path string, status int) {
+	if c.debug {
+		slog.Debug("veye http", "method", method, "path", path, "status", status)
+	}
+}
+
 func (c *Client) get(path string, out any) error {
 	resp, err := c.http.Get(c.base + path)
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", path, err)
 	}
 	defer resp.Body.Close()
+	c.logDebug("GET", path, resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET %s: HTTP %d", path, resp.StatusCode)
 	}
