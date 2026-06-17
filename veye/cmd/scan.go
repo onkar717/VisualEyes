@@ -164,37 +164,46 @@ func runAIScan() error {
 			continue
 		}
 
-		stageStatus := make([]string, 7) // index 1-6
+		stageEmoji := []string{"", "🔍", "📈", "📋", "🏗", "📖", "⚡"}
 		for ev := range ch {
 			if ev.Stage < 1 || ev.Stage > 6 {
 				continue
 			}
 			label := stageLabels[ev.Stage]
+			emoji := stageEmoji[ev.Stage]
 			switch ev.Status {
 			case "start":
-				stageStatus[ev.Stage] = styles.SevWarning.Render("…")
+				fmt.Printf("    %s  %s %s  %s\n",
+					styles.SevWarning.Render("…"),
+					emoji,
+					styles.SectionHeader.Render(fmt.Sprintf("Stage %d/6: %s", ev.Stage, label)),
+					styles.Mute.Render("running…"),
+				)
 			case "done":
 				detail := ""
 				if ev.Detail != "" {
 					detail = "  " + styles.Mute.Render(ev.Detail)
 				}
-				stageStatus[ev.Stage] = styles.Good.Render("✓")
-				fmt.Printf("    %s  %s%s\n",
-					stageStatus[ev.Stage],
-					styles.KeyStyle.Render(label),
+				fmt.Printf("    %s  %s %s%s\n",
+					styles.Good.Render("✓"),
+					emoji,
+					styles.Good.Render(fmt.Sprintf("Stage %d/6: %s", ev.Stage, label)),
 					detail,
 				)
 			case "failed":
-				stageStatus[ev.Stage] = styles.Bad.Render("✗")
-				fmt.Printf("    %s  %s\n", stageStatus[ev.Stage], styles.Bad.Render(label+" failed"))
+				fmt.Printf("    %s  %s %s\n",
+					styles.Bad.Render("✗"),
+					emoji,
+					styles.Bad.Render(fmt.Sprintf("Stage %d/6: %s — failed", ev.Stage, label)),
+				)
 			}
 		}
 
-		// Show RCA result summary.
+		// Show full RCA detail after pipeline completes.
 		rca, err := api.RCA(a.ID)
-		if err == nil && rca.Status == "done" && rca.RootCause != "" {
+		if err == nil && rca.Status == "done" {
 			fmt.Println()
-			fmt.Printf("    %s  %s\n", styles.KeyStyle.Render("Root cause"), wordWrap(rca.RootCause, 64))
+			renderScanRCADetail(a, rca)
 		}
 		fmt.Println()
 	}
@@ -414,6 +423,62 @@ func printScanResult(r *client.ScanResult) {
 		styles.Mute.Render("Scanned at"),
 		styles.Mute.Render(r.Timestamp),
 	)
+}
+
+// renderScanRCADetail prints the full incident-style panel after a scan --ai completes.
+func renderScanRCADetail(a client.ScanAllItem, rca *client.RCAResult) {
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#303060")).
+		Padding(0, 2).Width(72)
+
+	header := fmt.Sprintf("%s  %s  %s",
+		styles.SeverityBadge(a.Severity),
+		styles.ValStyle.Bold(true).Render(a.Message),
+		styles.Mute.Render(fmt.Sprintf("alert #%d", a.ID)),
+	)
+	fmt.Println(box.Render(header))
+	fmt.Println()
+
+	fmt.Printf("  %s  %s\n", styles.KeyStyle.Width(20).Render("Resource"), styles.ValStyle.Render(a.Resource))
+	if rca.Model != "" {
+		fmt.Printf("  %s  %s\n", styles.KeyStyle.Width(20).Render("LLM Model"), styles.Mute.Render(rca.Model))
+	}
+	fmt.Println()
+
+	if rca.RootCause != "" {
+		fmt.Println(styles.SectionHeader.Render("  Root Cause"))
+		for _, line := range wrap(rca.RootCause, 72) {
+			fmt.Printf("  %s\n", styles.ValStyle.Render(line))
+		}
+		fmt.Println()
+	}
+
+	if rca.Explanation != "" {
+		fmt.Println(styles.SectionHeader.Render("  Analysis"))
+		for _, line := range wrap(rca.Explanation, 72) {
+			fmt.Printf("  %s\n", styles.Mute.Render(line))
+		}
+		fmt.Println()
+	}
+
+	var cmds []client.FixCommand
+	if rca.Commands != "" {
+		_ = json.Unmarshal([]byte(rca.Commands), &cmds)
+	}
+	if len(cmds) > 0 {
+		fmt.Println(styles.SectionHeader.Render("  Remediation Plan"))
+		fmt.Println()
+		for i, c := range cmds {
+			safety := styles.Good.Render("[auto-safe]")
+			if !c.IsAutoSafe {
+				safety = styles.DestructiveBadge.Render("[DESTRUCTIVE]")
+			}
+			fmt.Printf("  Step %d: %s %s\n", i+1, safety, styles.ValStyle.Render("$ "+c.Command))
+			fmt.Println()
+		}
+		fmt.Println(styles.Mute.Render(fmt.Sprintf("  run 'veye apply %d' to execute  ·  'veye apply %d --dry-run' to preview", a.ID, a.ID)))
+	}
 }
 
 func formatPercent(v float64) string {
