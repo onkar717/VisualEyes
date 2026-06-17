@@ -9,6 +9,10 @@ Usage:
   python -m ai_sre.cli scan --dry-run     Preview what would be scanned
   python -m ai_sre.cli watch              Continuous monitoring loop
   python -m ai_sre.cli status             Cluster health snapshot (no LLM)
+  python -m ai_sre.cli incidents          Browse incident history (local DB)
+  python -m ai_sre.cli show <id>          Full incident detail
+  python -m ai_sre.cli apply <id>         Apply remediation for an incident
+  python -m ai_sre.cli report <id>        Export incident as JSON
   python -m ai_sre.cli config             Show active configuration
 """
 import json
@@ -18,6 +22,7 @@ import signal
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 
 import click
 from rich.console import Console
@@ -27,6 +32,7 @@ from rich.text import Text
 from rich import box
 
 from .config import config
+from . import db as _db
 from .pipeline import run_pipeline
 from .tools.k8s_tools import (
     list_pods_all_namespaces,
@@ -278,7 +284,12 @@ def scan(apply: bool, dry_run: bool, namespace: str):
 
     duration = time.time() - start
     console.print(f"\n[bright_black]Scan completed in {duration:.1f}s[/bright_black]\n")
+    _db.init_db()
+    _db.save_incident(report)
     _render_report(report)
+
+    if report.get("has_issue") and report.get("severity") in ("SEV1", "SEV2"):
+        _notify_slack(report)
 
     if apply and report.get("has_issue") and report.get("commands"):
         console.print()
@@ -322,10 +333,13 @@ def watch(interval: int, apply: bool, namespace: str):
                 alert_id=scan_count,
                 go_callback_url="",
             )
+            _db.init_db()
+            _db.save_incident(report)
             _render_report(report)
 
             sev = report.get("severity", "SEV4")
             if report.get("has_issue") and sev in ("SEV1", "SEV2"):
+                _notify_slack(report)
                 if apply:
                     _apply_remediation(report, dry_run=config.dry_run)
                 else:
@@ -432,6 +446,179 @@ def show_config():
     for key, val in rows:
         table.add_row(key, val)
     console.print(table)
+
+
+@cli.command()
+@click.option("--severity", "-s", default="", help="Filter by severity (SEV1-SEV4)")
+@click.option("--status", default="", help="Filter by status (OPEN, INVESTIGATING, MITIGATED, RESOLVED)")
+@click.option("--hours", default=0, type=int, help="Only show incidents from last N hours (0=all)")
+@click.option("--limit", "-n", default=25, type=int, show_default=True, help="Max incidents to show")
+def incidents(severity: str, status: str, hours: int, limit: int):
+    """Browse incident history stored in the local database."""
+    print_banner()
+    _db.init_db()
+    rows = _db.get_incidents(severity=severity or None, status=status or None,
+                             hours=hours, limit=limit)
+    if not rows:
+        console.print("[green bold]✓ No incidents found.[/green bold]")
+        return
+
+    mttr = _db.get_mttr_stats()
+    if mttr:
+        total_tracked = sum(v["count"] for v in mttr.values())
+        avgs = {sev: v["avg_mttr_seconds"] for sev, v in mttr.items()}
+        parts = "  ".join(f"[cyan]{s}[/cyan] {_fmt_mttr(v)}s" for s, v in avgs.items())
+        console.print(f"\n  MTTR ({total_tracked} mitigated):  {parts}\n")
+
+    from rich.table import Table
+    t = Table(box=box.ROUNDED, show_header=True, header_style="bold bright_white")
+    t.add_column("ID", style="cyan", width=24)
+    t.add_column("SEV", width=6)
+    t.add_column("Status", width=14)
+    t.add_column("Confidence", width=10)
+    t.add_column("Title")
+    t.add_column("Detected", width=12)
+
+    for inc in rows:
+        sev = inc.get("severity", "SEV4")
+        sev_style = _sev_style(sev)
+        detected = (inc.get("detected_at") or inc.get("created_at", ""))[:16].replace("T", " ")
+        title = inc.get("title", inc.get("category", "?"))
+        if len(title) > 45:
+            title = title[:42] + "..."
+        t.add_row(
+            inc.get("id", "?"),
+            f"[{sev_style}]{sev}[/{sev_style}]",
+            inc.get("status", "OPEN"),
+            f"{inc.get('confidence', inc.get('confidence_score', 0))}%",
+            title,
+            detected,
+        )
+    console.print(t)
+    console.print(f"\n[dim]Showing {len(rows)} incidents[/dim]\n")
+
+
+@cli.command()
+@click.argument("incident_id")
+def show(incident_id: str):
+    """Show full detail for a specific incident by ID."""
+    print_banner()
+    _db.init_db()
+    inc = _db.get_incident_by_id(incident_id)
+    if not inc:
+        console.print(f"[red]Incident '{incident_id}' not found in local DB.[/red]")
+        console.print("[dim]Run 'veye-ai incidents' to list stored incidents.[/dim]")
+        sys.exit(1)
+    _render_report(inc)
+
+    commands = inc.get("commands", [])
+    if commands:
+        console.print(f"\n[dim]Run: veye-ai apply {incident_id}  to execute remediation[/dim]")
+
+
+@cli.command()
+@click.argument("incident_id")
+@click.option("--dry-run/--no-dry-run", default=True, show_default=True,
+              help="Preview commands without executing")
+def apply(incident_id: str, dry_run: bool):
+    """Apply the remediation plan for a stored incident."""
+    print_banner()
+    _db.init_db()
+    inc = _db.get_incident_by_id(incident_id)
+    if not inc:
+        console.print(f"[red]Incident '{incident_id}' not found.[/red]")
+        sys.exit(1)
+
+    if not inc.get("has_issue", True):
+        console.print("[green]✓ Cluster was healthy — no remediation needed.[/green]")
+        return
+
+    commands = inc.get("commands", [])
+    if not commands:
+        console.print("[yellow]No remediation commands in this incident.[/yellow]")
+        return
+
+    console.print(Panel(
+        Text.assemble(
+            (_sev_style_rich(inc.get("severity", "SEV4")), ""),
+            (f"  {inc.get('title', '?')}  ", "bold white"),
+            (f"[{inc.get('status', 'OPEN')}]", "dim"),
+        ),
+        border_style=_sev_style(inc.get("severity", "SEV4")),
+        title="[bold]Applying Remediation[/bold]",
+    ))
+    console.print()
+
+    _apply_remediation(inc, dry_run=dry_run)
+    if not dry_run:
+        _db.update_status(incident_id, "MITIGATED")
+        console.print(f"\n[green]✓ Incident {incident_id} marked MITIGATED[/green]")
+
+
+@cli.command()
+@click.argument("incident_id")
+@click.option("--output", "-o", default="", help="Output file path (default: stdout)")
+def report(incident_id: str, output: str):
+    """Export a full incident report as JSON (stdout or --output file)."""
+    _db.init_db()
+    inc = _db.get_incident_by_id(incident_id)
+    if not inc:
+        console.print(f"[red]Incident '{incident_id}' not found.[/red]")
+        sys.exit(1)
+
+    out = json.dumps(inc, indent=2, default=str)
+    if output:
+        Path(output).write_text(out)
+        console.print(f"[green]✓ Report saved to {output}[/green]")
+    else:
+        print(out)
+
+
+def _fmt_mttr(secs: int) -> str:
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        return f"{secs // 60}m"
+    return f"{secs // 3600}h"
+
+
+def _sev_style_rich(sev: str) -> str:
+    return {"SEV1": "[bold red]SEV1[/bold red]", "SEV2": "[bold yellow]SEV2[/bold yellow]",
+            "SEV3": "[bold cyan]SEV3[/bold cyan]"}.get(sev.upper(), "[green]SEV4[/green]")
+
+
+def _notify_slack(report: dict) -> None:
+    slack_url = os.getenv("SLACK_WEBHOOK_URL", "")
+    if not slack_url:
+        return
+    sev = report.get("severity", "SEV4")
+    title = report.get("title", "Unknown Incident")
+    root_cause = report.get("root_cause", "")[:300]
+    namespaces = ", ".join(report.get("affected_namespaces", []))
+    color = {"SEV1": "#FF0000", "SEV2": "#FF8C00", "SEV3": "#FFD700"}.get(sev, "#00FF87")
+
+    payload = {
+        "attachments": [{
+            "color": color,
+            "title": f"[{sev}] {title}",
+            "fields": [
+                {"title": "Root Cause", "value": root_cause, "short": False},
+                {"title": "Namespaces", "value": namespaces or "unknown", "short": True},
+                {"title": "Confidence", "value": f"{report.get('confidence', 0)}%", "short": True},
+            ],
+            "footer": "VisualEyes AI-SRE",
+            "ts": int(time.time()),
+        }]
+    }
+    try:
+        import urllib.request
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(slack_url, data=data,
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=5)
+        logger.debug("Slack notification sent for %s", sev)
+    except Exception as e:
+        logger.warning("Slack notification failed: %s", e)
 
 
 if __name__ == "__main__":
