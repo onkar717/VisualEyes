@@ -2,10 +2,11 @@
 Log analysis tools: pattern mining, stack trace extraction, Loki LogQL support.
 Falls back to kubectl logs if Loki unavailable.
 """
+import concurrent.futures
 import json
 import logging
 import re
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import requests
 from crewai.tools import tool
@@ -250,3 +251,65 @@ def loki_query(logql: str = "", namespace: str = "", pod_name: str = "",
         return json.dumps({"error": f"Loki unreachable at {sre_config.loki_url}"})
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+@tool
+def analyze_logs_for_namespace(namespace: str = "default", max_pods: int = 10) -> str:
+    """Analyze logs from all running pods in a namespace in parallel.
+    Returns aggregated error counts, top error categories, and worst offenders.
+    Use when you need a namespace-wide log health picture quickly without targeting a specific pod.
+    Format: analyze_logs_for_namespace(namespace="production", max_pods=10)"""
+    try:
+        v1 = _get_v1()
+        pods = v1.list_namespaced_pod(namespace)
+        pod_names = [
+            p.metadata.name for p in pods.items
+            if p.status and p.status.phase == "Running"
+        ][:max_pods]
+
+        if not pod_names:
+            return json.dumps({"namespace": namespace, "pods_analyzed": 0,
+                               "message": "No running pods found"})
+
+        def analyze_one(name: str) -> dict:
+            raw = _fetch_pod_logs(name, namespace, tail=100)
+            analysis = _mine_patterns(raw)
+            errors = analysis.get("errors", [])
+            cat_freq: Dict[str, int] = {}
+            for e in errors:
+                cat = e.get("category", "other")
+                cat_freq[cat] = cat_freq.get(cat, 0) + 1
+            return {
+                "pod": name,
+                "error_count": len(errors),
+                "categories": cat_freq,
+                "top_error": errors[0]["text"][:200] if errors else None,
+            }
+
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+            futures = {ex.submit(analyze_one, name): name for name in pod_names}
+            for fut in concurrent.futures.as_completed(futures):
+                try:
+                    results.append(fut.result(timeout=15))
+                except Exception as e:
+                    results.append({"pod": futures[fut], "error": str(e)})
+
+        results.sort(key=lambda r: r.get("error_count", 0), reverse=True)
+
+        total_errors = sum(r.get("error_count", 0) for r in results)
+        agg_cats: Dict[str, int] = {}
+        for r in results:
+            for cat, cnt in r.get("categories", {}).items():
+                agg_cats[cat] = agg_cats.get(cat, 0) + cnt
+
+        return json.dumps({
+            "namespace": namespace,
+            "pods_analyzed": len(results),
+            "total_errors": total_errors,
+            "error_categories": agg_cats,
+            "pod_breakdown": results,
+            "worst_offender": results[0]["pod"] if results and results[0].get("error_count", 0) > 0 else None,
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e), "namespace": namespace})
