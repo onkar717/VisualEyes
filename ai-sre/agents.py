@@ -16,10 +16,12 @@ from .tools.metrics_tools import (
     get_oom_kill_events, detect_metric_anomaly,
 )
 from .tools.log_tools import (
-    analyze_pod_logs, search_logs_pattern, loki_query,
+    analyze_pod_logs, analyze_logs_for_namespace, search_logs_pattern, loki_query,
 )
 from .tools.runbook_tools import (
     list_available_runbooks, load_runbook, execute_safe_command,
+    restart_deployment, scale_deployment, delete_stuck_pod,
+    cordon_node, describe_cluster_resource,
 )
 
 llm = LLM(
@@ -114,6 +116,7 @@ log_agent = Agent(
     llm=llm,
     tools=[
         analyze_pod_logs,
+        analyze_logs_for_namespace,
         search_logs_pattern,
         loki_query,
         get_pod_logs,
@@ -143,6 +146,7 @@ infra_agent = Agent(
     llm=llm,
     tools=[
         describe_pod,
+        describe_cluster_resource,
         get_resource_quotas,
         get_pvc_status,
         get_hpa_status,
@@ -177,6 +181,10 @@ runbook_agent = Agent(
     tools=[
         list_available_runbooks,
         load_runbook,
+        restart_deployment,
+        scale_deployment,
+        delete_stuck_pod,
+        cordon_node,
         execute_safe_command,
     ],
     verbose=True,
