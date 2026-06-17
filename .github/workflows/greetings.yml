@@ -16,9 +16,9 @@ jobs:
     steps:
       - uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
 
-          issue-message: |
+          issue_message: |
             👋 Thanks for opening your first issue on VisualEyes!
 
             To help us resolve this quickly:
@@ -27,7 +27,7 @@ jobs:
 
             A maintainer will review this soon. In the meantime, check the [docs](https://github.com/onkar717/VisualEyes/tree/main/docs) and [INSTALLATION.md](https://github.com/onkar717/VisualEyes/blob/main/INSTALLATION.md)   your question may already be answered.
 
-          pr-message: |
+          pr_message: |
             👋 Thanks for your first pull request to VisualEyes!
 
             Before your PR is reviewed, please make sure:
