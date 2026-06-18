@@ -17,7 +17,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scan (CRITICAL + HIGH)
         uses: aquasecurity/trivy-action@master
@@ -44,7 +44,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run Trivy config scan (Dockerfiles, k8s manifests)
         uses: aquasecurity/trivy-action@master
