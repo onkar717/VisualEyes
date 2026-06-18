@@ -33,7 +33,7 @@ jobs:
         run: go test -v -race -count=1 -coverprofile=coverage-server.out -covermode=atomic ./server/...
 
       - name: Upload server coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: coverage-server.out
           flags: server
@@ -65,7 +65,7 @@ jobs:
         run: go test -v -race -count=1 -coverprofile=coverage-agents.out -covermode=atomic ./system-agent/... ./k8s-agent/...
 
       - name: Upload agent coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: coverage-agents.out
           flags: agents
@@ -97,7 +97,7 @@ jobs:
         run: go test -v -race -count=1 -coverprofile=coverage-veye.out -covermode=atomic ./veye/...
 
       - name: Upload veye coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: coverage-veye.out
           flags: veye
